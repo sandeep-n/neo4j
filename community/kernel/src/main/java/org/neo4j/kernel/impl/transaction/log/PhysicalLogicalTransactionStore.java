@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -30,6 +30,9 @@ import org.neo4j.kernel.impl.transaction.log.entry.LogEntryCommit;
 import org.neo4j.kernel.impl.transaction.log.entry.LogEntryReader;
 import org.neo4j.kernel.impl.transaction.log.entry.LogEntryStart;
 import org.neo4j.kernel.impl.transaction.log.entry.VersionAwareLogEntryReader;
+import org.neo4j.kernel.impl.transaction.log.files.LogFile;
+import org.neo4j.kernel.impl.transaction.log.files.LogFiles;
+import org.neo4j.kernel.impl.transaction.log.files.LogHeaderVisitor;
 import org.neo4j.kernel.impl.transaction.log.reverse.ReversedMultiFileTransactionCursor;
 import org.neo4j.kernel.impl.transaction.log.reverse.ReversedTransactionCursorMonitor;
 import org.neo4j.kernel.monitoring.Monitors;
@@ -51,12 +54,15 @@ public class PhysicalLogicalTransactionStore implements LogicalTransactionStore
     private final LogEntryReader<ReadableClosablePositionAwareChannel> logEntryReader;
     private final Monitors monitors;
     private final boolean failOnCorruptedLogFiles;
+    private LogFiles logFiles;
 
-    public PhysicalLogicalTransactionStore( LogFile logFile, TransactionMetadataCache transactionMetadataCache,
+    public PhysicalLogicalTransactionStore( LogFiles logFiles,
+            TransactionMetadataCache transactionMetadataCache,
             LogEntryReader<ReadableClosablePositionAwareChannel> logEntryReader, Monitors monitors,
             boolean failOnCorruptedLogFiles )
     {
-        this.logFile = logFile;
+        this.logFiles = logFiles;
+        this.logFile = logFiles.getLogFile();
         this.transactionMetadataCache = transactionMetadataCache;
         this.logEntryReader = logEntryReader;
         this.monitors = monitors;
@@ -74,7 +80,7 @@ public class PhysicalLogicalTransactionStore implements LogicalTransactionStore
             IOException
     {
         return ReversedMultiFileTransactionCursor
-                .fromLogFile( logFile, backToPosition, failOnCorruptedLogFiles,
+                .fromLogFile( logFiles, logFile, backToPosition, failOnCorruptedLogFiles,
                         monitors.newMonitor( ReversedTransactionCursorMonitor.class ) );
     }
 
@@ -94,9 +100,9 @@ public class PhysicalLogicalTransactionStore implements LogicalTransactionStore
                 return new PhysicalTransactionCursor<>( channel, logEntryReader );
             }
 
-            // ask LogFile about the version it may be in
+            // ask logFiles about the version it may be in
             LogVersionLocator headerVisitor = new LogVersionLocator( transactionIdToStartFrom );
-            logFile.accept( headerVisitor );
+            logFiles.accept( headerVisitor );
 
             // ask LogFile
             TransactionPositionLocator transactionPositionLocator =
@@ -107,9 +113,11 @@ public class PhysicalLogicalTransactionStore implements LogicalTransactionStore
         }
         catch ( FileNotFoundException e )
         {
-            throw new NoSuchTransactionException( transactionIdToStartFrom,
-                    "Log position acquired, but couldn't find the log file itself. " +
-                            "Perhaps it just recently was deleted? [" + e.getMessage() + "]" );
+            throw new NoSuchTransactionException(
+                    transactionIdToStartFrom,
+                    "Log position acquired, but couldn't find the log file itself. Perhaps it just recently was " +
+                    "deleted? [" + e.getMessage() + "]",
+                    e );
         }
     }
 
@@ -159,7 +167,7 @@ public class PhysicalLogicalTransactionStore implements LogicalTransactionStore
         private LogEntryStart startEntryForFoundTransaction;
         private long commitTimestamp;
 
-        public TransactionPositionLocator( long startTransactionId,
+        TransactionPositionLocator( long startTransactionId,
                 LogEntryReader<ReadableClosablePositionAwareChannel> logEntryReader )
         {
             this.startTransactionId = startTransactionId;
@@ -167,7 +175,7 @@ public class PhysicalLogicalTransactionStore implements LogicalTransactionStore
         }
 
         @Override
-        public boolean visit( LogPosition position, ReadableClosablePositionAwareChannel channel ) throws IOException
+        public boolean visit( ReadableClosablePositionAwareChannel channel ) throws IOException
         {
             LogEntry logEntry;
             LogEntryStart startEntry = null;

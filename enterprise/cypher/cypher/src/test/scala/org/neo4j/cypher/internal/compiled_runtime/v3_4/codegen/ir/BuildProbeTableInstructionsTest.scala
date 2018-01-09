@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -31,12 +31,13 @@ import org.neo4j.collection.primitive.PrimitiveLongIterator
 import org.neo4j.cypher.internal.compatibility.v3_4.runtime.compiled.codegen.ir._
 import org.neo4j.cypher.internal.compatibility.v3_4.runtime.compiled.codegen.ir.expressions.{CodeGenType, NodeProjection}
 import org.neo4j.cypher.internal.compatibility.v3_4.runtime.compiled.codegen.{CodeGenContext, JoinTableMethod, Variable}
-import org.neo4j.cypher.internal.v3_4.logical.plans.LogicalPlanId
-import org.neo4j.cypher.internal.util.v3_4.test_helpers.CypherFunSuite
 import org.neo4j.cypher.internal.frontend.v3_4.semantics.SemanticTable
 import org.neo4j.cypher.internal.runtime.QueryContext
 import org.neo4j.cypher.internal.runtime.interpreted.TransactionalContextWrapper
+import org.neo4j.cypher.internal.util.v3_4.attribution.Id
+import org.neo4j.cypher.internal.util.v3_4.test_helpers.CypherFunSuite
 import org.neo4j.graphdb.Node
+import org.neo4j.internal.kernel.api._
 import org.neo4j.kernel.api.ReadOperations
 import org.neo4j.kernel.impl.core.{NodeManager, NodeProxy}
 import org.neo4j.values.AnyValue
@@ -56,13 +57,27 @@ class BuildProbeTableInstructionsTest extends CypherFunSuite with CodeGenSugar {
   private val queryContext = mock[QueryContext]
   private val transactionalContext = mock[TransactionalContextWrapper]
   private val readOps = mock[ReadOperations]
+  private val dataRead = mock[Read]
+  private val cursors = mock[CursorFactory]
+  private def nodeCursor = {
+    val cursor = new StubNodeCursor
+    val it = allNodeIdsIterator()
+    while(it.hasNext) cursor.withNode(it.next())
+    cursor
+  }
+
   private val allNodeIds = mutable.ArrayBuffer[Long]()
 
   // used by instructions that generate probe tables
   private implicit val codeGenContext = new CodeGenContext(SemanticTable(), Map.empty)
   when(queryContext.transactionalContext).thenReturn(transactionalContext)
+  when(cursors.allocateNodeCursor()).thenAnswer(new Answer[NodeCursor] {
+    override def answer(invocation: InvocationOnMock): NodeCursor = nodeCursor
+  })
   when(transactionalContext.readOperations).thenReturn(readOps)
-  when(queryContext.entityAccessor).thenReturn(entityAccessor.asInstanceOf[queryContext.EntityAccessor])
+  when(transactionalContext.dataRead).thenReturn(dataRead)
+  when(transactionalContext.cursors).thenReturn(cursors)
+  when(queryContext.entityAccessor).thenReturn(entityAccessor)
   when(readOps.nodesGetAll()).then(new Answer[PrimitiveLongIterator] {
     def answer(invocation: InvocationOnMock) = allNodeIdsIterator()
   })
@@ -206,7 +221,7 @@ class BuildProbeTableInstructionsTest extends CypherFunSuite with CodeGenSugar {
 
   private def runTest(buildInstruction: BuildProbeTable, nodes: Set[Variable]): List[Map[String, Object]] = {
     val instructions = buildProbeTableWithTwoAllNodeScans(buildInstruction, nodes)
-    val ids: Map[String, LogicalPlanId] = instructions.flatMap(_.allOperatorIds.map(id => id -> LogicalPlanId.DEFAULT)).toMap
+    val ids: Map[String, Id] = instructions.flatMap(_.allOperatorIds.map(id => id -> Id.INVALID_ID)).toMap
     evaluate(instructions, queryContext, Seq(resultRowKey), EMPTY_MAP, ids)
   }
 

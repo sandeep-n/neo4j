@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,8 +21,11 @@ package org.neo4j.scheduler;
 
 import java.util.Collections;
 import java.util.Map;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -150,6 +153,11 @@ public interface JobScheduler extends Lifecycle
         public static final Group metricsEvent = new Group( "MetricsEvent" );
 
         /**
+         * Snapshot downloader
+         */
+        public static final Group downloadSnapshot = new JobScheduler.Group( "DownloadSnapshot" );
+
+        /**
          * UDC timed events.
          */
         public static Group udc  = new Group( "UsageDataCollection" );
@@ -158,6 +166,11 @@ public interface JobScheduler extends Lifecycle
          * Storage maintenance.
          */
         public static Group storageMaintenance = new Group( "StorageMaintenance" );
+
+        /**
+         * Raft timers.
+         */
+        public static Group raft = new Group( "RaftTimer" );
 
         /**
          * Native security.
@@ -179,6 +192,11 @@ public interface JobScheduler extends Lifecycle
          */
         public static Group transactionTimeoutMonitor = new Group( "TransactionTimeoutMonitor" );
 
+        /**
+         * Kernel transaction timeout monitor.
+         */
+        public static Group cypherWorker = new Group( "CypherWorker" );
+
         private Groups()
         {
         }
@@ -188,7 +206,7 @@ public interface JobScheduler extends Lifecycle
     {
         void cancel( boolean mayInterruptIfRunning );
 
-        void waitTermination() throws InterruptedException, ExecutionException;
+        void waitTermination() throws InterruptedException, ExecutionException, CancellationException;
 
         default void registerCancelListener( CancelListener listener )
         {
@@ -211,6 +229,9 @@ public interface JobScheduler extends Lifecycle
 
     /** Expose a group scheduler as an {@link Executor} */
     Executor executor( Group group );
+
+    /** Creates an {@link ExecutorService} that does works-stealing - read more about this in {@link ForkJoinPool}*/
+    ExecutorService workStealingExecutor( Group group, int parallelism );
 
     /**
      * Expose a group scheduler as a {@link java.util.concurrent.ThreadFactory}.

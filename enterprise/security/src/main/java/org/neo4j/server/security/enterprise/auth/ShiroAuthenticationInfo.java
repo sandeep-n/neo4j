@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,21 +23,26 @@ import org.apache.shiro.authc.AuthenticationInfo;
 import org.apache.shiro.authc.SimpleAuthenticationInfo;
 import org.apache.shiro.util.ByteSource;
 
-import org.neo4j.kernel.api.security.AuthenticationResult;
+import java.util.ArrayList;
+import java.util.List;
 
-import static org.neo4j.kernel.api.security.AuthenticationResult.FAILURE;
-import static org.neo4j.kernel.api.security.AuthenticationResult.PASSWORD_CHANGE_REQUIRED;
-import static org.neo4j.kernel.api.security.AuthenticationResult.SUCCESS;
-import static org.neo4j.kernel.api.security.AuthenticationResult.TOO_MANY_ATTEMPTS;
+import org.neo4j.internal.kernel.api.security.AuthenticationResult;
+
+import static org.neo4j.internal.kernel.api.security.AuthenticationResult.FAILURE;
+import static org.neo4j.internal.kernel.api.security.AuthenticationResult.PASSWORD_CHANGE_REQUIRED;
+import static org.neo4j.internal.kernel.api.security.AuthenticationResult.SUCCESS;
+import static org.neo4j.internal.kernel.api.security.AuthenticationResult.TOO_MANY_ATTEMPTS;
 
 public class ShiroAuthenticationInfo extends SimpleAuthenticationInfo
 {
     private AuthenticationResult authenticationResult;
+    private List<Throwable> throwables;
 
     public ShiroAuthenticationInfo()
     {
         super();
         this.authenticationResult = AuthenticationResult.FAILURE;
+        this.throwables = new ArrayList<>( 1 );
     }
 
     public ShiroAuthenticationInfo( Object principal, String realmName, AuthenticationResult authenticationResult )
@@ -56,6 +61,16 @@ public class ShiroAuthenticationInfo extends SimpleAuthenticationInfo
     public AuthenticationResult getAuthenticationResult()
     {
         return authenticationResult;
+    }
+
+    public void addThrowable( Throwable t )
+    {
+        throwables.add( t );
+    }
+
+    public List<Throwable> getThrowables()
+    {
+        return throwables;
     }
 
     @Override

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
 
-    Copyright (c) 2002-2017 "Neo Technology,"
+    Copyright (c) 2002-2018 "Neo Technology,"
     Network Engine for Objects in Lund AB [http://neotechnology.com]
 
     This file is part of Neo4j.
@@ -80,6 +80,7 @@
       <aka>Apache Software Licenses</aka>
       <aka>Apache 2</aka>
       <aka>Apache License, Version 2.0</aka>
+      <aka>Apache License, Version 2</aka>
       <aka>Apache License 2.0</aka>
       <aka>Apache 2.0</aka>
       <aka>Apache</aka>
@@ -130,6 +131,9 @@
     <license name="MIT License">
       <aka>MIT</aka>
       <aka>The MIT License</aka>
+    </license>
+    <license name="Mozilla Public License, Version 2.0">
+      <aka>Mozilla Public License, v. 2.0</aka>
     </license>
     <license name="Bouncy Castle License">
       <aka>Bouncy Castle Licence</aka>

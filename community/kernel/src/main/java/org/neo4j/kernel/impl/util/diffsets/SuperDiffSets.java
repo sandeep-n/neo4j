@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,13 +20,14 @@
 package org.neo4j.kernel.impl.util.diffsets;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.function.Predicate;
 
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
 import org.neo4j.helpers.collection.Iterators;
-import org.neo4j.kernel.api.exceptions.schema.ConstraintValidationException;
+import org.neo4j.internal.kernel.api.exceptions.schema.ConstraintValidationException;
 import org.neo4j.kernel.api.exceptions.schema.CreateConstraintFailureException;
 import org.neo4j.kernel.impl.util.VersionedHashMap;
 import org.neo4j.storageengine.api.txstate.DiffSetsVisitor;
@@ -39,8 +40,8 @@ import static java.util.Collections.newSetFromMap;
  * Super class of readable diffsets where use of {@link PrimitiveLongIterator} can be parameterized
  * to a specific subclass instead.
  */
-abstract class SuperDiffSets<T,LONGITERATOR extends PrimitiveLongIterator>
-        implements SuperReadableDiffSets<T,LONGITERATOR>
+abstract class SuperDiffSets<T,LONGITERATOR_OUT extends PrimitiveLongIterator, LONGITERATOR_IN extends PrimitiveLongIterator>
+        implements SuperReadableDiffSets<T,LONGITERATOR_OUT, LONGITERATOR_IN>
 {
     private Set<T> addedElements;
     private Set<T> removedElements;
@@ -130,6 +131,17 @@ abstract class SuperDiffSets<T,LONGITERATOR extends PrimitiveLongIterator>
     public Set<T> getAdded()
     {
         return resultSet( addedElements );
+    }
+
+    @Override
+    public Set<T> getAddedSnapshot()
+    {
+        if ( addedElements == null )
+        {
+            return Collections.emptySet();
+        }
+        //TODO VersionedHashMap can probably do this more efficiently, but it is hidden behind layers
+        return new HashSet<>( addedElements );
     }
 
     @Override

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -46,6 +46,18 @@ class PrettifierTest extends CypherFunSuite {
       "match (a) where a.prop = 42 return a" ->
         """MATCH (a)
           |  WHERE a.prop = 42
+          |RETURN a""".stripMargin,
+
+      "match (a) with distinct a, b as X, 3+3 as six order by b.prop, b.foo descending skip 1 limit 2 where true" ->
+        """MATCH (a)
+          |WITH DISTINCT a, b AS X, 3 + 3 AS six
+          |  ORDER BY b.prop ASCENDING, b.foo DESCENDING
+          |  SKIP 1
+          |  LIMIT 2
+          |  WHERE true""".stripMargin,
+
+      "create (a)--(b) RETURN a" ->
+        """CREATE (a)--(b)
           |RETURN a""".stripMargin
     )
 

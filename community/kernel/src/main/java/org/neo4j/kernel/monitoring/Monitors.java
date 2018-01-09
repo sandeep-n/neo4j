@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -59,7 +59,7 @@ public class Monitors
     private static final AtomicBoolean FALSE = new AtomicBoolean( false );
 
     // Concurrency: Mutation of these data structures is always guarded by the monitor lock on this Monitors instance,
-    // while look-ups and reads are performed concurrently. The methodMonitorListerners lists (the map values) are
+    // while look-ups and reads are performed concurrently. The methodMonitorListeners lists (the map values) are
     // read concurrently by the proxies, while changing the listener set always produce new lists that atomically
     // replace the ones already in the methodMonitorListeners map.
 

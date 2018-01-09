@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -33,8 +33,9 @@ case class FilterFunction(collection: Expression, id: String, predicate: Predica
 
   override def compute(value: AnyValue, m: ExecutionContext, state: QueryState) = {
     val traversable = makeTraversable(value)
+    val innerContext = m.createClone()
     VirtualValues.filter(traversable, new java.util.function.Function[AnyValue, java.lang.Boolean]() {
-      override def apply(v1: AnyValue): java.lang.Boolean =  predicate.isTrue(m.newWith1(id, v1), state)
+      override def apply(v1: AnyValue): java.lang.Boolean =  predicate.isTrue(innerContext.set(id, v1), state)
     })
   }
 

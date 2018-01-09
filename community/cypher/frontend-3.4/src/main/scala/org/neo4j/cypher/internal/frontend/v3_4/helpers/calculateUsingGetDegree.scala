@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,7 +24,7 @@ import org.neo4j.cypher.internal.v3_4.expressions._
  */
 object calculateUsingGetDegree {
 
-  def apply(expr: Expression, node: Variable, types: Seq[RelTypeName], dir: SemanticDirection): Expression = {
+  def apply(expr: Expression, node: LogicalVariable, types: Seq[RelTypeName], dir: SemanticDirection): Expression = {
       types
         .map(typ => GetDegree(node.copyId, Some(typ), dir)(typ.position))
         .reduceOption[Expression](Add(_, _)(expr.position))

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,8 +24,9 @@ import org.junit.runners.Parameterized;
 
 import java.util.Arrays;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.neo4j.values.utils.AnyValueTestUtil.assertEqual;
+import static org.neo4j.values.utils.AnyValueTestUtil.assertIncomparable;
+import static org.neo4j.values.utils.AnyValueTestUtil.assertNotEqual;
 
 /**
  * This test was faithfully converted (including personal remarks) from PropertyEqualityTest.
@@ -288,24 +289,12 @@ public class ValueEqualityTest
         {
             if ( shouldMatch )
             {
-                assertEquality( a, b );
+                assertEqual( a, b );
             }
             else
             {
-                assertNonEquality( a, b );
+                assertNotEqual( a, b );
             }
-        }
-
-        void assertEquality( Value a, Value b )
-        {
-            assertTrue( String.format( "Expected %s to be equal to %s but it wasn't.", a, b ), a.equals( b ) );
-            assertTrue( String.format( "Expected %s and %s to share hash, but they didn't.", a, b ),
-                    a.hashCode() == b.hashCode() );
-        }
-
-        void assertNonEquality( Value a, Value b )
-        {
-            assertFalse( String.format( "Expected %s to not be equal to %s but it was.", a, b ), a.equals( b ) );
         }
     }
 }

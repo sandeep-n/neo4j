@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,9 +24,9 @@ import java.util.function.Function;
 
 import org.neo4j.helpers.collection.Iterables;
 import org.neo4j.index.internal.gbptree.RecoveryCleanupWorkCollector;
+import org.neo4j.internal.kernel.api.TokenNameLookup;
 import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.io.pagecache.PageCache;
-import org.neo4j.internal.kernel.api.TokenNameLookup;
 import org.neo4j.kernel.api.index.SchemaIndexProvider;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.api.BatchTransactionApplierFacade;
@@ -188,7 +188,7 @@ public class RecordStorageEngineRule extends ExternalResource
         }
     }
 
-    private class ExtendedRecordStorageEngine extends RecordStorageEngine
+    private static class ExtendedRecordStorageEngine extends RecordStorageEngine
     {
         private final Function<BatchTransactionApplierFacade,BatchTransactionApplierFacade>
                 transactionApplierTransformer;

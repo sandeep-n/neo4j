@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -28,6 +28,7 @@ import org.neo4j.logging.Log;
 
 import static org.neo4j.kernel.configuration.Settings.DURATION;
 import static org.neo4j.kernel.configuration.Settings.setting;
+import static org.neo4j.kernel.impl.cache.MeasureDoNothing.loggingMonitor;
 
 public class MonitorGc implements Lifecycle
 {
@@ -57,7 +58,8 @@ public class MonitorGc implements Lifecycle
     @Override
     public void start() throws Throwable
     {
-        monitorGc = new MeasureDoNothing( "neo4j.PauseMonitor", log, config.get( Configuration.gc_monitor_wait_time ).toMillis(),
+        monitorGc = new MeasureDoNothing( "neo4j.PauseMonitor", loggingMonitor( log ),
+                config.get( Configuration.gc_monitor_wait_time ).toMillis(),
                 config.get( Configuration.gc_monitor_threshold ).toMillis() );
         monitorGc.start();
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,7 +24,7 @@ import org.neo4j.cypher.internal.runtime.interpreted.ExecutionContext
 import org.neo4j.cypher.internal.runtime.interpreted.commands.ShortestPath
 import org.neo4j.cypher.internal.runtime.interpreted.commands.expressions.ShortestPathExpression
 import org.neo4j.cypher.internal.runtime.interpreted.commands.predicates.Predicate
-import org.neo4j.cypher.internal.v3_4.logical.plans.LogicalPlanId
+import org.neo4j.cypher.internal.util.v3_4.attribution.Id
 import org.neo4j.values.storable.Values
 import org.neo4j.values.virtual.{ListValue, PathValue, VirtualValues}
 
@@ -35,7 +35,7 @@ import scala.collection.JavaConverters._
  */
 case class ShortestPathPipe(source: Pipe, shortestPathCommand: ShortestPath, predicates: Seq[Predicate] = Seq.empty,
                             withFallBack: Boolean = false, disallowSameNode: Boolean = true)
-                           (val id: LogicalPlanId = LogicalPlanId.DEFAULT)
+                           (val id: Id = Id.INVALID_ID)
   extends PipeWithSource(source) {
   private def pathName = shortestPathCommand.pathName
   private val shortestPathExpression = ShortestPathExpression(shortestPathCommand, predicates, withFallBack, disallowSameNode)
@@ -51,13 +51,20 @@ case class ShortestPathPipe(source: Pipe, shortestPathCommand: ShortestPath, pre
       shortestPathCommand.relIterator match {
         case Some(relName) =>
           result.iterator().asScala.map {
-            case(path: PathValue) => ctx.newWith2(pathName, path, relName, VirtualValues.list(path.edges():_*))
-            case _ => throw new InternalException("We expect only paths here")
+            case path: PathValue =>
+              val relations = VirtualValues.list(path.edges(): _*)
+              executionContextFactory.copyWith(ctx, pathName, path, relName, relations)
+
+            case value =>
+              throw new InternalException(s"Expected path, got '$value'")
           }
         case None =>
           result.iterator().asScala.map {
-            case path: PathValue => ctx.newWith1(pathName, path)
-            case _ => throw new InternalException("We expect only paths here")
+            case path: PathValue =>
+              executionContextFactory.copyWith(ctx, pathName, path)
+
+            case value =>
+              throw new InternalException(s"Expected path, got '$value'")
           }
       }
     })

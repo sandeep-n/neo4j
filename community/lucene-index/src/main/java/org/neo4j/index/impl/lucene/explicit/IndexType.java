@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -209,6 +209,11 @@ public abstract class IndexType
                                LuceneDataSource.WHITESPACE_ANALYZER;
                 }
                 result = new CustomType( analyzer, toLowerCase, similarity );
+            }
+            else
+            {
+                throw new IllegalArgumentException( "The given type was not recognized: " + type +
+                        ". Known types are 'fulltext' and 'exact'" );
             }
         }
         else

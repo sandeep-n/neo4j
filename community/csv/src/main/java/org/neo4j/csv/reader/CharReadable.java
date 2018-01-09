@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -63,6 +63,11 @@ public interface CharReadable extends Closeable, SourceTraceability
      */
     int read( char[] into, int offset, int length ) throws IOException;
 
+    /**
+     * @return length of this source, in bytes.
+     */
+    long length();
+
     abstract class Adapter extends SourceTraceability.Adapter implements CharReadable
     {
         @Override
@@ -70,4 +75,49 @@ public interface CharReadable extends Closeable, SourceTraceability
         {   // Nothing to close
         }
     }
+
+    CharReadable EMPTY = new CharReadable()
+    {
+        @Override
+        public long position()
+        {
+            return 0;
+        }
+
+        @Override
+        public long lineNumber()
+        {
+            return 0;
+        }
+
+        @Override
+        public String sourceDescription()
+        {
+            return "EMPTY";
+        }
+
+        @Override
+        public int read( char[] into, int offset, int length ) throws IOException
+        {
+            return -1;
+        }
+
+        @Override
+        public SectionedCharBuffer read( SectionedCharBuffer buffer, int from ) throws IOException
+        {
+            buffer.compact( buffer, from );
+            return buffer;
+        }
+
+        @Override
+        public long length()
+        {
+            return 0;
+        }
+
+        @Override
+        public void close() throws IOException
+        {
+        }
+    };
 }

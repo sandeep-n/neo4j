@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -30,7 +30,7 @@ class removeIdenticalPlansTest extends CypherFunSuite with LogicalPlanningTestSu
     val scan = AllNodesScan(IdName("a"), Set.empty)(solved)
     val join = NodeHashJoin(Set(IdName("a")), scan, scan)(solved)
 
-    val rewritten = join.endoRewrite(removeIdenticalPlans)
+    val rewritten = join.endoRewrite(removeIdenticalPlans(idGen))
 
     rewritten should equal(join)
     rewritten shouldNot be theSameInstanceAs join
@@ -42,7 +42,7 @@ class removeIdenticalPlansTest extends CypherFunSuite with LogicalPlanningTestSu
     val scan2 = AllNodesScan(IdName("a"), Set.empty)(solved)
     val join = NodeHashJoin(Set(IdName("a")), scan1, scan2)(solved)
 
-    val rewritten = join.endoRewrite(removeIdenticalPlans)
+    val rewritten = join.endoRewrite(removeIdenticalPlans(idGen))
 
     rewritten should equal(join)
     rewritten.left should be theSameInstanceAs join.left

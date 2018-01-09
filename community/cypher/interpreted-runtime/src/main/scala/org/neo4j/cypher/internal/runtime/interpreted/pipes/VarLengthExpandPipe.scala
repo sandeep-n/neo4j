@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,13 +19,12 @@
  */
 package org.neo4j.cypher.internal.runtime.interpreted.pipes
 
-import org.neo4j.cypher.internal.util.v3_4.InternalException
 import org.neo4j.cypher.internal.runtime.interpreted.ExecutionContext
-import org.neo4j.cypher.internal.v3_4.logical.plans.LogicalPlanId
+import org.neo4j.cypher.internal.util.v3_4.InternalException
+import org.neo4j.cypher.internal.util.v3_4.attribution.Id
 import org.neo4j.cypher.internal.v3_4.expressions.SemanticDirection
-import org.neo4j.kernel.impl.util.ValueUtils
 import org.neo4j.values.storable.Values
-import org.neo4j.values.virtual.{EdgeValue, NodeValue, VirtualValues}
+import org.neo4j.values.virtual._
 
 import scala.collection.mutable
 
@@ -54,7 +53,7 @@ case class VarLengthExpandPipe(source: Pipe,
                                max: Option[Int],
                                nodeInScope: Boolean,
                                filteringStep: VarLengthPredicate= VarLengthPredicate.NONE)
-                              (val id: LogicalPlanId = LogicalPlanId.DEFAULT) extends PipeWithSource(source) {
+                              (val id: Id = Id.INVALID_ID) extends PipeWithSource(source) {
   private def varLengthExpand(node: NodeValue, state: QueryState, maxDepth: Option[Int],
                               row: ExecutionContext): Iterator[(NodeValue, Seq[EdgeValue])] = {
     val stack = new mutable.Stack[(NodeValue, Seq[EdgeValue])]
@@ -65,7 +64,7 @@ case class VarLengthExpandPipe(source: Pipe,
         val (node, rels) = stack.pop()
         if (rels.length < maxDepth.getOrElse(Int.MaxValue) && filteringStep.filterNode(row,state)(node)) {
           val relationships: Iterator[EdgeValue] = state.query.getRelationshipsForIds(node.id(), dir,
-                                                                                      types.types(state.query)).map(ValueUtils.fromRelationshipProxy)
+                                                                                      types.types(state.query))
 
           relationships.filter(filteringStep.filterRelationship(row, state)).foreach { rel =>
             val otherNode = rel.otherNode(node)
@@ -88,17 +87,29 @@ case class VarLengthExpandPipe(source: Pipe,
   }
 
   protected def internalCreateResults(input: Iterator[ExecutionContext], state: QueryState): Iterator[ExecutionContext] = {
+    def expand(row: ExecutionContext, n: NodeValue) = {
+      val paths = varLengthExpand(n, state, max, row)
+      paths.collect {
+        case (node, rels) if rels.length >= min && isToNodeValid(row, state, node) =>
+          executionContextFactory.copyWith(row, relName, VirtualValues.list(rels: _*), toName, node)
+      }
+    }
+
     input.flatMap {
       row => {
-        fetchFromContext(row, fromName) match {
-          case n: NodeValue =>
-            val paths = varLengthExpand(n, state, max, row)
-            paths.collect {
-              case (node, rels) if rels.length >= min && isToNodeValid(row, node) =>
-                row.newWith2(relName, VirtualValues.list(rels:_*), toName, node)
-            }
+        fetchFromContext(row, state, fromName) match {
+          case node: NodeValue =>
+            expand(row, node)
 
-          case Values.NO_VALUE => Iterator(row.newWith2(relName, Values.NO_VALUE, toName, Values.NO_VALUE))
+          case nodeRef: NodeReference =>
+            val node = state.query.nodeOps.getById(nodeRef.id)
+            expand(row, node)
+
+          case Values.NO_VALUE =>
+            if (nodeInScope)
+              Iterator(row.set(relName, Values.NO_VALUE))
+            else
+              Iterator(row.set(relName, Values.NO_VALUE, toName, Values.NO_VALUE))
 
           case value => throw new InternalException(s"Expected to find a node at $fromName but found $value instead")
         }
@@ -106,9 +117,16 @@ case class VarLengthExpandPipe(source: Pipe,
     }
   }
 
-  private def isToNodeValid(row: ExecutionContext, node: Any): Boolean =
-    !nodeInScope || fetchFromContext(row, toName) == node
+  private def isToNodeValid(row: ExecutionContext, state: QueryState, node: VirtualNodeValue): Boolean =
+    !nodeInScope || {
+      fetchFromContext(row, state, toName) match {
+        case toNode: VirtualNodeValue =>
+          toNode.id == node.id
+        case _ =>
+          false
+      }
+    }
 
-  def fetchFromContext(row: ExecutionContext, name: String): Any =
+  def fetchFromContext(row: ExecutionContext, state: QueryState, name: String): Any =
     row.getOrElse(name, throw new InternalException(s"Expected to find a node at $name but found nothing"))
 }

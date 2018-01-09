@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,9 +23,8 @@ import java.util
 import java.util.Map
 
 import org.neo4j.cypher.internal.runtime.{Operations, QueryContext}
-import org.neo4j.graphdb.PropertyContainer
 import org.neo4j.values.AnyValue
-import org.neo4j.values.virtual.{EdgeValue, MapValue, NodeValue, VirtualValues}
+import org.neo4j.values.virtual.{MapValue, VirtualEdgeValue, VirtualNodeValue, VirtualValues}
 
 import scala.collection.immutable
 
@@ -44,12 +43,12 @@ trait MapSupport {
 
   def castToMap: PartialFunction[AnyValue, QueryContext => MapValue] = {
     case x: MapValue => _ => x
-    case x: NodeValue => ctx => VirtualValues.map(new LazyMap(ctx, ctx.nodeOps, x.id()))
-    case x: EdgeValue => ctx => VirtualValues.map(new LazyMap(ctx, ctx.relationshipOps, x.id()))
+    case x: VirtualNodeValue => ctx => VirtualValues.map(new LazyMap(ctx, ctx.nodeOps, x.id()))
+    case x: VirtualEdgeValue => ctx => VirtualValues.map(new LazyMap(ctx, ctx.relationshipOps, x.id()))
   }
 }
 
-class LazyMap[T <: PropertyContainer](ctx: QueryContext, ops: Operations[T], id: Long)
+class LazyMap[T](ctx: QueryContext, ops: Operations[T], id: Long)
   extends java.util.Map[String, AnyValue] {
 
   import scala.collection.JavaConverters._
@@ -76,7 +75,7 @@ class LazyMap[T <: PropertyContainer](ctx: QueryContext, ops: Operations[T], id:
 
   override def keySet(): util.Set[String] = allProps.keySet()
 
-  override def entrySet(): util.Set[Map.Entry[String, AnyValue]] = allProps.entrySet()
+  override def entrySet(): util.Set[util.Map.Entry[String, AnyValue]] = allProps.entrySet()
 
   override def containsKey(key: Any): Boolean = ctx.getOptPropertyKeyId(key.asInstanceOf[String])
     .exists(ops.hasProperty(id, _))

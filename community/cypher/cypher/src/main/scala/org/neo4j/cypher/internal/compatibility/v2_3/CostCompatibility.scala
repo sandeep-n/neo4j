@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,7 +24,6 @@ import org.neo4j.cypher.internal.javacompat.GraphDatabaseCypherService
 import org.neo4j.cypher.{CypherPlanner, CypherRuntime}
 import org.neo4j.helpers.Clock
 import org.neo4j.kernel.GraphDatabaseQueryService
-import org.neo4j.kernel.api.KernelAPI
 import org.neo4j.kernel.impl.core.NodeManager
 import org.neo4j.kernel.monitoring.{Monitors => KernelMonitors}
 import org.neo4j.logging.Log
@@ -33,7 +32,6 @@ case class CostCompatibility(graph: GraphDatabaseQueryService,
                              config: CypherCompilerConfiguration,
                              clock: Clock,
                              kernelMonitors: KernelMonitors,
-                             kernelAPI: KernelAPI,
                              log: Log,
                              planner: CypherPlanner,
                              runtime: CypherRuntime) extends Compatibility {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,19 +21,26 @@ package org.neo4j.kernel.impl.api.index.inmemory;
 
 import java.util.Set;
 
-import org.neo4j.collection.primitive.PrimitiveLongIterator;
+import org.neo4j.collection.primitive.PrimitiveLongResourceIterator;
 import org.neo4j.helpers.collection.BoundedIterable;
 import org.neo4j.kernel.api.index.ArrayEncoder;
+import org.neo4j.kernel.api.schema.index.IndexDescriptor;
+import org.neo4j.storageengine.api.schema.AbstractIndexReader;
 import org.neo4j.storageengine.api.schema.IndexReader;
 import org.neo4j.values.storable.Value;
 
-abstract class InMemoryIndexImplementation implements IndexReader, BoundedIterable<Long>
+abstract class InMemoryIndexImplementation extends AbstractIndexReader implements BoundedIterable<Long>
 {
+    InMemoryIndexImplementation( IndexDescriptor descriptor )
+    {
+        super( descriptor );
+    }
+
     abstract void initialize();
 
     abstract void drop();
 
-    public final PrimitiveLongIterator seek( Value... values )
+    public final PrimitiveLongResourceIterator seek( Value... values )
     {
         return doIndexSeek( encode( values ) );
     }
@@ -56,7 +63,7 @@ abstract class InMemoryIndexImplementation implements IndexReader, BoundedIterab
 
     protected abstract long doCountIndexedNodes( long nodeId, Object... encode );
 
-    abstract PrimitiveLongIterator doIndexSeek( Object... propertyValue );
+    abstract PrimitiveLongResourceIterator doIndexSeek( Object... propertyValue );
 
     abstract boolean doAdd( long nodeId, boolean applyIdempotently, Object... propertyValue );
 

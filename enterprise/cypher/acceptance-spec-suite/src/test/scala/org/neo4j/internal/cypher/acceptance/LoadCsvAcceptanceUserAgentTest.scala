@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -29,7 +29,7 @@ import sun.net.www.protocol.http.HttpURLConnection
 class LoadCsvAcceptanceUserAgentTest
   extends ExecutionEngineFunSuite with BeforeAndAfterAll with CypherComparisonSupport {
 
-  val expectedToSucceed: TestConfiguration = Configs.CommunityInterpreted - Configs.Version2_3
+  val expectedToSucceed: TestConfiguration = Configs.Interpreted - Configs.Version2_3
 
   test("should be able to download data from the web") {
     val url = s"http://127.0.0.1:$port/test.csv".cypherEscape

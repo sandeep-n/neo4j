@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -67,7 +67,7 @@ public class RecordStorageCommandCreationContext implements CommandCreationConte
                 new StandardDynamicRecordAllocator( idBatches.idGenerator( StoreType.PROPERTY_ARRAY ),
                         neoStores.getPropertyStore().getArrayStore().getRecordDataSize() ),
                 idBatches.idGenerator( StoreType.PROPERTY ),
-                propertyTraverser );
+                propertyTraverser, neoStores.getPropertyStore().allowStorePoints() );
     }
 
     public long nextId( StoreType storeType )

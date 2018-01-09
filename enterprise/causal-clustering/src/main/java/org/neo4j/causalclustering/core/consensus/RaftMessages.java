@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,6 +19,7 @@
  */
 package org.neo4j.causalclustering.core.consensus;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -37,6 +38,26 @@ import static org.neo4j.causalclustering.core.consensus.RaftMessages.Type.PRUNE_
 
 public interface RaftMessages
 {
+
+    interface Handler<T, E extends Exception>
+    {
+        T handle( Vote.Request request ) throws E;
+        T handle( Vote.Response response ) throws E;
+        T handle( PreVote.Request request ) throws E;
+        T handle( PreVote.Response response ) throws E;
+        T handle( AppendEntries.Request request ) throws E;
+        T handle( AppendEntries.Response response ) throws E;
+        T handle( Heartbeat heartbeat ) throws E;
+        T handle( LogCompactionInfo logCompactionInfo ) throws E;
+        T handle( HeartbeatResponse heartbeatResponse ) throws E;
+        T handle( Timeout.Election election ) throws E;
+        T handle( Timeout.Heartbeat heartbeat ) throws E;
+        T handle( NewEntry.Request request ) throws E;
+        T handle( NewEntry.BatchRequest batchRequest ) throws E;
+        T handle( PruneRequest pruneRequest ) throws E;
+    }
+
+    // Position is used to identify messages. Changing order will break upgrade paths.
     enum Type
     {
         VOTE_REQUEST,
@@ -59,12 +80,16 @@ public interface RaftMessages
         NEW_BATCH_REQUEST,
 
         PRUNE_REQUEST,
+
+        PRE_VOTE_REQUEST,
+        PRE_VOTE_RESPONSE,
     }
 
     interface RaftMessage extends Message
     {
         MemberId from();
         Type type();
+        <T, E extends Exception> T dispatch( Handler<T, E> handler ) throws E;
     }
 
     class Directed
@@ -140,6 +165,12 @@ public interface RaftMessages
             }
 
             @Override
+            public <T,E extends Exception> T dispatch( Handler<T,E> handler ) throws E
+            {
+                return handler.handle( this );
+            }
+
+            @Override
             public boolean equals( Object o )
             {
                 if ( this == o )
@@ -203,6 +234,12 @@ public interface RaftMessages
             }
 
             @Override
+            public <T,E extends Exception> T dispatch( Handler<T,E> handler ) throws E
+            {
+                return handler.handle( this );
+            }
+
+            @Override
             public boolean equals( Object o )
             {
                 if ( this == o )
@@ -246,6 +283,148 @@ public interface RaftMessages
         }
     }
 
+    interface PreVote
+    {
+        class Request extends BaseRaftMessage
+        {
+            private long term;
+            private MemberId candidate;
+            private long lastLogIndex;
+            private long lastLogTerm;
+
+            public Request( MemberId from, long term, MemberId candidate, long lastLogIndex, long lastLogTerm )
+            {
+                super( from, Type.PRE_VOTE_REQUEST );
+                this.term = term;
+                this.candidate = candidate;
+                this.lastLogIndex = lastLogIndex;
+                this.lastLogTerm = lastLogTerm;
+            }
+
+            public long term()
+            {
+                return term;
+            }
+
+            @Override
+            public <T,E extends Exception> T dispatch( Handler<T,E> handler ) throws E
+            {
+                return handler.handle( this );
+            }
+
+            @Override
+            public boolean equals( Object o )
+            {
+                if ( this == o )
+                {
+                    return true;
+                }
+                if ( o == null || getClass() != o.getClass() )
+                {
+                    return false;
+                }
+                Request request = (Request) o;
+                return lastLogIndex == request.lastLogIndex &&
+                        lastLogTerm == request.lastLogTerm &&
+                        term == request.term &&
+                        candidate.equals( request.candidate );
+            }
+
+            @Override
+            public int hashCode()
+            {
+                int result = (int) term;
+                result = 31 * result + candidate.hashCode();
+                result = 31 * result + (int) (lastLogIndex ^ (lastLogIndex >>> 32));
+                result = 31 * result + (int) (lastLogTerm ^ (lastLogTerm >>> 32));
+                return result;
+            }
+
+            @Override
+            public String toString()
+            {
+                return format( "PreVote.Request from %s {term=%d, candidate=%s, lastAppended=%d, lastLogTerm=%d}",
+                        from, term, candidate, lastLogIndex, lastLogTerm );
+            }
+
+            public long lastLogTerm()
+            {
+                return lastLogTerm;
+            }
+
+            public long lastLogIndex()
+            {
+                return lastLogIndex;
+            }
+
+            public MemberId candidate()
+            {
+                return candidate;
+            }
+        }
+
+        class Response extends BaseRaftMessage
+        {
+            private long term;
+            private boolean voteGranted;
+
+            public Response( MemberId from, long term, boolean voteGranted )
+            {
+                super( from, Type.PRE_VOTE_RESPONSE );
+                this.term = term;
+                this.voteGranted = voteGranted;
+            }
+
+            @Override
+            public <T,E extends Exception> T dispatch( Handler<T,E> handler ) throws E
+            {
+                return handler.handle( this );
+            }
+
+            @Override
+            public boolean equals( Object o )
+            {
+                if ( this == o )
+                {
+                    return true;
+                }
+                if ( o == null || getClass() != o.getClass() )
+                {
+                    return false;
+                }
+
+                Response response = (Response) o;
+
+                return term == response.term && voteGranted == response.voteGranted;
+
+            }
+
+            @Override
+            public int hashCode()
+            {
+                int result = (int) term;
+                result = 31 * result + (voteGranted ? 1 : 0);
+                return result;
+            }
+
+            @Override
+            public String toString()
+            {
+                return format( "PreVote.Response from %s {term=%d, voteGranted=%s}", from, term, voteGranted );
+            }
+
+            public long term()
+            {
+                return term;
+            }
+
+            public boolean voteGranted()
+            {
+                return voteGranted;
+            }
+        }
+    }
+
     interface AppendEntries
     {
         class Request extends BaseRaftMessage
@@ -256,8 +435,7 @@ public interface RaftMessages
             private RaftLogEntry[] entries;
             private long leaderCommit;
 
-            public Request( MemberId from, long leaderTerm, long prevLogIndex, long prevLogTerm,
-                            RaftLogEntry[] entries, long leaderCommit )
+            public Request( MemberId from, long leaderTerm, long prevLogIndex, long prevLogTerm, RaftLogEntry[] entries, long leaderCommit )
             {
                 super( from, Type.APPEND_ENTRIES_REQUEST );
                 Objects.requireNonNull( entries );
@@ -296,6 +474,12 @@ public interface RaftMessages
             }
 
             @Override
+            public <T,E extends Exception> T dispatch( Handler<T,E> handler ) throws E
+            {
+                return handler.handle( this );
+            }
+
+            @Override
             public boolean equals( Object o )
             {
                 if ( this == o )
@@ -317,7 +501,7 @@ public interface RaftMessages
             @Override
             public int hashCode()
             {
-                return Objects.hash( leaderTerm, prevLogIndex, prevLogTerm, entries, leaderCommit );
+                return Objects.hash( leaderTerm, prevLogIndex, prevLogTerm, Arrays.hashCode( entries ), leaderCommit );
             }
 
             @Override
@@ -363,6 +547,12 @@ public interface RaftMessages
             public long appendIndex()
             {
                 return appendIndex;
+            }
+
+            @Override
+            public <T,E extends Exception> T dispatch( Handler<T,E> handler ) throws E
+            {
+                return handler.handle( this );
             }
 
             @Override
@@ -432,6 +622,12 @@ public interface RaftMessages
         }
 
         @Override
+        public <T,E extends Exception> T dispatch( Handler<T,E> handler ) throws E
+        {
+            return handler.handle( this );
+        }
+
+        @Override
         public boolean equals( Object o )
         {
             if ( this == o )
@@ -481,6 +677,12 @@ public interface RaftMessages
         }
 
         @Override
+        public <T,E extends Exception> T dispatch( Handler<T,E> handler ) throws E
+        {
+            return handler.handle( this );
+        }
+
+        @Override
         public String toString()
         {
             return "HeartbeatResponse{from=" + from + "}";
@@ -507,6 +709,12 @@ public interface RaftMessages
         public long prevIndex()
         {
             return prevIndex;
+        }
+
+        @Override
+        public <T,E extends Exception> T dispatch( Handler<T,E> handler ) throws E
+        {
+            return handler.handle( this );
         }
 
         @Override
@@ -557,6 +765,12 @@ public interface RaftMessages
             }
 
             @Override
+            public <T,E extends Exception> T dispatch( Handler<T,E> handler ) throws E
+            {
+                return handler.handle( this );
+            }
+
+            @Override
             public String toString()
             {
                 return "Timeout.Election{}";
@@ -568,6 +782,12 @@ public interface RaftMessages
             public Heartbeat( MemberId from )
             {
                 super( from, Type.HEARTBEAT_TIMEOUT );
+            }
+
+            @Override
+            public <T,E extends Exception> T dispatch( Handler<T,E> handler ) throws E
+            {
+                return handler.handle( this );
             }
 
             @Override
@@ -588,6 +808,12 @@ public interface RaftMessages
             {
                 super( from, Type.NEW_ENTRY_REQUEST );
                 this.content = content;
+            }
+
+            @Override
+            public <T,E extends Exception> T dispatch( Handler<T,E> handler ) throws E
+            {
+                return handler.handle( this );
             }
 
             @Override
@@ -641,6 +867,12 @@ public interface RaftMessages
             }
 
             @Override
+            public <T,E extends Exception> T dispatch( Handler<T,E> handler ) throws E
+            {
+                return handler.handle( this );
+            }
+
+            @Override
             public boolean equals( Object o )
             {
                 if ( this == o )
@@ -680,12 +912,63 @@ public interface RaftMessages
         }
     }
 
-    class ClusterIdAwareMessage implements RaftMessage
+    interface EnrichedRaftMessage<RM extends RaftMessage> extends RaftMessage
+    {
+        RM message();
+
+        @Override
+        default MemberId from()
+        {
+            return message().from();
+        }
+
+        @Override
+        default Type type()
+        {
+            return message().type();
+        }
+
+        @Override
+        default <T, E extends Exception> T dispatch( Handler<T, E> handler ) throws E
+        {
+            return message().dispatch( handler );
+        }
+    }
+
+    interface ClusterIdAwareMessage<RM extends RaftMessage> extends EnrichedRaftMessage<RM>
+    {
+        ClusterId clusterId();
+
+        static <RM extends RaftMessage> ClusterIdAwareMessage<RM> of( ClusterId clusterId, RM message )
+        {
+            return new ClusterIdAwareMessageImpl<>( clusterId, message );
+        }
+    }
+
+    interface ReceivedInstantAwareMessage<RM extends RaftMessage> extends EnrichedRaftMessage<RM>
+    {
+        Instant receivedAt();
+
+        static <RM extends RaftMessage> ReceivedInstantAwareMessage<RM> of( Instant receivedAt, RM message )
+        {
+            return new ReceivedInstantAwareMessageImpl<>( receivedAt, message );
+        }
+    }
+
+    interface ReceivedInstantClusterIdAwareMessage<RM extends RaftMessage> extends ReceivedInstantAwareMessage<RM>, ClusterIdAwareMessage<RM>
+    {
+        static <RM extends RaftMessage> ReceivedInstantClusterIdAwareMessage<RM> of( Instant receivedAt, ClusterId clusterId, RM message )
+        {
+            return new ReceivedInstantClusterIdAwareMessageImpl<>( receivedAt, clusterId, message );
+        }
+    }
+
+    class ClusterIdAwareMessageImpl<RM extends RaftMessage> implements ClusterIdAwareMessage<RM>
     {
         private final ClusterId clusterId;
-        private final RaftMessage message;
+        private final RM message;
 
-        public ClusterIdAwareMessage( ClusterId clusterId, RaftMessage message )
+        private ClusterIdAwareMessageImpl( ClusterId clusterId, RM message )
         {
             Objects.requireNonNull( message );
             this.clusterId = clusterId;
@@ -697,7 +980,8 @@ public interface RaftMessages
             return clusterId;
         }
 
-        public RaftMessage message()
+        @Override
+        public RM message()
         {
             return message;
         }
@@ -713,32 +997,132 @@ public interface RaftMessages
             {
                 return false;
             }
-            ClusterIdAwareMessage that = (ClusterIdAwareMessage) o;
-            return Objects.equals( clusterId, that.clusterId ) && Objects.equals( message, that.message );
+            ClusterIdAwareMessageImpl that = (ClusterIdAwareMessageImpl) o;
+            return Objects.equals( clusterId, that.clusterId ) && Objects.equals( message(), that.message() );
         }
 
         @Override
         public int hashCode()
         {
-            return Objects.hash( clusterId, message );
+            return Objects.hash( clusterId, message() );
         }
 
         @Override
         public String toString()
         {
-            return format( "{clusterId: %s, message: %s}", clusterId, message );
+            return format( "{clusterId: %s, message: %s}", clusterId, message() );
+        }
+    }
+
+    class ReceivedInstantAwareMessageImpl<RM extends RaftMessage> implements ReceivedInstantAwareMessage<RM>
+    {
+        private final Instant receivedAt;
+        private final RM message;
+
+        private ReceivedInstantAwareMessageImpl( Instant receivedAt, RM message )
+        {
+            Objects.requireNonNull( message );
+            this.receivedAt = receivedAt;
+            this.message = message;
         }
 
         @Override
-        public MemberId from()
+        public Instant receivedAt()
         {
-            return message.from();
+            return receivedAt;
         }
 
         @Override
-        public Type type()
+        public RM message()
         {
-            return message.type();
+            return message;
+        }
+
+        @Override
+        public boolean equals( Object o )
+        {
+            if ( this == o )
+            {
+                return true;
+            }
+            if ( o == null || getClass() != o.getClass() )
+            {
+                return false;
+            }
+            ReceivedInstantAwareMessageImpl that = (ReceivedInstantAwareMessageImpl) o;
+            return Objects.equals( receivedAt, that.receivedAt ) && Objects.equals( message(), that.message() );
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return Objects.hash( receivedAt, message() );
+        }
+
+        @Override
+        public String toString()
+        {
+            return format( "{receivedAt: %s, message: %s}", receivedAt, message() );
+        }
+    }
+
+    class ReceivedInstantClusterIdAwareMessageImpl<RM extends RaftMessage> implements ReceivedInstantClusterIdAwareMessage<RM>
+    {
+        private final Instant receivedAt;
+        private final ClusterId clusterId;
+        private final RM message;
+
+        private ReceivedInstantClusterIdAwareMessageImpl( Instant receivedAt, ClusterId clusterId, RM message )
+        {
+            Objects.requireNonNull( message );
+            this.clusterId = clusterId;
+            this.receivedAt = receivedAt;
+            this.message = message;
+        }
+
+        @Override
+        public Instant receivedAt()
+        {
+            return receivedAt;
+        }
+
+        @Override
+        public ClusterId clusterId()
+        {
+            return clusterId;
+        }
+
+        @Override
+        public RM message()
+        {
+            return message;
+        }
+
+        @Override
+        public boolean equals( Object o )
+        {
+            if ( this == o )
+            {
+                return true;
+            }
+            if ( o == null || getClass() != o.getClass() )
+            {
+                return false;
+            }
+            ReceivedInstantClusterIdAwareMessageImpl that = (ReceivedInstantClusterIdAwareMessageImpl) o;
+            return Objects.equals( receivedAt, that.receivedAt ) && Objects.equals( clusterId, that.clusterId ) && Objects.equals( message(), that.message() );
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return Objects.hash( receivedAt, clusterId, message() );
+        }
+
+        @Override
+        public String toString()
+        {
+            return format( "{clusterId: %s, receivedAt: %s, message: %s}", clusterId, receivedAt, message() );
         }
     }
 
@@ -755,6 +1139,12 @@ public interface RaftMessages
         public long pruneIndex()
         {
             return pruneIndex;
+        }
+
+        @Override
+        public <T,E extends Exception> T dispatch( Handler<T,E> handler ) throws E
+        {
+            return handler.handle( this );
         }
 
         @Override
@@ -785,8 +1175,8 @@ public interface RaftMessages
 
     abstract class BaseRaftMessage implements RaftMessage
     {
-        protected MemberId from;
-        private Type type;
+        protected final MemberId from;
+        private final Type type;
 
         BaseRaftMessage( MemberId from, Type type )
         {

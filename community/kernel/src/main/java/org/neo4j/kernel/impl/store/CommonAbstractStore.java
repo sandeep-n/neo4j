@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -37,6 +37,7 @@ import org.neo4j.kernel.impl.store.format.RecordFormat;
 import org.neo4j.kernel.impl.store.id.IdGenerator;
 import org.neo4j.kernel.impl.store.id.IdGeneratorFactory;
 import org.neo4j.kernel.impl.store.id.IdRange;
+import org.neo4j.kernel.impl.store.id.IdSequence;
 import org.neo4j.kernel.impl.store.id.IdType;
 import org.neo4j.kernel.impl.store.id.validation.IdValidator;
 import org.neo4j.kernel.impl.store.record.AbstractBaseRecord;
@@ -402,6 +403,23 @@ public abstract class CommonAbstractStore<RECORD extends AbstractBaseRecord,HEAD
         }
         catch ( IOException e )
         {
+            throw new UnderlyingStorageException( e );
+        }
+    }
+
+    /**
+     * DANGER: make sure to always close this cursor.
+     */
+    public PageCursor openPageCursorForReading( long id )
+    {
+        try
+        {
+            long pageId = pageIdForRecord( id );
+            return storeFile.io( pageId, PF_SHARED_READ_LOCK );
+        }
+        catch ( IOException e )
+        {
+            // TODO: think about what we really should be doing with the exception handling here...
             throw new UnderlyingStorageException( e );
         }
     }
@@ -1038,6 +1056,20 @@ public abstract class CommonAbstractStore<RECORD extends AbstractBaseRecord,HEAD
         }
     }
 
+    @Override
+    public void getRecordByCursor( long id, RECORD record, RecordLoad mode, PageCursor cursor ) throws UnderlyingStorageException
+    {
+        try
+        {
+            readIntoRecord( id, record, mode, cursor );
+        }
+        catch ( IOException e )
+        {
+            throw new UnderlyingStorageException( e );
+        }
+
+    }
+
     void readIntoRecord( long id, RECORD record, RecordLoad mode, PageCursor cursor ) throws IOException
     {
         // Mark the record with this id regardless of whether or not we load the contents of it.
@@ -1100,9 +1132,15 @@ public abstract class CommonAbstractStore<RECORD extends AbstractBaseRecord,HEAD
     @Override
     public void prepareForCommit( RECORD record )
     {
+        prepareForCommit( record, this );
+    }
+
+    @Override
+    public void prepareForCommit( RECORD record, IdSequence idSequence )
+    {
         if ( record.inUse() )
         {
-            recordFormat.prepare( record, recordSize, this );
+            recordFormat.prepare( record, recordSize, idSequence );
         }
     }
 

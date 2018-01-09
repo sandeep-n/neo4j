@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -29,7 +29,7 @@ import org.neo4j.values.virtual.VirtualValues;
 
 import static java.util.Collections.emptyMap;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.mockito.ArgumentMatchers.anyObject;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.RETURNS_MOCKS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -86,7 +86,7 @@ public class MachineRoom
 
     private static void init( BoltStateMachine machine ) throws AuthenticationException, BoltConnectionFatality
     {
-        when( machine.spi.authenticate( anyObject() ) ).thenReturn( mock( AuthenticationResult.class ) );
+        when( machine.spi.authenticate( any() ) ).thenReturn( mock( AuthenticationResult.class ) );
         machine.init( USER_AGENT, emptyMap(), nullResponseHandler() );
     }
 

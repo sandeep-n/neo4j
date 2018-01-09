@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,7 +21,6 @@ package org.neo4j.unsafe.impl.batchimport.input.csv;
 
 import org.junit.Test;
 
-import java.io.StringReader;
 import java.util.Map;
 import java.util.function.Supplier;
 
@@ -127,7 +126,7 @@ public class ExternalPropertiesDecoratorTest
 
     private Supplier<CharReadable> readable( final String data )
     {
-        return () -> Readables.wrap( new StringReader( data ) );
+        return () -> Readables.wrap( data );
     }
 
     private Overridden config()

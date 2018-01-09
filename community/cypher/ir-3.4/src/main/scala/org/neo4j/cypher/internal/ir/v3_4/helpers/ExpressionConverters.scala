@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -48,7 +48,7 @@ object ExpressionConverters {
         patternRelationships = patternContent.rels.toSet,
         patternNodes = patternContent.nodeIds.toSet
       ).addPredicates(predicates: _*)
-      qg.addArgumentIds(qg.coveredIds.filter(_.name.isNamed).toIndexedSeq)
+      qg.addArgumentIds(qg.idsWithoutOptionalMatchesOrUpdates.filter(_.name.isNamed).toIndexedSeq)
     }
   }
 
@@ -69,7 +69,7 @@ object ExpressionConverters {
         patternRelationships = patternContent.rels.toSet,
         patternNodes = patternContent.nodeIds.toSet
       ).addPredicates(predicates: _*)
-      qg.addArgumentIds(qg.coveredIds.filter(_.name.isNamed).toIndexedSeq)
+      qg.addArgumentIds(qg.idsWithoutOptionalMatchesOrUpdates.filter(_.name.isNamed).toIndexedSeq)
     }
   }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -26,17 +26,21 @@ import java.util.Optional;
 import org.neo4j.graphdb.NotInTransactionException;
 import org.neo4j.graphdb.TransactionTerminatedException;
 import org.neo4j.kernel.api.exceptions.Status;
+import org.neo4j.kernel.api.query.ExecutingQuery;
 import org.neo4j.kernel.api.txstate.TxStateHolder;
 import org.neo4j.kernel.impl.factory.AccessCapability;
 import org.neo4j.kernel.impl.factory.CanWrite;
 import org.neo4j.kernel.impl.locking.LockTracer;
 import org.neo4j.kernel.impl.proc.Procedures;
+import org.neo4j.resources.CpuClock;
+import org.neo4j.resources.HeapAllocation;
 import org.neo4j.storageengine.api.StorageStatement;
 
+import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.neo4j.kernel.api.security.SecurityContext.AUTH_DISABLED;
+import static org.neo4j.internal.kernel.api.security.SecurityContext.AUTH_DISABLED;
 
 public class KernelStatementTest
 {
@@ -90,5 +94,41 @@ public class KernelStatementTest
                 storeStatement, procedures, accessCapability, LockTracer.NONE, mock( StatementOperationParts.class ) );
 
         statement.assertOpen();
+    }
+
+    @Test
+    public void reportQueryWaitingTimeToTransactionStatisticWhenFinishQueryExecution()
+    {
+        KernelTransactionImplementation transaction = mock( KernelTransactionImplementation.class );
+        TxStateHolder txStateHolder = mock( TxStateHolder.class );
+        StorageStatement storeStatement = mock( StorageStatement.class );
+        AccessCapability accessCapability = mock( AccessCapability.class );
+        Procedures procedures = mock( Procedures.class );
+
+        KernelTransactionImplementation.Statistics statistics = new KernelTransactionImplementation.Statistics( transaction,
+                CpuClock.NOT_AVAILABLE, HeapAllocation.NOT_AVAILABLE );
+        when( transaction.getStatistics() ).thenReturn( statistics );
+        when( transaction.executingQueries() ).thenReturn( ExecutingQueryList.EMPTY );
+
+        KernelStatement statement = new KernelStatement( transaction, txStateHolder,
+                storeStatement, procedures, accessCapability, LockTracer.NONE, mock( StatementOperationParts.class ) );
+        statement.acquire();
+
+        ExecutingQuery query = getQueryWithWaitingTime();
+        ExecutingQuery query2 = getQueryWithWaitingTime();
+        ExecutingQuery query3 = getQueryWithWaitingTime();
+
+        statement.stopQueryExecution( query );
+        statement.stopQueryExecution( query2 );
+        statement.stopQueryExecution( query3 );
+
+        assertEquals( 3, statistics.getWaitingTimeNanos( 1 ) );
+    }
+
+    private ExecutingQuery getQueryWithWaitingTime()
+    {
+        ExecutingQuery executingQuery = mock( ExecutingQuery.class );
+        when( executingQuery.reportedWaitingTimeNanos() ).thenReturn( 1L );
+        return executingQuery;
     }
 }

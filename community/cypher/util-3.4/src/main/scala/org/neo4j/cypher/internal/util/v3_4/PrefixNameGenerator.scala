@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,6 +19,10 @@ package org.neo4j.cypher.internal.util.v3_4
 object FreshIdNameGenerator extends PrefixNameGenerator("FRESHID")
 
 object AggregationNameGenerator extends PrefixNameGenerator("AGGREGATION")
+
+object NodeNameGenerator extends PrefixNameGenerator("NODE")
+
+object RelNameGenerator extends PrefixNameGenerator("REL")
 
 object UnNamedNameGenerator extends PrefixNameGenerator("UNNAMED") {
   implicit class NameString(name: String) {

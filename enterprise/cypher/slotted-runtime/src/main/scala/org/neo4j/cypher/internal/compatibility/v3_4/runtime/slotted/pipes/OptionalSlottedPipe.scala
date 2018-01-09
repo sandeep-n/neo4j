@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,22 +19,43 @@
  */
 package org.neo4j.cypher.internal.compatibility.v3_4.runtime.slotted.pipes
 
-import org.neo4j.cypher.internal.compatibility.v3_4.runtime.PipelineInformation
-import org.neo4j.cypher.internal.compatibility.v3_4.runtime.slotted.PrimitiveExecutionContext
+import org.neo4j.cypher.internal.compatibility.v3_4.runtime.{LongSlot, RefSlot, Slot, SlotConfiguration}
+import org.neo4j.cypher.internal.compatibility.v3_4.runtime.slotted.SlottedExecutionContext
 import org.neo4j.cypher.internal.runtime.interpreted.pipes.{Pipe, PipeWithSource, QueryState}
 import org.neo4j.cypher.internal.runtime.interpreted.ExecutionContext
-import org.neo4j.cypher.internal.v3_4.logical.plans.LogicalPlanId
+import org.neo4j.cypher.internal.util.v3_4.attribution.Id
+import org.neo4j.values.storable.Values
 
-case class OptionalSlottedPipe(source: Pipe, nullableOffsets: Seq[Int],
-                               pipelineInformation: PipelineInformation)
-                              (val id: LogicalPlanId = LogicalPlanId.DEFAULT)
+case class OptionalSlottedPipe(source: Pipe,
+                               nullableSlots: Seq[Slot],
+                               slots: SlotConfiguration,
+                               argumentSize: SlotConfiguration.Size)
+                              (val id: Id = Id.INVALID_ID)
   extends PipeWithSource(source) with Pipe {
 
+  //===========================================================================
+  // Compile-time initializations
+  //===========================================================================
+  private val setNullableSlotToNullFunctions =
+    nullableSlots.map {
+      case LongSlot(offset, _, _) =>
+        (context: ExecutionContext) => context.setLongAt(offset, -1L)
+      case RefSlot(offset, _, _) =>
+        (context: ExecutionContext) => context.setRefAt(offset, Values.NO_VALUE)
+    }
+
+  //===========================================================================
+  // Runtime code
+  //===========================================================================
+  private def setNullableSlotsToNull(context: ExecutionContext) =
+    setNullableSlotToNullFunctions.foreach { f =>
+      f(context)
+    }
+
   private def notFoundExecutionContext(state: QueryState): ExecutionContext = {
-    val context = PrimitiveExecutionContext(pipelineInformation)
-    state.copyArgumentStateTo(context)
-    // TODO: This can probably be done with java.util.Arrays.fill knowing the first offset
-    nullableOffsets.foreach(offset => context.setLongAt(offset, -1))
+    val context = SlottedExecutionContext(slots)
+    state.copyArgumentStateTo(context, argumentSize.nLongs, argumentSize.nReferences)
+    setNullableSlotsToNull(context)
     context
   }
 

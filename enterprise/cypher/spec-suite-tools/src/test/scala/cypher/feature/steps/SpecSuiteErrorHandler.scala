@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -182,6 +182,8 @@ case class SpecSuiteErrorHandler(typ: String, phase: String, detail: String) ext
     else if (msg.matches(semanticError("Procedure call does not provide the required number of arguments.+")))
       detail should equal("InvalidNumberOfArguments")
     else if (msg.matches("Expected a parameter named .+"))
+      detail should equal("MissingParameter")
+    else if (msg.matches("Expected parameter\\(s\\): .+"))
       detail should equal("MissingParameter")
     else if (msg.startsWith("Procedure call cannot take an aggregating function as argument, please add a 'WITH' to your statement."))
       detail should equal("InvalidAggregation")

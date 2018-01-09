@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -45,7 +45,11 @@ import static org.neo4j.kernel.impl.transaction.log.entry.LogHeader.LOG_HEADER_S
  */
 public interface TransactionIdStore
 {
-    // Tx id counting starting from this value (this value means no transaction ever committed)
+    /**
+     * Tx id counting starting from this value (this value means no transaction ever committed).
+     *
+     * Note that a read only transaction will get txId = 0, see {@link org.neo4j.internal.kernel.api.Transaction}.
+     */
     long BASE_TX_ID = 1;
     long BASE_TX_CHECKSUM = 0;
 
@@ -73,6 +77,11 @@ public interface TransactionIdStore
      * until handed to {@link #transactionCommitted(long, long, long)}.
      */
     long nextCommittingTransactionId();
+
+    /**
+     * @return the transaction id of last committing transaction.
+     */
+    long committingTransactionId();
 
     /**
      * Signals that a transaction with the given transaction id has been committed (i.e. appended to a log).

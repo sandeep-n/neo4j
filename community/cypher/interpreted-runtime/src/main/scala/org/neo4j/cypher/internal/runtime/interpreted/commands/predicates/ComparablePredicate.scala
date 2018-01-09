@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -33,7 +33,7 @@ abstract sealed class ComparablePredicate(val left: Expression, val right: Expre
     val l = left(m, state)
     val r = right(m, state)
 
-    if (l == Values.NO_VALUE || r == Values.NO_VALUE) None
+    val res = if (l == Values.NO_VALUE || r == Values.NO_VALUE) None
     else (l, r) match {
       case (d: FloatingPointValue, _) if d.doubleValue().isNaN => None
       case (_, d: FloatingPointValue) if d.doubleValue().isNaN => None
@@ -42,6 +42,7 @@ abstract sealed class ComparablePredicate(val left: Expression, val right: Expre
       case (n1: BooleanValue, n2: BooleanValue) => Some(compare(AnyValues.COMPARATOR.compare(n1, n2)))
       case _ => None
     }
+    res
   }
 
   def sign: String
@@ -71,12 +72,12 @@ case class Equals(a: Expression, b: Expression) extends Predicate {
   }
 
   def isMatch(m: ExecutionContext, state: QueryState): Option[Boolean] = {
-    val a1 = a(m, state)
-    val b1 = b(m, state)
+    val l = a(m, state)
+    val r = b(m, state)
 
-    (a1, b1) match {
-      case (x, y) if x == Values.NO_VALUE || y == Values.NO_VALUE => None
-      case _ => Some(a1.equals(b1))
+    l.ternaryEquals(r) match {
+      case null => None
+      case v => Some(v)
     }
   }
 

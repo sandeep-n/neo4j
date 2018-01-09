@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -104,6 +104,9 @@ class ExpressionConverters(converters: ExpressionConverter*) {
 
       case ast.NilPathStep =>
         nilProjector
+
+      case x =>
+        throw new IllegalArgumentException(s"Unknown pattern part found in expression: $x")
     }
 
     val projector = project(e.step)

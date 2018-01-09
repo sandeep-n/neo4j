@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -54,6 +54,39 @@ class MatchAcceptanceTest extends ExecutionEngineFunSuite with QueryStatisticsTe
     count should equal(3)
   }
 
+  test("should not fail when planning independent optional matches") {
+    // Should plan without throwing exception
+    innerExecuteDeprecated(
+      """MATCH (study:Study {UUID:$studyUUID})
+        |MATCH (study)-[hasSubject:HAS_SUBJECT]->(subject:Study_Subject)-[:HAS_DATASET]->(dataset:Study_Dataset)<-[:HAS_DATASET]-(study)
+        |WHERE toLower(COALESCE(subject.Archived,'false')) = 'false' AND toLower(COALESCE(dataset.Archived,'false')) = 'false'
+        |WITH DISTINCT study, { RecordID: COALESCE(hasSubject.RecordID, subject.RecordID), SubjectUUID: subject.UUID } AS derivedData, subject
+        |MATCH (subject)-[:HAS_DATASET]-(dataset:Study_Dataset)<-[:HAS_DATASET]-(study)
+        |  WHERE size(FILTER(x in labels(dataset) WHERE x in ['YPQ','WASI'])) = 1 AND toLower(COALESCE(dataset.Archived,'false')) = 'false'
+        |WITH study, derivedData, subject, collect(dataset) AS datasets
+        |MATCH (stai:Study_Dataset:STAI) WHERE (stai IN datasets)
+        |MATCH (pswq:Study_Dataset:PSWQ) WHERE (pswq IN datasets)
+        |MATCH (pss:Study_Dataset:PSS) WHERE (pss IN datasets)
+        |MATCH (njre_q_r:Study_Dataset:NJRE_Q_R) WHERE (njre_q_r IN datasets)
+        |MATCH (iu:Study_Dataset:IU) WHERE (iu IN datasets)
+        |MATCH (gad_7:Study_Dataset:GAD_7) WHERE (gad_7 IN datasets)
+        |MATCH (fmps:Study_Dataset:FMPS) WHERE (fmps IN datasets)
+        |MATCH (bdi:Study_Dataset:BDI) WHERE (bdi IN datasets)
+        |MATCH (wdq:Study_Dataset:WDQ) WHERE (wdq IN datasets)
+        |MATCH (treasurehunt:Study_Dataset:TREASUREHUNT) WHERE (treasurehunt IN datasets)
+        |MATCH (scid_v2:Study_Dataset:SCID_V2) WHERE (scid_v2 IN datasets)
+        |MATCH (ybocs:Study_Dataset:YBOCS) WHERE (ybocs IN datasets)
+        |MATCH (bis:Study_Dataset:BIS) WHERE (bis IN datasets)
+        |MATCH (sdq:Study_Dataset:SDQ) WHERE (sdq IN datasets)
+        |MATCH (ehi:Study_Dataset:EHI) WHERE (ehi IN datasets)
+        |MATCH (oci_r:Study_Dataset:OCI_R) WHERE (oci_r IN datasets)
+        |MATCH (pi_wsur:Study_Dataset:PI_WSUR) WHERE (pi_wsur IN datasets)
+        |MATCH (rfq:Study_Dataset:RFQ) WHERE (rfq IN datasets)
+        |OPTIONAL MATCH (wasi:Study_Dataset:WASI) WHERE (wasi IN datasets)
+        |OPTIONAL MATCH (ypq:Study_Dataset:YPQ) WHERE (ypq IN datasets)
+        |RETURN DISTINCT derivedData AS DerivedData, subject , stai, pswq, pss, njre_q_r, iu, gad_7, fmps, bdi, wdq, treasurehunt, scid_v2, ybocs, bis, sdq, ehi, oci_r, pi_wsur, rfq, wasi, ypq""".stripMargin, Map("studyUUID" -> 1))
+  }
+
   test("Should not use both pruning var expand and projections that need path info") {
     val n1 = createLabeledNode("Neo")
     val n2 = createLabeledNode()
@@ -73,7 +106,7 @@ class MatchAcceptanceTest extends ExecutionEngineFunSuite with QueryStatisticsTe
   test("OPTIONAL MATCH, DISTINCT and DELETE in an unfortunate combination") {
     val start = createLabeledNode("Start")
     createLabeledNode("End")
-    val result = executeWith(Configs.CommunityInterpreted - Configs.Cost2_3,
+    val result = executeWith(Configs.Interpreted - Configs.Cost2_3,
       """
         |MATCH (start:Start),(end:End)
         |OPTIONAL MATCH (start)-[rel]->(end)
@@ -93,7 +126,7 @@ class MatchAcceptanceTest extends ExecutionEngineFunSuite with QueryStatisticsTe
         |RETURN a, b, COLLECT( DISTINCT c) as c
       """.stripMargin
 
-    val result = executeWith(Configs.CommunityInterpreted, query)
+    val result = executeWith(Configs.Interpreted, query)
     result.size should be(0)
     result.hasNext should be(false)
 
@@ -107,7 +140,7 @@ class MatchAcceptanceTest extends ExecutionEngineFunSuite with QueryStatisticsTe
     val n4 = createNode(Map("x" -> 50d))
     val n5 = createNode(Map("x" -> 50.toByte))
 
-    val result = executeWith(Configs.Interpreted, s"match (n) where n.x < 100 return n")
+    val result = executeWith(Configs.Interpreted + Configs.Morsel, s"match (n) where n.x < 100 return n")
 
     result.columnAs[Node]("n").toList should equal(List(n1, n2, n3, n4, n5))
   }
@@ -119,7 +152,7 @@ class MatchAcceptanceTest extends ExecutionEngineFunSuite with QueryStatisticsTe
     createNode(Map("x" -> "Zzing"))
     createNode(Map("x" -> 'Ä'))
 
-    val result = executeWith(Configs.CommunityInterpreted, s"match (n) where n.x < 'Z' AND n.x < 'z' return n")
+    val result = executeWith(Configs.Interpreted, s"match (n) where n.x < 'Z' AND n.x < 'z' return n")
 
     result.columnAs("n").toList should equal(List(n1, n2))
   }
@@ -129,7 +162,7 @@ class MatchAcceptanceTest extends ExecutionEngineFunSuite with QueryStatisticsTe
     createNodes("A", "B")
     val r1 = relate("A" -> "KNOWS" -> "B")
 
-    val result = executeWith(Configs.CommunityInterpreted, "match p = shortestPath((a {name:'A'})-[*..15]-(b {name:'B'})) return p").
+    val result = executeWith(Configs.Interpreted, "match p = shortestPath((a {name:'A'})-[*..15]-(b {name:'B'})) return p").
 
       toList.head("p").asInstanceOf[Path]
 
@@ -147,7 +180,7 @@ class MatchAcceptanceTest extends ExecutionEngineFunSuite with QueryStatisticsTe
     relate("A" -> "KNOWS" -> "B")
 
     //Checking that we don't get an exception
-    executeWith(Configs.CommunityInterpreted, "match p = shortestPath((a {name:'A'})-[*]-(b {name:'B'})) return p").toList
+    executeWith(Configs.Interpreted, "match p = shortestPath((a {name:'A'})-[*]-(b {name:'B'})) return p").toList
   }
 
   test("should not traverse same relationship twice in shortest path") {
@@ -156,7 +189,7 @@ class MatchAcceptanceTest extends ExecutionEngineFunSuite with QueryStatisticsTe
     relate("A" -> "KNOWS" -> "B")
 
     // when
-    val result = executeWith(Configs.CommunityInterpreted, "MATCH (a{name:'A'}), (b{name:'B'}) MATCH p=allShortestPaths((a)-[:KNOWS|KNOWS*]->(b)) RETURN p").
+    val result = executeWith(Configs.Interpreted, "MATCH (a{name:'A'}), (b{name:'B'}) MATCH p=allShortestPaths((a)-[:KNOWS|KNOWS*]->(b)) RETURN p").
       toList
 
     // then
@@ -186,7 +219,7 @@ class MatchAcceptanceTest extends ExecutionEngineFunSuite with QueryStatisticsTe
     val c = createNode("C")
     val r = relate(a, b, "X")
 
-    val result = executeWith(Configs.CommunityInterpreted,
+    val result = executeWith(Configs.Interpreted,
       """
     match (a {name:'A'}), (x) where x.name in ['B', 'C']
     optional match p = shortestPath((a)-[*]->(x))
@@ -201,7 +234,7 @@ class MatchAcceptanceTest extends ExecutionEngineFunSuite with QueryStatisticsTe
   test("should handle all shortest paths") {
     val (a, b, c, d) = createDiamond()
 
-    val result = executeWith(Configs.CommunityInterpreted,
+    val result = executeWith(Configs.Interpreted,
       """
     match (a), (d) where id(a) = %d and id(d) = %d
     match p = allShortestPaths( (a)-[*]->(d) )
@@ -214,7 +247,7 @@ class MatchAcceptanceTest extends ExecutionEngineFunSuite with QueryStatisticsTe
     val a = createNode()
     val b = createNode()
     relate(a, b)
-    val result = executeWith(Configs.CommunityInterpreted, "match (a), (b) where id(a) = 0 and id(b) = 1 match p=shortestPath((b)<-[*]-(a)) return p").toList.head("p").asInstanceOf[Path]
+    val result = executeWith(Configs.Interpreted, "match (a), (b) where id(a) = 0 and id(b) = 1 match p=shortestPath((b)<-[*]-(a)) return p").toList.head("p").asInstanceOf[Path]
 
     result.startNode() should equal(b)
     result.endNode() should equal(a)
@@ -225,7 +258,7 @@ class MatchAcceptanceTest extends ExecutionEngineFunSuite with QueryStatisticsTe
     val b = createLabeledNode("B")
     val r1 = relate(a, b)
 
-    val result = executeWith(Configs.CommunityInterpreted, "match (a:A) match p = shortestPath( (a)-[*]->(b:B) ) return p").toList.head("p").asInstanceOf[Path]
+    val result = executeWith(Configs.Interpreted, "match (a:A) match p = shortestPath( (a)-[*]->(b:B) ) return p").toList.head("p").asInstanceOf[Path]
 
 
     graph.inTx {
@@ -263,7 +296,7 @@ class MatchAcceptanceTest extends ExecutionEngineFunSuite with QueryStatisticsTe
   test("length on filter") {
     val q = "match (n) optional match (n)-[r]->(m) return length(filter(x in collect(r) WHERE x <> null)) as cn"
 
-    executeWith(Configs.CommunityInterpreted, q)
+    executeWith(Configs.Interpreted, q)
       .toList should equal(List(Map("cn" -> 0)))
   }
 
@@ -332,7 +365,7 @@ class MatchAcceptanceTest extends ExecutionEngineFunSuite with QueryStatisticsTe
     val r1 = relate(node1, node2, "prop" -> 10)
     val r2 = relate(node1, node2, "prop" -> 0)
 
-    val result = executeWith(Configs.All - Configs.Compiled, query)
+    val result = executeWith(Configs.All - Configs.Compiled + Configs.Morsel, query)
 
     result.toList should equal(List(Map("r" -> r1)))
   }
@@ -340,14 +373,14 @@ class MatchAcceptanceTest extends ExecutionEngineFunSuite with QueryStatisticsTe
   // Not TCK material -- id()
   test("id in where leads to empty result") {
     // when
-    val result = executeWith(Configs.All, "MATCH (n) WHERE id(n)=1337 RETURN n")
+    val result = executeWith(Configs.All + Configs.Morsel, "MATCH (n) WHERE id(n)=1337 RETURN n")
 
     // then DOESN'T THROW EXCEPTION
     result shouldBe empty
   }
 
   test("should not fail if asking for a non existent node id with WHERE") {
-    executeWith(Configs.Interpreted, "match (n) where id(n) in [0,1] return n")
+    executeWith(Configs.Interpreted + Configs.Morsel, "match (n) where id(n) in [0,1] return n")
       .toList
     // should not throw an exception
   }
@@ -355,8 +388,8 @@ class MatchAcceptanceTest extends ExecutionEngineFunSuite with QueryStatisticsTe
   test("should be able to set properties with a literal map twice in the same transaction") {
     val node = createLabeledNode("FOO")
 
-    executeWith(Configs.CommunityInterpreted - Configs.Cost2_3, "MATCH (n:FOO) SET n = { first: 'value' }")
-    executeWith(Configs.CommunityInterpreted - Configs.Cost2_3, "MATCH (n:FOO) SET n = { second: 'value' }")
+    executeWith(Configs.Interpreted - Configs.Cost2_3, "MATCH (n:FOO) SET n = { first: 'value' }")
+    executeWith(Configs.Interpreted - Configs.Cost2_3, "MATCH (n:FOO) SET n = { second: 'value' }")
 
     graph.inTx {
       node.getProperty("first", null) should equal(null)
@@ -539,10 +572,8 @@ class MatchAcceptanceTest extends ExecutionEngineFunSuite with QueryStatisticsTe
         |RETURN project.p""".stripMargin
 
     //WHEN
-    val first = executeWith(Configs.CommunityInterpreted - Configs.Cost2_3, query)
-      .length
-    val second = executeWith(Configs.CommunityInterpreted - Configs.Cost2_3, query)
-      .length
+    val first = executeWith(Configs.Interpreted - Configs.Cost2_3, query).length
+    val second = executeWith(Configs.Interpreted - Configs.Cost2_3, query).length
     val check = executeWith(Configs.All, "MATCH (f:Folder) RETURN f.name").toSet
 
     //THEN
@@ -576,10 +607,8 @@ class MatchAcceptanceTest extends ExecutionEngineFunSuite with QueryStatisticsTe
 
     //WHEN
 
-    val first = executeWith(Configs.CommunityInterpreted - Configs.Cost2_3, query)
- .length
-    val second = executeWith(Configs.CommunityInterpreted - Configs.Cost2_3, query)
- .length
+    val first = executeWith(Configs.Interpreted - Configs.Cost2_3, query).length
+    val second = executeWith(Configs.Interpreted - Configs.Cost2_3, query).length
     val check = executeWith(Configs.All, "MATCH (f:Folder) RETURN f.name").toSet
 
     //THEN
@@ -589,9 +618,9 @@ class MatchAcceptanceTest extends ExecutionEngineFunSuite with QueryStatisticsTe
 
   // Not TCK material -- id()
   test("should return empty result when there are no relationship with the given id") {
-    executeWith(Configs.All, "MATCH ()-[r]->() WHERE id(r) = 42 RETURN r") shouldBe empty
-    executeWith(Configs.All, "MATCH ()<-[r]-() WHERE id(r) = 42 RETURN r") shouldBe empty
-    executeWith(Configs.All, "MATCH ()-[r]-() WHERE id(r) = 42 RETURN r") shouldBe empty
+    executeWith(Configs.All + Configs.Morsel, "MATCH ()-[r]->() WHERE id(r) = 42 RETURN r") shouldBe empty
+    executeWith(Configs.All + Configs.Morsel, "MATCH ()<-[r]-() WHERE id(r) = 42 RETURN r") shouldBe empty
+    executeWith(Configs.All + Configs.Morsel, "MATCH ()-[r]-() WHERE id(r) = 42 RETURN r") shouldBe empty
   }
 
   // Not TCK material -- id()
@@ -604,7 +633,7 @@ class MatchAcceptanceTest extends ExecutionEngineFunSuite with QueryStatisticsTe
     1.to(1000).foreach(_ => createNode())
 
     // when
-    val result = executeWith(Configs.CommunityInterpreted, s"profile WITH [$a,$b,$d] AS arr MATCH (n) WHERE id(n) IN arr return count(*)")
+    val result = executeWith(Configs.Interpreted, s"profile WITH [$a,$b,$d] AS arr MATCH (n) WHERE id(n) IN arr return count(*)")
 
     // then
     result.toList should equal(List(Map("count(*)" -> 3)))
@@ -688,7 +717,7 @@ class MatchAcceptanceTest extends ExecutionEngineFunSuite with QueryStatisticsTe
 
     // When
     val res =
-      executeWith(Configs.AllExceptSlotted, "UNWIND {p} AS n MATCH (n)<-[:PING_DAY]-(p:Ping) RETURN count(p) as c", params = Map("p" -> List(node1, node2)))
+      executeWith(Configs.All, "UNWIND {p} AS n MATCH (n)<-[:PING_DAY]-(p:Ping) RETURN count(p) as c", params = Map("p" -> List(node1, node2)))
 
     //Then
     res.toList should equal(List(Map("c" -> 2)))
@@ -705,7 +734,7 @@ class MatchAcceptanceTest extends ExecutionEngineFunSuite with QueryStatisticsTe
 
     // When
     val res =
-      executeWith(Configs.AllExceptSlotted,
+      executeWith(Configs.All,
         """UNWIND {p1} AS n1
           |UNWIND {p2} AS n2
           |MATCH (n1)<-[:PING_DAY]-(n2) RETURN n1.prop, n2.prop""".stripMargin,
@@ -726,7 +755,7 @@ class MatchAcceptanceTest extends ExecutionEngineFunSuite with QueryStatisticsTe
         |         RETURN candidate
       """.stripMargin
 
-    val res = executeWith(Configs.All - Configs.Compiled, query)
+    val res = executeWith(Configs.All + Configs.Morsel - Configs.Compiled, query)
 
     //Then
     res.toList should equal(List(Map("candidate" -> "John"), Map("candidate" -> "Jonathan")))
@@ -743,7 +772,7 @@ class MatchAcceptanceTest extends ExecutionEngineFunSuite with QueryStatisticsTe
         |         RETURN candidate
       """.stripMargin
 
-    val res = executeWith(Configs.All - Configs.Compiled, query)
+    val res = executeWith(Configs.All + Configs.Morsel - Configs.Compiled, query)
 
     //Then
     res.toList should equal(List(Map("candidate" -> "John"), Map("candidate" -> "Jonathan")))
@@ -805,7 +834,7 @@ class MatchAcceptanceTest extends ExecutionEngineFunSuite with QueryStatisticsTe
     createLabeledNode("B")
     createLabeledNode("C")
 
-    val result = executeWith(Configs.Interpreted, "MATCH (a) WHERE a:A:B OR a:A:C RETURN a")
+    val result = executeWith(Configs.Interpreted + Configs.Morsel, "MATCH (a) WHERE a:A:B OR a:A:C RETURN a")
 
     // Then
     result.toList should equal(List(Map("a" -> n1), Map("a" -> n2), Map("a" -> n3)))
@@ -856,7 +885,7 @@ class MatchAcceptanceTest extends ExecutionEngineFunSuite with QueryStatisticsTe
     // Given an empty database
 
     // When
-    val result = executeWith(Configs.All, "PROFILE MATCH (n) WHERE 1 = 1 AND 5 > 1 RETURN n")
+    val result = executeWith(Configs.All + Configs.Morsel, "PROFILE MATCH (n) WHERE 1 = 1 AND 5 > 1 RETURN n")
 
     // Then
     result.executionPlanDescription().find("Selection") shouldBe empty
@@ -872,8 +901,51 @@ class MatchAcceptanceTest extends ExecutionEngineFunSuite with QueryStatisticsTe
         |  RETURN DISTINCT req.eid, y.eid
       """.stripMargin
 
-    val result = executeWith(Configs.CommunityInterpreted, query)
+    val result = executeWith(Configs.Interpreted, query)
 
     result.toList should equal(List(Map("req.eid" -> null, "y.eid" -> null)))
+  }
+
+  test("Problem with index seek gh #10387") {
+    graph.createIndex("ROLE", "id")
+    graph.createIndex("REALM", "id")
+
+    createLabeledNode(Map("id" -> "abc"), "ROLE")
+    val realm = createLabeledNode(Map("id" -> "def"), "REALM")
+    val q =
+      """MATCH (role:ROLE)
+              |WHERE role.id = "abc"
+              |WITH role
+              |UNWIND [{realmId: "def", rights: ["read"]}] AS permission
+              |MATCH (realm:REALM)
+              |WHERE realm.id = permission.realmId
+              |RETURN realm""".stripMargin
+
+    val res = executeWith(Configs.Interpreted, q)
+    res.toList should equal(List(Map("realm" -> realm)))
+    }
+
+  test("ambiguous variable name inside property gh #10444") {
+    val query =
+      """
+        |MATCH (folder:folder)<-[rel:in_folder]-(video:Video)
+        |WHERE id(folder) = {folderId}
+        |WITH {videokey:video, rel:rel} as video ORDER BY video.rel.position, video.videokey.created
+        |WITH collect(video) AS videos
+        |WITH videos, CASE WHEN {position} = 'end' THEN size(videos) - 1 ELSE {position} END as position,
+        |    range(0, size(videos)-1) as iterator,
+        |    reduce(x=[-1,0], v IN videos | CASE WHEN id(v.videokey) = {videoId} THEN [x[1],x[1]+1] ELSE [x[0], x[1]+1] END)[0] as movingVideoPosition
+        |
+        |    FOREACH (index IN iterator | FOREACH (rel IN [videos[index].rel] | SET rel.position =
+        |      CASE WHEN id(videos[index].videokey) = {videoId} THEN position
+        |    ELSE index + 1 END
+        |    ))
+      """.stripMargin
+
+
+    val configuration = Configs.Interpreted - Configs.Version2_3
+    val result = executeWith(configuration, query, params = Map("position" -> "2", "folderId" -> 0, "videoId" -> 0))
+
+    result.toList should equal(List.empty)
   }
 }

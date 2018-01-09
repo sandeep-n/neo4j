@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -28,8 +28,7 @@ import org.neo4j.collection.primitive.Primitive;
 import org.neo4j.collection.primitive.PrimitiveIntSet;
 import org.neo4j.collection.primitive.PrimitiveLongCollections;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
-import org.neo4j.helpers.collection.Iterators;
-import org.neo4j.kernel.api.exceptions.schema.ConstraintValidationException;
+import org.neo4j.internal.kernel.api.exceptions.schema.ConstraintValidationException;
 import org.neo4j.kernel.impl.api.state.RelationshipChangesForNode.DiffStrategy;
 import org.neo4j.kernel.impl.util.diffsets.DiffSets;
 import org.neo4j.storageengine.api.Direction;
@@ -213,9 +212,9 @@ public class NodeStateImpl extends PropertyContainerStateImpl implements NodeSta
     }
 
     @Override
-    public boolean hasChanges()
+    public boolean hasRelationshipChanges()
     {
-        return super.hasChanges() || hasAddedRelationships() || hasRemovedRelationships();
+        return hasAddedRelationships() || hasRemovedRelationships();
     }
 
     @Override
@@ -232,10 +231,10 @@ public class NodeStateImpl extends PropertyContainerStateImpl implements NodeSta
             PrimitiveLongCollections.emptyIterator();
     }
 
-    public abstract static class Defaults extends StateDefaults<Long, NodeState, NodeStateImpl>
+    public abstract static class Defaults extends StateDefaults<NodeState, NodeStateImpl>
     {
         @Override
-        final NodeStateImpl createValue( Long id, TxState state )
+        final NodeStateImpl createValue( long id, TxState state )
         {
             return new NodeStateImpl( id, state );
         }
@@ -319,7 +318,13 @@ public class NodeStateImpl extends PropertyContainerStateImpl implements NodeSta
             }
 
             @Override
-            public boolean hasChanges()
+            public boolean hasPropertyChanges()
+            {
+                return false;
+            }
+
+            @Override
+            public boolean hasRelationshipChanges()
             {
                 return false;
             }
@@ -334,6 +339,12 @@ public class NodeStateImpl extends PropertyContainerStateImpl implements NodeSta
             public StorageProperty getAddedProperty( int propertyKeyId )
             {
                 return null;
+            }
+
+            @Override
+            public boolean isPropertyChangedOrRemoved( int propertyKey )
+            {
+                return false;
             }
 
             @Override
@@ -353,6 +364,7 @@ public class NodeStateImpl extends PropertyContainerStateImpl implements NodeSta
             {
                 return null;
             }
+
         };
     }
 }

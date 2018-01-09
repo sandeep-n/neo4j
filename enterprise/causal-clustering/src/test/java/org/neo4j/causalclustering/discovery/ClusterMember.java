@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -32,4 +32,16 @@ public interface ClusterMember<T extends GraphDatabaseAPI>
     ClientConnectorAddresses clientConnectorAddresses();
 
     String settingValue( String settingName );
+
+    /**
+     * {@link Cluster} will use this {@link ThreadGroup} for the threads that start, and shut down, this cluster member.
+     * This way, the group will be transitively inherited by all the threads that are in turn started by the member
+     * during its start up and shut down processes.
+     * <p>
+     * This helps with debugging, because it makes it immediately visible (in the debugger) which cluster member any
+     * given thread belongs to.
+     *
+     * @return The intended parent thread group for this cluster member.
+     */
+    ThreadGroup threadGroup();
 }

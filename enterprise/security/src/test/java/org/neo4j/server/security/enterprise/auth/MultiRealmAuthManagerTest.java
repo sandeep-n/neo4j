@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -31,11 +31,11 @@ import java.util.Collections;
 import org.neo4j.commandline.admin.security.SetDefaultAdminCommand;
 import org.neo4j.kernel.api.exceptions.InvalidArgumentsException;
 import org.neo4j.kernel.api.security.AuthManager;
-import org.neo4j.kernel.api.security.AuthSubject;
+import org.neo4j.internal.kernel.api.security.AuthSubject;
 import org.neo4j.kernel.api.security.AuthToken;
-import org.neo4j.kernel.api.security.AuthenticationResult;
+import org.neo4j.internal.kernel.api.security.AuthenticationResult;
 import org.neo4j.kernel.api.security.PasswordPolicy;
-import org.neo4j.kernel.api.security.SecurityContext;
+import org.neo4j.internal.kernel.api.security.SecurityContext;
 import org.neo4j.kernel.api.security.exception.InvalidAuthTokenException;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.security.Credential;
@@ -251,7 +251,7 @@ public class MultiRealmAuthManagerTest extends InitialUserTest
 
         // Then
         assertThat( result, equalTo( AuthenticationResult.PASSWORD_CHANGE_REQUIRED ) );
-        logProvider.assertExactly( info( "[jake]: logged in" ) );
+        logProvider.assertExactly( info( "[jake]: logged in (password change required)" ) );
     }
 
     @Test
@@ -297,7 +297,7 @@ public class MultiRealmAuthManagerTest extends InitialUserTest
 
         // Then
         assertThat( result, equalTo( AuthenticationResult.FAILURE ) );
-        logProvider.assertExactly( error( "[%s]: failed to log in: invalid principal or credentials", "unknown" ) );
+        logProvider.assertExactly( error( "[%s]: failed to log in: invalid principal or credentials%s%s", "unknown", "", "" ) );
     }
 
     @Test
@@ -312,8 +312,8 @@ public class MultiRealmAuthManagerTest extends InitialUserTest
 
         // Then
         assertThat( result, equalTo( AuthenticationResult.FAILURE ) );
-        logProvider.assertExactly( error( "[%s]: failed to log in: invalid principal or credentials",
-                escape( "unknown\n\t\r\"haxx0r\"" ) ) );
+        logProvider.assertExactly( error( "[%s]: failed to log in: invalid principal or credentials%s%s",
+                escape( "unknown\n\t\r\"haxx0r\"" ), "", "" ) );
     }
 
     @Test

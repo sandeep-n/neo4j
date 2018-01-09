@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -131,11 +131,14 @@ public abstract class Service
      * the implementation class to the services listings file. But it serves as
      * a handle for an Annotation Processing Tool to utilize for performing that
      * task.
+     * <p>
+     * This annotation is deprecated and will be removed in a future release.
      *
      * @author Tobias Ivarsson
      */
     @Target( ElementType.TYPE )
     @Retention( RetentionPolicy.SOURCE )
+    @Deprecated
     public @interface Implementation
     {
         /**

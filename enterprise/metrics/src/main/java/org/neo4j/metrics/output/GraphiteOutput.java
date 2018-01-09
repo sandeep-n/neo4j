@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -40,7 +40,7 @@ import org.neo4j.logging.Log;
 public class GraphiteOutput implements Lifecycle, EventReporter
 {
     private final HostnamePort hostnamePort;
-    private long period;
+    private final long period;
     private final MetricRegistry registry;
     private final Log logger;
     private final String prefix;

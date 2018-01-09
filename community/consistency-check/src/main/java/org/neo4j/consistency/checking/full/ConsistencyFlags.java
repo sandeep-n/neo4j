@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -41,9 +41,9 @@ public class ConsistencyFlags
     }
 
     public ConsistencyFlags( boolean checkGraph,
-            boolean checkIndexes,
-            boolean checkLabelScanStore,
-            boolean checkPropertyOwners )
+                             boolean checkIndexes,
+                             boolean checkLabelScanStore,
+                             boolean checkPropertyOwners )
     {
         this.checkGraph = checkGraph;
         this.checkIndexes = checkIndexes;

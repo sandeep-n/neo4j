@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -44,7 +44,7 @@ class NativeSchemaNumberIndex<KEY extends SchemaNumberKey, VALUE extends SchemaN
     final File storeFile;
     final Layout<KEY,VALUE> layout;
     final GBPTreeFileUtil gbpTreeFileUtil;
-    private final IndexDescriptor descriptor;
+    final IndexDescriptor descriptor;
     private final long indexId;
     private final SchemaIndexProvider.Monitor monitor;
 

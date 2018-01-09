@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -224,35 +224,35 @@ public class ExtractorsTest
     }
 
     @Test
-    public void shouldTrimStringIfConfiguredTo() throws Exception
+    public void shouldTrimStringArrayIfConfiguredTo() throws Exception
     {
         // GIVEN
-        Extractors extractors = new Extractors( ',', true, true );
-        String value = " abcde fgh  ";
+        Extractors extractors = new Extractors( ';', true, true );
+        String value = "ab;cd ; ef; gh ";
 
         // WHEN
         char[] asChars = value.toCharArray();
-        Extractor<String> extractor = extractors.string();
+        Extractor<String[]> extractor = extractors.stringArray();
         extractor.extract( asChars, 0, asChars.length, true );
 
         // THEN
-        assertEquals( value.trim(), extractor.value() );
+        assertArrayEquals( new String[] {"ab", "cd", "ef", "gh"}, extractor.value() );
     }
 
     @Test
     public void shouldNotTrimStringIfNotConfiguredTo() throws Exception
     {
         // GIVEN
-        Extractors extractors = new Extractors( ',', true, false );
-        String value = " abcde fgh  ";
+        Extractors extractors = new Extractors( ';', true, false );
+        String value = "ab;cd ; ef; gh ";
 
         // WHEN
         char[] asChars = value.toCharArray();
-        Extractor<String> extractor = extractors.string();
+        Extractor<String[]> extractor = extractors.stringArray();
         extractor.extract( asChars, 0, asChars.length, true );
 
         // THEN
-        assertEquals( value, extractor.value() );
+        assertArrayEquals( new String[] {"ab", "cd ", " ef", " gh "}, extractor.value() );
     }
 
     @Test

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,9 +25,12 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.RuleChain;
 
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.neo4j.causalclustering.core.CoreGraphDatabase;
 import org.neo4j.causalclustering.core.consensus.roles.Role;
@@ -37,10 +40,14 @@ import org.neo4j.graphdb.Label;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.security.WriteOperationsNotAllowedException;
+import org.neo4j.io.pagecache.monitoring.PageCacheCounters;
 import org.neo4j.test.causalclustering.ClusterRule;
 import org.neo4j.test.rule.VerboseTimeout;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.CoreMatchers.containsString;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
@@ -48,13 +55,14 @@ import static org.neo4j.causalclustering.discovery.Cluster.dataMatchesEventually
 import static org.neo4j.causalclustering.helpers.DataCreator.countNodes;
 import static org.neo4j.function.Predicates.await;
 import static org.neo4j.graphdb.Label.label;
+import static org.neo4j.test.assertion.Assert.assertEventually;
 
 public class CoreReplicationIT
 {
     private final ClusterRule clusterRule =
-            new ClusterRule( getClass() ).withNumberOfCoreMembers( 3 ).withNumberOfReadReplicas( 0 );
+            new ClusterRule().withNumberOfCoreMembers( 3 ).withNumberOfReadReplicas( 0 );
     private final VerboseTimeout timeout = VerboseTimeout.builder()
-            .withTimeout( 1000, TimeUnit.SECONDS )
+            .withTimeout( 1000, SECONDS )
             .build();
 
     @Rule
@@ -104,6 +112,46 @@ public class CoreReplicationIT
             // expected
             assertThat( ignored.getMessage(), containsString( "No write operations are allowed" ) );
         }
+    }
+
+    @Test
+    public void pageFaultsFromReplicationMustCountInMetrics() throws Exception
+    {
+        // Given initial pin counts on all members
+        Function<CoreClusterMember,PageCacheCounters> getPageCacheCounters =
+                ccm -> ccm.database().getDependencyResolver().resolveDependency( PageCacheCounters.class );
+        List<PageCacheCounters> countersList =
+                cluster.coreMembers().stream().map( getPageCacheCounters ).collect( Collectors.toList() );
+        long[] initialPins = countersList.stream().mapToLong( PageCacheCounters::pins ).toArray();
+
+        // when the leader commits a write transaction,
+        cluster.coreTx( ( db, tx ) ->
+        {
+            Node node = db.createNode( label( "boo" ) );
+            node.setProperty( "foobar", "baz_bat" );
+            tx.success();
+        } );
+
+        // then the replication should cause pins on a majority of core members to increase.
+        // However, the commit returns as soon as the transaction has been replicated through the Raft log, which
+        // happens before the transaction is applied on the members. Therefor we are racing with the followers
+        // transaction application, so we have to spin.
+        int minimumUpdatedMembersCount = countersList.size() / 2 + 1;
+        assertEventually( "Expected followers to eventually increase pin counts", () ->
+        {
+            long[] pinsAfterCommit = countersList.stream().mapToLong( PageCacheCounters::pins ).toArray();
+            int membersWithIncreasedPinCount = 0;
+            for ( int i = 0; i < initialPins.length; i++ )
+            {
+                long before = initialPins[i];
+                long after = pinsAfterCommit[i];
+                if ( before < after )
+                {
+                    membersWithIncreasedPinCount++;
+                }
+            }
+            return membersWithIncreasedPinCount;
+        }, is( greaterThanOrEqualTo( minimumUpdatedMembersCount ) ), 10, SECONDS );
     }
 
     @Test
@@ -159,7 +207,7 @@ public class CoreReplicationIT
 
     private void awaitForDataToBeApplied( CoreClusterMember leader ) throws InterruptedException, TimeoutException
     {
-        await( () -> countNodes(leader) > 0, 10, TimeUnit.SECONDS);
+        await( () -> countNodes(leader) > 0, 10, SECONDS);
     }
 
     @Test

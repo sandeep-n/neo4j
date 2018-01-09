@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -644,6 +644,26 @@ public class BufferedCharSeekerTest
                 "Quux" ) );
     }
 
+    @Test
+    public void shouldTrimWhitespace() throws Exception
+    {
+        // given
+        String data = lines( "\n",
+                "Foo, Bar,  Twobar , \"Baz\" , \" Quux \",\"Wiii \" , Waaaa  " );
+
+        // when
+        seeker = seeker( data, withTrimStrings( config(), true ) );
+
+        // then
+        assertNextValue( seeker, mark, COMMA, "Foo" );
+        assertNextValue( seeker, mark, COMMA, "Bar" );
+        assertNextValue( seeker, mark, COMMA, "Twobar" );
+        assertNextValue( seeker, mark, COMMA, "Baz" );
+        assertNextValue( seeker, mark, COMMA, " Quux " );
+        assertNextValue( seeker, mark, COMMA, "Wiii " );
+        assertNextValue( seeker, mark, COMMA, "Waaaa" );
+    }
+
     private String lines( String newline, String... lines )
     {
         StringBuilder builder = new StringBuilder();
@@ -765,7 +785,7 @@ public class BufferedCharSeekerTest
 
     private CharSeeker seeker( String data, Configuration config )
     {
-        return seeker( wrap( stringReaderWithName( data, TEST_SOURCE ) ), config );
+        return seeker( wrap( stringReaderWithName( data, TEST_SOURCE ), data.length() * 2 ), config );
     }
 
     private Reader stringReaderWithName( String data, final String name )
@@ -833,6 +853,18 @@ public class BufferedCharSeekerTest
         };
     }
 
+    private static Configuration withTrimStrings( Configuration config, boolean trimStrings )
+    {
+        return new Configuration.Overridden( config )
+        {
+            @Override
+            public boolean trimStrings()
+            {
+                return trimStrings;
+            }
+        };
+    }
+
     private static final int TAB = '\t';
     private static final int COMMA = ',';
     private static final Random random = new Random();
@@ -854,10 +886,11 @@ public class BufferedCharSeekerTest
     {
         private final StringReader reader;
         private final int maxBytesPerRead;
-        private int position;
+        private final String data;
 
         ControlledCharReadable( String data, int maxBytesPerRead )
         {
+            this.data = data;
             this.reader = new StringReader( data );
             this.maxBytesPerRead = maxBytesPerRead;
         }
@@ -879,13 +912,19 @@ public class BufferedCharSeekerTest
         @Override
         public long position()
         {
-            return position;
+            return 0;
         }
 
         @Override
         public String sourceDescription()
         {
             return getClass().getSimpleName();
+        }
+
+        @Override
+        public long length()
+        {
+            return data.length() * 2;
         }
     }
 }

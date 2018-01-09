@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,6 +25,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -32,6 +33,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -194,17 +196,43 @@ public class WorkSyncTest
         assertThat( sum.sum(), is( 30L ) );
     }
 
-    @Test
+    @Test ( timeout = 10000 )
     public void mustCombineWork() throws Exception
     {
-        ExecutorService executor = Executors.newFixedThreadPool( 64 );
-        for ( int i = 0; i < 1000; i++ )
+        BinaryLatch startLatch = new BinaryLatch();
+        BinaryLatch blockLatch = new BinaryLatch();
+        FutureTask<Void> blocker = new FutureTask<>( new CallableWork( new AddWork( 1 )
         {
-            executor.submit( new CallableWork( new AddWork( 1 ) ) );
-        }
-        executor.shutdown();
-        assertTrue( executor.awaitTermination( 2, TimeUnit.SECONDS ) );
+            @Override
+            public void apply( Adder adder )
+            {
+                super.apply( adder );
+                startLatch.release();
+                blockLatch.await();
+            }
+        } ) );
+        new Thread( blocker ).start();
+        startLatch.await();
+        Collection<FutureTask<Void>> tasks = new ArrayList<>();
+        tasks.add( blocker );
+        for ( int i = 0; i < 20; i++ )
+        {
 
+            CallableWork task = new CallableWork( new AddWork( 1 ) );
+            FutureTask<Void> futureTask = new FutureTask<>( task );
+            tasks.add( futureTask );
+            Thread thread = new Thread( futureTask );
+            thread.start();
+            //wait for the thread to reach the lock
+            while ( thread.getState() != Thread.State.TIMED_WAITING )
+            {
+            }
+        }
+        blockLatch.release();
+        for ( FutureTask<Void> task : tasks )
+        {
+            task.get();
+        }
         assertThat( count.sum(), lessThan( sum.sum() ) );
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,7 +20,6 @@
 package org.neo4j.tools.rebuild;
 
 import java.io.File;
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -53,7 +52,6 @@ import org.neo4j.kernel.impl.store.MetaDataStore;
 import org.neo4j.kernel.impl.store.StoreAccess;
 import org.neo4j.kernel.impl.transaction.CommittedTransactionRepresentation;
 import org.neo4j.kernel.impl.transaction.TransactionRepresentation;
-import org.neo4j.kernel.impl.transaction.log.PhysicalLogFiles;
 import org.neo4j.kernel.impl.transaction.log.PhysicalLogVersionedStoreChannel;
 import org.neo4j.kernel.impl.transaction.log.PhysicalTransactionCursor;
 import org.neo4j.kernel.impl.transaction.log.ReadAheadLogChannel;
@@ -62,11 +60,11 @@ import org.neo4j.kernel.impl.transaction.log.ReadableLogChannel;
 import org.neo4j.kernel.impl.transaction.log.ReaderLogVersionBridge;
 import org.neo4j.kernel.impl.transaction.log.entry.LogEntryReader;
 import org.neo4j.kernel.impl.transaction.log.entry.VersionAwareLogEntryReader;
+import org.neo4j.kernel.impl.transaction.log.files.LogFiles;
+import org.neo4j.kernel.impl.transaction.log.files.LogFilesBuilder;
 import org.neo4j.kernel.internal.GraphDatabaseAPI;
 import org.neo4j.logging.FormattedLog;
 
-import static java.lang.String.format;
-import static org.neo4j.kernel.impl.transaction.log.PhysicalLogFile.openForVersion;
 import static org.neo4j.kernel.impl.transaction.log.TransactionIdStore.BASE_TX_ID;
 import static org.neo4j.kernel.impl.transaction.tracing.CommitEvent.NULL;
 import static org.neo4j.storageengine.api.TransactionApplicationMode.EXTERNAL;
@@ -147,26 +145,13 @@ class RebuildFromLogs
     {
         try ( PageCache pageCache = StandalonePageCacheFactory.createPageCache( fs ) )
         {
-            PhysicalLogFiles logFiles = new PhysicalLogFiles( source, fs );
+            LogFiles logFiles = LogFilesBuilder.logFilesBasedOnlyBuilder( source, fs ).build();
             long highestVersion = logFiles.getHighestLogVersion();
             if ( highestVersion < 0 )
             {
                 printUsage( "Inconsistent number of log files found in " + source );
                 return;
             }
-            long txCount = findLastTransactionId( logFiles, highestVersion );
-            ProgressMonitorFactory progress;
-            if ( txCount < 0 )
-            {
-                progress = ProgressMonitorFactory.NONE;
-                System.err.println(
-                        "Unable to report progress, cannot find highest txId, attempting rebuild anyhow." );
-            }
-            else
-            {
-                progress = ProgressMonitorFactory.textual( System.err );
-            }
-            progress.singlePart( format( "Rebuilding store from %s transactions ", txCount ), txCount );
 
             long lastTxId;
             try ( TransactionApplier applier = new TransactionApplier( fs, target, pageCache ) )
@@ -188,25 +173,6 @@ class RebuildFromLogs
         {
             checker.checkConsistency();
         }
-    }
-
-    private long findLastTransactionId( PhysicalLogFiles logFiles, long highestVersion ) throws IOException
-    {
-        PhysicalLogVersionedStoreChannel channel = openForVersion( logFiles, fs, highestVersion, false );
-        ReadableLogChannel logChannel = new ReadAheadLogChannel( channel );
-
-        long lastTransactionId = -1;
-
-        LogEntryReader<ReadableClosablePositionAwareChannel> entryReader = new VersionAwareLogEntryReader<>();
-        try ( IOCursor<CommittedTransactionRepresentation> cursor =
-                new PhysicalTransactionCursor<>( logChannel, entryReader ) )
-        {
-            while ( cursor.next() )
-            {
-                lastTransactionId = cursor.get().getCommitEntry().getTxId();
-            }
-        }
-        return lastTransactionId;
     }
 
     private static void printUsage( String... msgLines )
@@ -237,10 +203,10 @@ class RebuildFromLogs
 
         long applyTransactionsFrom( File sourceDir, long upToTxId ) throws Exception
         {
-            PhysicalLogFiles logFiles = new PhysicalLogFiles( sourceDir, fs );
+            LogFiles logFiles = LogFilesBuilder.logFilesBasedOnlyBuilder( sourceDir, fs ).build();
             int startVersion = 0;
-            ReaderLogVersionBridge versionBridge = new ReaderLogVersionBridge( fs, logFiles );
-            PhysicalLogVersionedStoreChannel startingChannel = openForVersion( logFiles, fs, startVersion, false );
+            ReaderLogVersionBridge versionBridge = new ReaderLogVersionBridge( logFiles );
+            PhysicalLogVersionedStoreChannel startingChannel = logFiles.openForVersion( startVersion );
             ReadableLogChannel channel = new ReadAheadLogChannel( startingChannel, versionBridge );
             long txId = BASE_TX_ID;
             TransactionQueue queue = new TransactionQueue( 10_000,
@@ -304,7 +270,7 @@ class RebuildFromLogs
         }
 
         @Override
-        public void close() throws Exception
+        public void close()
         {
             graphdb.shutdown();
         }

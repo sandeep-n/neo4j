@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -35,7 +35,9 @@ import org.neo4j.graphdb.mockfs.EphemeralFileSystemAbstraction;
 import org.neo4j.helpers.collection.Iterables;
 import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.io.pagecache.PageCache;
+import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.store.allocator.ReusableRecordsAllocator;
+import org.neo4j.kernel.impl.store.id.DefaultIdGeneratorFactory;
 import org.neo4j.kernel.impl.store.record.AbstractBaseRecord;
 import org.neo4j.kernel.impl.store.record.DynamicRecord;
 import org.neo4j.kernel.impl.store.record.LabelTokenRecord;
@@ -84,7 +86,8 @@ public abstract class RecordStoreConsistentReadTest<R extends AbstractBaseRecord
         PageCache pageCache = pageCacheRule.getPageCache( fs,
                 config().withInconsistentReads( nextReadIsInconsistent ) );
         File storeDir = new File( "stores" );
-        StoreFactory factory = new StoreFactory( storeDir, pageCache, fs, NullLogProvider.getInstance() );
+        StoreFactory factory = new StoreFactory( storeDir, Config.defaults(), new DefaultIdGeneratorFactory( fs ),
+                pageCache, fs, NullLogProvider.getInstance() );
         NeoStores neoStores = factory.openAllNeoStores( true );
         S store = initialiseStore( neoStores );
 
@@ -444,7 +447,7 @@ public abstract class RecordStoreConsistentReadTest<R extends AbstractBaseRecord
             PropertyBlock block = new PropertyBlock();
             DynamicRecordAllocator stringAllocator = new ReusableRecordsAllocator( 64, new DynamicRecord( 7 ) );
             Value value = Values.of( "a string too large to fit in the property block itself" );
-            PropertyStore.encodeValue( block, 6, value, stringAllocator, null );
+            PropertyStore.encodeValue( block, 6, value, stringAllocator, null, true );
             if ( light )
             {
                 block.getValueRecords().clear();

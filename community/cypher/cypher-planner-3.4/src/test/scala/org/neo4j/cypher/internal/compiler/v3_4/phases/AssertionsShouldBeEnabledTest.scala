@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,7 +19,7 @@
  */
 package org.neo4j.cypher.internal.compiler.v3_4.phases
 
-import org.neo4j.cypher.internal.frontend.v3_4.helpers.AssertionRunner.{Thunk, runUnderAssertion}
+import org.neo4j.cypher.internal.util.v3_4.AssertionRunner.{Thunk, runUnderAssertion}
 import org.neo4j.cypher.internal.util.v3_4.test_helpers.CypherFunSuite
 
 class AssertionsShouldBeEnabledTest extends CypherFunSuite {

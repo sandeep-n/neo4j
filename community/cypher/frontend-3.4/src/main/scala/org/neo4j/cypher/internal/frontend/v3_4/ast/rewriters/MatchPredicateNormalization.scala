@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,7 +21,7 @@ import org.neo4j.cypher.internal.frontend.v3_4.ast._
 import org.neo4j.cypher.internal.frontend.v3_4.helpers.calculateUsingGetDegree
 import org.neo4j.cypher.internal.v3_4.expressions._
 
-abstract class MatchPredicateNormalization(normalizer: MatchPredicateNormalizer) extends Rewriter {
+abstract class MatchPredicateNormalization(normalizer: MatchPredicateNormalizer, getDegreeRewriting: Boolean) extends Rewriter {
 
   def apply(that: AnyRef): AnyRef = instance(that)
 
@@ -43,7 +43,11 @@ abstract class MatchPredicateNormalization(normalizer: MatchPredicateNormalizer)
       val newWhere: Option[Where] = predOpt.map {
         exp =>
           val pos: InputPosition = where.fold(m.position)(_.position)
-          Where(exp.endoRewrite(whereRewriter))(pos)
+          val e = if (getDegreeRewriting)
+            exp.endoRewrite(whereRewriter)
+          else
+            exp
+          Where(e)(pos)
       }
 
       m.copy(

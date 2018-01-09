@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -56,6 +56,7 @@ public class ReadReplica implements ClusterMember
     private final String boltAdvertisedSocketAddress;
     protected ReadReplicaGraphDatabase database;
     protected Monitors monitors;
+    private final ThreadGroup threadGroup;
 
     public ReadReplica( File parentDir, int serverId, int boltPort, int httpPort, int txPort, int backupPort,
                         DiscoveryServiceFactory discoveryServiceFactory,
@@ -97,13 +98,16 @@ public class ReadReplica implements ClusterMember
         config.put( CausalClusteringSettings.transaction_listen_address.name(), listenAddress( listenAddress, txPort ) );
         config.put( OnlineBackupSettings.online_backup_server.name(), listenAddress( listenAddress, backupPort ) );
         config.put( GraphDatabaseSettings.logs_directory.name(), new File( neo4jHome, "logs" ).getAbsolutePath() );
+        config.put( GraphDatabaseSettings.logical_logs_location.name(), "replica-tx-logs-" + serverId );
 
         this.discoveryServiceFactory = discoveryServiceFactory;
         storeDir = new File( new File( new File( neo4jHome, "data" ), "databases" ), "graph.db" );
+
         //noinspection ResultOfMethodCallIgnored
         storeDir.mkdirs();
 
         this.monitors = monitors;
+        threadGroup = new ThreadGroup( toString() );
     }
 
     public String boltAdvertisedAddress()
@@ -155,6 +159,12 @@ public class ReadReplica implements ClusterMember
     public String settingValue( String settingName )
     {
         return config.get(settingName);
+    }
+
+    @Override
+    public ThreadGroup threadGroup()
+    {
+        return threadGroup;
     }
 
     public File storeDir()

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -38,11 +38,11 @@ import org.neo4j.kernel.impl.locking.Lock;
 import org.neo4j.kernel.impl.locking.LockService;
 import org.neo4j.kernel.impl.store.NeoStores;
 import org.neo4j.kernel.impl.store.NodeStore;
+import org.neo4j.kernel.impl.store.PropertyStore;
 import org.neo4j.kernel.impl.store.RecordCursors;
-import org.neo4j.kernel.impl.store.RecordStore;
+import org.neo4j.kernel.impl.store.RelationshipGroupStore;
 import org.neo4j.kernel.impl.store.RelationshipStore;
 import org.neo4j.kernel.impl.store.StoreType;
-import org.neo4j.kernel.impl.store.record.RelationshipGroupRecord;
 import org.neo4j.kernel.impl.util.InstanceCache;
 import org.neo4j.storageengine.api.Direction;
 import org.neo4j.storageengine.api.NodeItem;
@@ -67,13 +67,16 @@ public class StoreStatement implements StorageStatement
     private final InstanceCache<StoreNodeRelationshipCursor> nodeRelationshipsCursor;
     private final InstanceCache<StoreSinglePropertyCursor> singlePropertyCursorCache;
     private final InstanceCache<StorePropertyCursor> propertyCursorCache;
+
     private final NeoStores neoStores;
     private final NodeStore nodeStore;
     private final RelationshipStore relationshipStore;
+    private final RelationshipGroupStore relationshipGroupStore;
+    private final PropertyStore propertyStore;
+
     private final Supplier<IndexReaderFactory> indexReaderFactorySupplier;
     private final RecordCursors recordCursors;
     private final Supplier<LabelScanReader> labelScanStore;
-    private final RecordStore<RelationshipGroupRecord> relationshipGroupStore;
     private final RecordStorageCommandCreationContext commandCreationContext;
 
     private IndexReaderFactory indexReaderFactory;
@@ -90,9 +93,11 @@ public class StoreStatement implements StorageStatement
         this.indexReaderFactorySupplier = indexReaderFactory;
         this.labelScanStore = labelScanReaderSupplier;
         this.commandCreationContext = commandCreationContext;
+
         this.nodeStore = neoStores.getNodeStore();
         this.relationshipStore = neoStores.getRelationshipStore();
         this.relationshipGroupStore = neoStores.getRelationshipGroupStore();
+        this.propertyStore = neoStores.getPropertyStore();
         this.recordCursors = new RecordCursors( neoStores );
 
         singleNodeCursor = new InstanceCache<StoreSingleNodeCursor>()
@@ -278,5 +283,29 @@ public class StoreStatement implements StorageStatement
     public long reserveRelationship()
     {
         return commandCreationContext.nextId( StoreType.RELATIONSHIP );
+    }
+
+    @Override
+    public Nodes nodes()
+    {
+        return nodeStore;
+    }
+
+    @Override
+    public Relationships relationships()
+    {
+        return relationshipStore;
+    }
+
+    @Override
+    public Groups groups()
+    {
+        return relationshipGroupStore;
+    }
+
+    @Override
+    public Properties properties()
+    {
+        return propertyStore;
     }
 }

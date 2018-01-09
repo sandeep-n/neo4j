@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,22 +23,23 @@ import org.junit.Test;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static java.util.Arrays.asList;
-import static junit.framework.TestCase.assertEquals;
-import static junit.framework.TestCase.assertTrue;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.neo4j.helpers.collection.Iterators.iterator;
 import static org.neo4j.helpers.collection.ResourceClosingIterator.newResourceIterator;
 
 public class ResourceIterableTest
 {
     @Test
-    public void streamShouldCloseOnCompleted() throws Throwable
+    public void streamShouldCloseSingleOnCompleted() throws Throwable
     {
         // Given
         AtomicBoolean closed = new AtomicBoolean( false );
-        ResourceIterator<Integer> resourceIterator = newResourceIterator( () -> closed.set( true ), iterator( new Integer[]{1, 2, 3} ) );
+        ResourceIterator<Integer> resourceIterator = newResourceIterator( iterator( new Integer[]{1, 2, 3} ), () -> closed.set( true ) );
 
         ResourceIterable<Integer> iterable = () -> resourceIterator;
 
@@ -48,5 +49,24 @@ public class ResourceIterableTest
         // Then
         assertEquals( asList(1,2,3), result );
         assertTrue( closed.get() );
+    }
+
+    @Test
+    public void streamShouldCloseMultipleOnCompleted() throws Throwable
+    {
+        // Given
+        AtomicInteger closed = new AtomicInteger();
+        Resource resource = closed::incrementAndGet;
+        ResourceIterator<Integer> resourceIterator =
+                newResourceIterator( iterator( new Integer[]{1, 2, 3} ), resource, resource );
+
+        ResourceIterable<Integer> iterable = () -> resourceIterator;
+
+        // When
+        List<Integer> result = iterable.stream().collect( Collectors.toList() );
+
+        // Then
+        assertEquals( asList(1,2,3), result );
+        assertEquals( "two calls to close", 2, closed.get() );
     }
 }

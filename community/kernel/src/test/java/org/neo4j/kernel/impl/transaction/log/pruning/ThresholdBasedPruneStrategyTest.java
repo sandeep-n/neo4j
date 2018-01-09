@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,18 +20,20 @@
 package org.neo4j.kernel.impl.transaction.log.pruning;
 
 import org.junit.Test;
+import org.mockito.InOrder;
 
 import java.io.File;
 
 import org.neo4j.io.fs.FileSystemAbstraction;
-import org.neo4j.kernel.impl.transaction.log.LogFileInformation;
-import org.neo4j.kernel.impl.transaction.log.PhysicalLogFiles;
-import org.neo4j.kernel.impl.transaction.log.pruning.LogPruneStrategy.Monitor;
+import org.neo4j.kernel.impl.transaction.log.files.LogFiles;
+import org.neo4j.kernel.impl.transaction.log.files.TransactionLogFiles;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -40,12 +42,11 @@ import static org.neo4j.kernel.impl.transaction.log.entry.LogHeader.LOG_HEADER_S
 public class ThresholdBasedPruneStrategyTest
 {
     private final FileSystemAbstraction fileSystem = mock( FileSystemAbstraction.class );
-    private final LogFileInformation logFileInfo = mock( LogFileInformation.class );
-    private final PhysicalLogFiles files = mock( PhysicalLogFiles.class );
+    private final LogFiles files = mock( TransactionLogFiles.class );
     private final Threshold threshold = mock( Threshold.class );
 
     @Test
-    public void shouldNotDeleteAnythingIfThresholdDoesNotAllow() throws Exception
+    public void shouldNotDeleteAnythingIfThresholdDoesNotAllow()
     {
         // Given
         File fileName0 = new File( "logical.log.v0" );
@@ -76,16 +77,15 @@ public class ThresholdBasedPruneStrategyTest
 
         when( threshold.reached( any(), anyLong(), any() ) ).thenReturn( false );
 
-        final ThresholdBasedPruneStrategy strategy = new ThresholdBasedPruneStrategy( fileSystem, logFileInfo, files, threshold );
-        Monitor monitor = mock( Monitor.class );
+        final ThresholdBasedPruneStrategy strategy = new ThresholdBasedPruneStrategy( fileSystem, files, threshold );
 
         // When
-        strategy.prune( 7L, monitor );
+        strategy.findLogVersionsToDelete( 7L ).forEachOrdered(
+                v -> fileSystem.deleteFile( files.getLogFileForVersion( v ) ) );
 
         // Then
         verify( threshold, times( 1 ) ).init();
         verify( fileSystem, times( 0 ) ).deleteFile( any() );
-        verify( monitor ).noLogsPruned( 7L );
     }
 
     @Test
@@ -124,18 +124,20 @@ public class ThresholdBasedPruneStrategyTest
 
         when( fileSystem.getFileSize( any() ) ).thenReturn( LOG_HEADER_SIZE + 1L );
 
-        final ThresholdBasedPruneStrategy strategy = new ThresholdBasedPruneStrategy(
-                fileSystem, logFileInfo, files, threshold );
-        Monitor monitor = mock( Monitor.class );
+        final ThresholdBasedPruneStrategy strategy = new ThresholdBasedPruneStrategy( fileSystem, files, threshold );
 
         // When
-        strategy.prune( 7L, monitor );
+        strategy.findLogVersionsToDelete( 7L ).forEachOrdered(
+                v -> fileSystem.deleteFile( files.getLogFileForVersion( v ) ) );
 
         // Then
-        verify( threshold, times( 1 ) ).init();
-        verify( fileSystem, times( 1 ) ).deleteFile( fileName1 );
-        verify( fileSystem, times( 1 ) ).deleteFile( fileName2 );
-        verify( fileSystem, times( 1 ) ).deleteFile( fileName3 );
-        verify( monitor ).logsPruned( 7L, 1, 3 );
+        InOrder order = inOrder( threshold, fileSystem );
+        order.verify( threshold, times( 1 ) ).init();
+        order.verify( fileSystem, times( 1 ) ).deleteFile( fileName1 );
+        order.verify( fileSystem, times( 1 ) ).deleteFile( fileName2 );
+        order.verify( fileSystem, times( 1 ) ).deleteFile( fileName3 );
+        verify( fileSystem, never() ).deleteFile( fileName4 );
+        verify( fileSystem, never() ).deleteFile( fileName5 );
+        verify( fileSystem, never() ).deleteFile( fileName6 );
     }
 }

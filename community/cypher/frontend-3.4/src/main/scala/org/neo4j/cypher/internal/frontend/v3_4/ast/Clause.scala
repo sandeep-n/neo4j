@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -643,7 +643,7 @@ case class Return(distinct: Boolean,
     }
 }
 
-case class PragmaWithout(excluded: Seq[Variable])(val position: InputPosition) extends HorizonClause {
+case class PragmaWithout(excluded: Seq[LogicalVariable])(val position: InputPosition) extends HorizonClause {
   override def name = "_PRAGMA WITHOUT"
   val excludedNames: Set[String] = excluded.map(_.name).toSet
 

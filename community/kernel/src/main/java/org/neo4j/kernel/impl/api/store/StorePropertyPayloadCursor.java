@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,6 +22,7 @@ package org.neo4j.kernel.impl.api.store;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
+import org.neo4j.kernel.impl.store.GeometryType;
 import org.neo4j.kernel.impl.store.LongerShortString;
 import org.neo4j.kernel.impl.store.PropertyType;
 import org.neo4j.kernel.impl.store.RecordCursor;
@@ -31,7 +32,6 @@ import org.neo4j.kernel.impl.store.record.PropertyBlock;
 import org.neo4j.kernel.impl.store.record.Record;
 import org.neo4j.kernel.impl.util.Bits;
 import org.neo4j.string.UTF8;
-import org.neo4j.values.storable.ArrayValue;
 import org.neo4j.values.storable.BooleanValue;
 import org.neo4j.values.storable.ByteValue;
 import org.neo4j.values.storable.CharValue;
@@ -50,6 +50,7 @@ import static org.neo4j.kernel.impl.store.PropertyType.BYTE;
 import static org.neo4j.kernel.impl.store.PropertyType.CHAR;
 import static org.neo4j.kernel.impl.store.PropertyType.DOUBLE;
 import static org.neo4j.kernel.impl.store.PropertyType.FLOAT;
+import static org.neo4j.kernel.impl.store.PropertyType.GEOMETRY;
 import static org.neo4j.kernel.impl.store.PropertyType.INT;
 import static org.neo4j.kernel.impl.store.PropertyType.LONG;
 import static org.neo4j.kernel.impl.store.PropertyType.SHORT;
@@ -224,7 +225,13 @@ class StorePropertyPayloadCursor
         assertOfType( ARRAY );
         readFromStore( arrayRecordCursor );
         buffer.flip();
-        return readArrayFromBuffer( buffer );
+        return PropertyUtil.readArrayFromBuffer( buffer );
+    }
+
+    Value geometryValue()
+    {
+        assertOfType( GEOMETRY );
+        return GeometryType.decode( data, position );
     }
 
     Value value()
@@ -255,6 +262,8 @@ class StorePropertyPayloadCursor
             return shortArrayValue();
         case ARRAY:
             return arrayValue();
+        case GEOMETRY:
+            return geometryValue();
         default:
             throw new IllegalStateException( "No such type:" + type() );
         }
@@ -316,59 +325,6 @@ class StorePropertyPayloadCursor
         while ( newCapacity - buffer.limit() < requiredCapacity );
 
         return ByteBuffer.allocate( newCapacity ).order( ByteOrder.LITTLE_ENDIAN );
-    }
-
-    private static ArrayValue readArrayFromBuffer( ByteBuffer buffer )
-    {
-        if ( buffer.limit() <= 0 )
-        {
-            throw new IllegalStateException( "Given buffer is empty" );
-        }
-
-        byte typeId = buffer.get();
-        buffer.order( ByteOrder.BIG_ENDIAN );
-        try
-        {
-            if ( typeId == PropertyType.STRING.intValue() )
-            {
-                int arrayLength = buffer.getInt();
-                String[] result = new String[arrayLength];
-
-                for ( int i = 0; i < arrayLength; i++ )
-                {
-                    int byteLength = buffer.getInt();
-                    result[i] = UTF8.decode( buffer.array(), buffer.position(), byteLength );
-                    buffer.position( buffer.position() + byteLength );
-                }
-                return Values.stringArray( result );
-            }
-            else
-            {
-                ShortArray type = ShortArray.typeOf( typeId );
-                int bitsUsedInLastByte = buffer.get();
-                int requiredBits = buffer.get();
-                if ( requiredBits == 0 )
-                {
-                    return type.createEmptyArray();
-                }
-                if ( type == ShortArray.BYTE && requiredBits == Byte.SIZE )
-                {   // Optimization for byte arrays (probably large ones)
-                    byte[] byteArray = new byte[buffer.limit() - buffer.position()];
-                    buffer.get( byteArray );
-                    return Values.byteArray( byteArray );
-                }
-                else
-                {   // Fallback to the generic approach, which is a slower
-                    Bits bits = Bits.bitsFromBytes( buffer.array(), buffer.position() );
-                    int length = ((buffer.limit() - buffer.position()) * 8 - (8 - bitsUsedInLastByte)) / requiredBits;
-                    return type.createArray( length, bits, requiredBits );
-                }
-            }
-        }
-        finally
-        {
-            buffer.order( ByteOrder.LITTLE_ENDIAN );
-        }
     }
 
     private void assertOfType( PropertyType expected )

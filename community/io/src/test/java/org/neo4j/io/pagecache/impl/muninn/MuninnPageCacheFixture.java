@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,6 +22,7 @@ package org.neo4j.io.pagecache.impl.muninn;
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 
+import org.neo4j.io.mem.MemoryAllocator;
 import org.neo4j.io.pagecache.PageCacheTestSupport;
 import org.neo4j.io.pagecache.PageSwapperFactory;
 import org.neo4j.io.pagecache.tracing.PageCacheTracer;
@@ -32,10 +33,12 @@ public class MuninnPageCacheFixture extends PageCacheTestSupport.Fixture<MuninnP
     CountDownLatch backgroundFlushLatch;
 
     @Override
-    public MuninnPageCache createPageCache( PageSwapperFactory swapperFactory, int maxPages, int pageSize,
-            PageCacheTracer tracer, PageCursorTracerSupplier cursorTracerSupplier )
+    public MuninnPageCache createPageCache( PageSwapperFactory swapperFactory, int maxPages,
+                                            PageCacheTracer tracer, PageCursorTracerSupplier cursorTracerSupplier )
     {
-        return new MuninnPageCache( swapperFactory, maxPages, pageSize, tracer, cursorTracerSupplier );
+        long memory = MuninnPageCache.memoryRequiredForPages( maxPages );
+        MemoryAllocator allocator = MemoryAllocator.createAllocator( String.valueOf( memory ) );
+        return new MuninnPageCache( swapperFactory, allocator, tracer, cursorTracerSupplier );
     }
 
     @Override

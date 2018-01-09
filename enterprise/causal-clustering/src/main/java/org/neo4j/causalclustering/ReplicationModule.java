@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -31,8 +31,10 @@ import org.neo4j.causalclustering.core.replication.RaftReplicator;
 import org.neo4j.causalclustering.core.replication.session.GlobalSession;
 import org.neo4j.causalclustering.core.replication.session.GlobalSessionTrackerState;
 import org.neo4j.causalclustering.core.replication.session.LocalSessionPool;
-import org.neo4j.causalclustering.core.state.storage.DurableStateStorage;
+import org.neo4j.causalclustering.helper.ConstantTimeTimeoutStrategy;
 import org.neo4j.causalclustering.helper.ExponentialBackoffStrategy;
+import org.neo4j.causalclustering.core.state.storage.DurableStateStorage;
+import org.neo4j.causalclustering.helper.TimeoutStrategy;
 import org.neo4j.causalclustering.identity.MemberId;
 import org.neo4j.causalclustering.messaging.Outbound;
 import org.neo4j.io.fs.FileSystemAbstraction;
@@ -69,10 +71,23 @@ public class ReplicationModule
         long replicationLimit = config.get( CausalClusteringSettings.replication_total_size_limit );
         Duration initialBackoff = config.get( CausalClusteringSettings.replication_retry_timeout_base );
         Duration upperBoundBackoff = config.get( CausalClusteringSettings.replication_retry_timeout_limit );
+        Duration leaderBackoff = config.get( CausalClusteringSettings.replication_leader_retry_timeout );
 
-        ExponentialBackoffStrategy retryStrategy = new ExponentialBackoffStrategy( initialBackoff, upperBoundBackoff );
-        replicator = life.add( new RaftReplicator( consensusModule.raftMachine(), myself, outbound, sessionPool,
-            progressTracker, retryStrategy, platformModule.availabilityGuard, logProvider, replicationLimit ) );
+        TimeoutStrategy progressRetryStrategy = new ExponentialBackoffStrategy( initialBackoff, upperBoundBackoff );
+        TimeoutStrategy leaderRetryStrategy = new ConstantTimeTimeoutStrategy( leaderBackoff );
+        replicator = life.add( new RaftReplicator(
+                consensusModule.raftMachine(),
+                myself,
+                outbound,
+                sessionPool,
+                progressTracker,
+                progressRetryStrategy,
+                leaderRetryStrategy,
+                platformModule.availabilityGuard,
+                logProvider,
+                replicationLimit,
+                platformModule.clock
+        ) );
     }
 
     public RaftReplicator getReplicator()

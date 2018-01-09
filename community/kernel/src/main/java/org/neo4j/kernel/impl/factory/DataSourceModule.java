@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -33,17 +33,17 @@ import org.neo4j.graphdb.RelationshipType;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.graphdb.spatial.Geometry;
 import org.neo4j.graphdb.spatial.Point;
+import org.neo4j.internal.kernel.api.exceptions.KernelException;
+import org.neo4j.internal.kernel.api.security.SecurityContext;
 import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.io.pagecache.PageCache;
 import org.neo4j.kernel.AvailabilityGuard;
 import org.neo4j.kernel.DatabaseAvailability;
 import org.neo4j.kernel.NeoStoreDataSource;
-import org.neo4j.kernel.api.KernelAPI;
+import org.neo4j.kernel.api.InwardKernel;
 import org.neo4j.kernel.api.KernelTransaction;
 import org.neo4j.kernel.api.Statement;
-import org.neo4j.internal.kernel.api.exceptions.KernelException;
 import org.neo4j.kernel.api.explicitindex.AutoIndexing;
-import org.neo4j.kernel.api.security.SecurityContext;
 import org.neo4j.kernel.builtinprocs.SpecialBuiltInProcedures;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.guard.Guard;
@@ -63,6 +63,7 @@ import org.neo4j.kernel.impl.core.StartupStatisticsProvider;
 import org.neo4j.kernel.impl.core.ThreadToStatementContextBridge;
 import org.neo4j.kernel.impl.core.TokenNotFoundException;
 import org.neo4j.kernel.impl.logging.LogService;
+import org.neo4j.kernel.impl.pagecache.PublishPageCacheTracerMetricsAfterStart;
 import org.neo4j.kernel.impl.proc.ProcedureConfig;
 import org.neo4j.kernel.impl.proc.ProcedureGDSFactory;
 import org.neo4j.kernel.impl.proc.ProcedureTransactionProvider;
@@ -71,7 +72,7 @@ import org.neo4j.kernel.impl.proc.TerminationGuardProvider;
 import org.neo4j.kernel.impl.proc.TypeMappers.SimpleConverter;
 import org.neo4j.kernel.impl.query.QueryExecutionEngine;
 import org.neo4j.kernel.impl.store.StoreId;
-import org.neo4j.kernel.impl.transaction.log.PhysicalLogFile;
+import org.neo4j.kernel.impl.transaction.log.files.LogFileCreationMonitor;
 import org.neo4j.kernel.impl.transaction.state.DataSourceManager;
 import org.neo4j.kernel.impl.util.Dependencies;
 import org.neo4j.kernel.info.DiagnosticsManager;
@@ -108,7 +109,7 @@ public class DataSourceModule
 
     public final NeoStoreDataSource neoStoreDataSource;
 
-    public final Supplier<KernelAPI> kernelAPI;
+    public final Supplier<InwardKernel> kernelAPI;
 
     public final Supplier<QueryExecutionEngine> queryExecutor;
 
@@ -202,11 +203,9 @@ public class DataSourceModule
                 fileSystem,
                 platformModule.transactionMonitor,
                 databaseHealth,
-                platformModule.monitors.newMonitor( PhysicalLogFile.Monitor.class ),
+                platformModule.monitors.newMonitor( LogFileCreationMonitor.class ),
                 editionModule.headerInformationFactory,
-                startupStatistics,
-                guard,
-                editionModule.commitProcessFactory,
+                startupStatistics, editionModule.commitProcessFactory,
                 autoIndexing,
                 pageCache,
                 editionModule.constraintSemantics,
@@ -226,6 +225,8 @@ public class DataSourceModule
         life.add( new MonitorGc( config, logging.getInternalLog( MonitorGc.class ) ) );
 
         life.add( nodeManager );
+
+        life.add( new PublishPageCacheTracerMetricsAfterStart( platformModule.tracers.pageCursorTracerSupplier ) );
 
         life.add( new DatabaseAvailability( platformModule.availabilityGuard, platformModule.transactionMonitor,
                 config.get( GraphDatabaseSettings.shutdown_transaction_end_timeout ).toMillis() ) );
@@ -307,6 +308,12 @@ public class DataSourceModule
             public Statement statement()
             {
                 return threadToStatementContextBridge.get();
+            }
+
+            @Override
+            public KernelTransaction kernelTransaction()
+            {
+                return threadToStatementContextBridge.getKernelTransactionBoundToThisThread( true );
             }
 
             @Override

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -43,7 +43,7 @@ import static org.junit.Assume.assumeTrue;
 public class ClusterIdReuseIT
 {
     @Rule
-    public final ClusterRule clusterRule = new ClusterRule( getClass() )
+    public final ClusterRule clusterRule = new ClusterRule()
             .withNumberOfCoreMembers( 3 )
             // increased to decrease likelihood of unnecessary leadership changes
             .withSharedCoreParam( CausalClusteringSettings.leader_election_timeout, "2s" )

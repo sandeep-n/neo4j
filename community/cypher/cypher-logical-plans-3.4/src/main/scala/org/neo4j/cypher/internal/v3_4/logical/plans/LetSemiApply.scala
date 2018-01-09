@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,6 +20,7 @@
 package org.neo4j.cypher.internal.v3_4.logical.plans
 
 import org.neo4j.cypher.internal.ir.v3_4.{CardinalityEstimation, IdName, PlannerQuery}
+import org.neo4j.cypher.internal.util.v3_4.attribution.IdGen
 
 /**
   * For every row in left, set that row as the argument, and apply to right. Produce left row, and set 'idName' =
@@ -32,8 +33,8 @@ import org.neo4j.cypher.internal.ir.v3_4.{CardinalityEstimation, IdName, Planner
   * }
   */
 case class LetSemiApply(left: LogicalPlan, right: LogicalPlan, idName: IdName)
-                       (val solved: PlannerQuery with CardinalityEstimation)
-  extends AbstractLetSemiApply(left, right, idName, solved)
+                       (val solved: PlannerQuery with CardinalityEstimation)(implicit idGen: IdGen)
+  extends AbstractLetSemiApply(left, right, idName, solved)(idGen)
 
 /**
   * For every row in left, set that row as the argument, and apply to right. Produce left row, and set 'idName' =
@@ -46,12 +47,12 @@ case class LetSemiApply(left: LogicalPlan, right: LogicalPlan, idName: IdName)
   * }
   */
 case class LetAntiSemiApply(left: LogicalPlan, right: LogicalPlan, idName: IdName)
-                           (val solved: PlannerQuery with CardinalityEstimation)
-  extends AbstractLetSemiApply(left, right, idName, solved)
+                           (val solved: PlannerQuery with CardinalityEstimation)(implicit idGen: IdGen)
+  extends AbstractLetSemiApply(left, right, idName, solved)(idGen)
 
 abstract class AbstractLetSemiApply(left: LogicalPlan, right: LogicalPlan,
-                                    idName: IdName, solved: PlannerQuery with CardinalityEstimation)
-  extends LogicalPlan with LazyLogicalPlan {
+                                    idName: IdName, solved: PlannerQuery with CardinalityEstimation)(implicit idGen: IdGen)
+  extends LogicalPlan(idGen) with LazyLogicalPlan {
   val lhs = Some(left)
   val rhs = Some(right)
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,6 +20,7 @@
 package org.neo4j.values.storable;
 
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 
 import org.neo4j.values.AnyValue;
 import org.neo4j.values.SequenceValue;
@@ -54,13 +55,29 @@ public abstract class ArrayValue extends Value implements SequenceValue
             @Override
             public AnyValue next()
             {
-                return value( offset );
+                if ( !hasNext() )
+                {
+                    throw new NoSuchElementException();
+                }
+                return value( offset++ );
             }
         };
     }
 
     @Override
     public boolean equals( boolean x )
+    {
+        return false;
+    }
+
+    @Override
+    public boolean equals( long x )
+    {
+        return false;
+    }
+
+    @Override
+    public boolean equals( double x )
     {
         return false;
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,7 +22,7 @@ package org.neo4j.kernel.impl.util.watcher;
 import org.junit.Test;
 
 import org.neo4j.kernel.impl.logging.SimpleLogService;
-import org.neo4j.kernel.impl.transaction.log.PhysicalLogFile;
+import org.neo4j.kernel.impl.transaction.log.files.TransactionLogFiles;
 import org.neo4j.logging.AssertableLogProvider;
 import org.neo4j.logging.NullLogProvider;
 
@@ -47,8 +47,8 @@ public class DefaultFileDeletionEventListenerTest
     {
         AssertableLogProvider internalLogProvider = new AssertableLogProvider( false );
         DefaultFileDeletionEventListener listener = buildListener( internalLogProvider );
-        listener.fileDeleted( PhysicalLogFile.DEFAULT_NAME + ".0" );
-        listener.fileDeleted( PhysicalLogFile.DEFAULT_NAME + ".1" );
+        listener.fileDeleted( TransactionLogFiles.DEFAULT_NAME + ".0" );
+        listener.fileDeleted( TransactionLogFiles.DEFAULT_NAME + ".1" );
 
         internalLogProvider.assertNoLoggingOccurred();
     }
@@ -57,6 +57,6 @@ public class DefaultFileDeletionEventListenerTest
     {
         SimpleLogService logService = new SimpleLogService( NullLogProvider.getInstance(), internalLogProvider );
         return new DefaultFileDeletionEventListener( logService,
-                filename -> filename.startsWith( PhysicalLogFile.DEFAULT_NAME ) );
+                filename -> filename.startsWith( TransactionLogFiles.DEFAULT_NAME ) );
     }
 }

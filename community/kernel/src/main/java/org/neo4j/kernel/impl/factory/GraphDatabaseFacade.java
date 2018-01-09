@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,12 +23,13 @@ import java.io.File;
 import java.net.URL;
 import java.util.Collections;
 import java.util.Map;
-import java.util.Optional;
+import java.util.NoSuchElementException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 import org.neo4j.collection.primitive.PrimitiveLongCollections;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
+import org.neo4j.collection.primitive.PrimitiveLongResourceIterator;
 import org.neo4j.function.Suppliers;
 import org.neo4j.function.ThrowingAction;
 import org.neo4j.graphdb.ConstraintViolationException;
@@ -40,8 +41,10 @@ import org.neo4j.graphdb.NotFoundException;
 import org.neo4j.graphdb.QueryExecutionException;
 import org.neo4j.graphdb.Relationship;
 import org.neo4j.graphdb.RelationshipType;
+import org.neo4j.graphdb.Resource;
 import org.neo4j.graphdb.ResourceIterable;
 import org.neo4j.graphdb.ResourceIterator;
+import org.neo4j.graphdb.ResourceUtils;
 import org.neo4j.graphdb.Result;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.TransactionTerminatedException;
@@ -54,24 +57,25 @@ import org.neo4j.graphdb.traversal.BidirectionalTraversalDescription;
 import org.neo4j.graphdb.traversal.TraversalDescription;
 import org.neo4j.helpers.collection.PrefetchingResourceIterator;
 import org.neo4j.helpers.collection.ResourceClosingIterator;
+import org.neo4j.internal.kernel.api.IndexQuery;
+import org.neo4j.internal.kernel.api.InternalIndexState;
+import org.neo4j.internal.kernel.api.NodeCursor;
+import org.neo4j.internal.kernel.api.exceptions.InvalidTransactionTypeKernelException;
+import org.neo4j.internal.kernel.api.exceptions.KernelException;
+import org.neo4j.internal.kernel.api.exceptions.schema.ConstraintValidationException;
+import org.neo4j.internal.kernel.api.security.SecurityContext;
 import org.neo4j.kernel.GraphDatabaseQueryService;
 import org.neo4j.kernel.api.KernelTransaction;
 import org.neo4j.kernel.api.ReadOperations;
 import org.neo4j.kernel.api.Statement;
 import org.neo4j.kernel.api.exceptions.EntityNotFoundException;
-import org.neo4j.kernel.api.exceptions.InvalidTransactionTypeKernelException;
-import org.neo4j.internal.kernel.api.exceptions.KernelException;
 import org.neo4j.kernel.api.exceptions.Status;
 import org.neo4j.kernel.api.exceptions.index.IndexNotFoundKernelException;
-import org.neo4j.kernel.api.exceptions.schema.ConstraintValidationException;
 import org.neo4j.kernel.api.exceptions.schema.SchemaKernelException;
 import org.neo4j.kernel.api.exceptions.schema.SchemaRuleNotFoundException;
 import org.neo4j.kernel.api.explicitindex.AutoIndexing;
-import org.neo4j.kernel.api.index.InternalIndexState;
-import org.neo4j.kernel.api.schema.IndexQuery;
 import org.neo4j.kernel.api.schema.SchemaDescriptorFactory;
 import org.neo4j.kernel.api.schema.index.IndexDescriptor;
-import org.neo4j.kernel.api.security.SecurityContext;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.guard.Guard;
 import org.neo4j.kernel.impl.api.TokenAccess;
@@ -110,7 +114,7 @@ import static java.lang.String.format;
 import static org.neo4j.collection.primitive.PrimitiveLongCollections.map;
 import static org.neo4j.graphdb.factory.GraphDatabaseSettings.transaction_timeout;
 import static org.neo4j.helpers.collection.Iterators.emptyResourceIterator;
-import static org.neo4j.kernel.api.security.SecurityContext.AUTH_DISABLED;
+import static org.neo4j.internal.kernel.api.security.SecurityContext.AUTH_DISABLED;
 import static org.neo4j.kernel.impl.api.explicitindex.InternalAutoIndexing.NODE_AUTO_INDEX;
 import static org.neo4j.kernel.impl.api.explicitindex.InternalAutoIndexing.RELATIONSHIP_AUTO_INDEX;
 import static org.neo4j.kernel.impl.api.operations.KeyReadOperations.NO_SUCH_LABEL;
@@ -262,9 +266,10 @@ public class GraphDatabaseFacade implements GraphDatabaseAPI
     @Override
     public Node createNode()
     {
-        try ( Statement statement = spi.currentStatement() )
+        KernelTransaction transaction = spi.currentTransaction();
+        try ( Statement ignore = transaction.acquireStatement() )
         {
-            return new NodeProxy( nodeActions, statement.dataWriteOperations().nodeCreate() );
+            return new NodeProxy( nodeActions, transaction.dataWrite().nodeCreate() );
         }
         catch ( InvalidTransactionTypeKernelException e )
         {
@@ -275,9 +280,10 @@ public class GraphDatabaseFacade implements GraphDatabaseAPI
     @Override
     public Long createNodeId()
     {
-        try ( Statement statement = spi.currentStatement() )
+        KernelTransaction transaction = spi.currentTransaction();
+        try ( Statement ignore = transaction.acquireStatement() )
         {
-            return statement.dataWriteOperations().nodeCreate();
+            return transaction.dataWrite().nodeCreate();
         }
         catch ( InvalidTransactionTypeKernelException e )
         {
@@ -327,14 +333,16 @@ public class GraphDatabaseFacade implements GraphDatabaseAPI
             throw new NotFoundException( format( "Node %d not found", id ),
                     new EntityNotFoundException( EntityType.NODE, id ) );
         }
-        try ( Statement statement = spi.currentStatement() )
+
+        KernelTransaction ktx = spi.currentTransaction();
+        assertTransactionOpen( ktx );
+        try ( Statement ignore = ktx.acquireStatement() )
         {
-            if ( !statement.readOperations().nodeExists( id ) )
+            if ( !ktx.dataRead().nodeExists( id ) )
             {
                 throw new NotFoundException( format( "Node %d not found", id ),
                         new EntityNotFoundException( EntityType.NODE, id ) );
             }
-
             return new NodeProxy( nodeActions, id );
         }
     }
@@ -376,9 +384,9 @@ public class GraphDatabaseFacade implements GraphDatabaseAPI
     }
 
     @Override
-    public boolean isAvailable( long timeout )
+    public boolean isAvailable( long timeoutMillis )
     {
-        return spi.databaseIsAvailable( timeout );
+        return spi.databaseIsAvailable( timeoutMillis );
     }
 
     @Override
@@ -454,11 +462,36 @@ public class GraphDatabaseFacade implements GraphDatabaseAPI
     @Override
     public ResourceIterable<Node> getAllNodes()
     {
-        assertTransactionOpen();
+        KernelTransaction ktx = spi.currentTransaction();
+        assertTransactionOpen( ktx );
         return () ->
         {
-            Statement statement = spi.currentStatement();
-            return map2nodes( statement.readOperations().nodesGetAll(), statement );
+            Statement statement = ktx.acquireStatement();
+            NodeCursor cursor = ktx.cursors().allocateNodeCursor();
+            ktx.dataRead().allNodesScan( cursor );
+            return new PrefetchingResourceIterator<Node>()
+            {
+                @Override
+                protected Node fetchNextOrNull()
+                {
+                    if ( cursor.next() )
+                    {
+                        return new NodeProxy( nodeActions, cursor.nodeReference() );
+                    }
+                    else
+                    {
+                        close();
+                        return null;
+                    }
+                }
+
+                @Override
+                public void close()
+                {
+                    cursor.close();
+                    statement.close();
+                }
+            };
         };
     }
 
@@ -587,7 +620,9 @@ public class GraphDatabaseFacade implements GraphDatabaseAPI
             Node node = iterator.next();
             if ( iterator.hasNext() )
             {
-                throw new MultipleFoundException();
+                throw new MultipleFoundException(
+                        format( "Found multiple nodes with label: '%s', property name: '%s' and property " +
+                                "value: '%s' while only one was expected.", myLabel, key, value ) );
             }
             return node;
         }
@@ -633,7 +668,8 @@ public class GraphDatabaseFacade implements GraphDatabaseAPI
             {
                 // Ha! We found an index - let's use it to find matching nodes
                 IndexQuery.ExactPredicate query = IndexQuery.exact( descriptor.schema().getPropertyId(), value );
-                return map2nodes( readOps.indexQuery( descriptor, query ), statement );
+                PrimitiveLongResourceIterator indexResult = readOps.indexQuery( descriptor, query );
+                return map2nodes( indexResult, statement, indexResult );
             }
         }
         catch ( KernelException e )
@@ -667,10 +703,9 @@ public class GraphDatabaseFacade implements GraphDatabaseAPI
     private ResourceIterator<Node> getNodesByLabelAndPropertyWithoutIndex( int propertyId, Value value,
             Statement statement, int labelId )
     {
-        return map2nodes(
-                new PropertyValueFilteringNodeIdIterator(
-                        statement.readOperations().nodesGetForLabel( labelId ),
-                        statement.readOperations(), propertyId, value ), statement );
+        PrimitiveLongResourceIterator nodeIds = statement.readOperations().nodesGetForLabel( labelId );
+        return map2nodes( new PropertyValueFilteringNodeIdIterator( nodeIds, statement.readOperations(), propertyId, value ),
+                statement, nodeIds );
     }
 
     private ResourceIterator<Node> allNodesWithLabel( final Label myLabel )
@@ -684,15 +719,52 @@ public class GraphDatabaseFacade implements GraphDatabaseAPI
             return emptyResourceIterator();
         }
 
-        final PrimitiveLongIterator nodeIds = statement.readOperations().nodesGetForLabel( labelId );
+        final PrimitiveLongResourceIterator nodeIds = statement.readOperations().nodesGetForLabel( labelId );
         return ResourceClosingIterator
-                .newResourceIterator( statement, map( nodeId -> new NodeProxy( nodeActions, nodeId ), nodeIds ) );
+                .newResourceIterator( map( nodeId -> new NodeProxy( nodeActions, nodeId ), nodeIds ), statement, nodeIds );
     }
 
-    private ResourceIterator<Node> map2nodes( PrimitiveLongIterator input, Statement statement )
+    private ResourceIterator<Node> map2nodes( PrimitiveLongIterator input, Resource... resources )
     {
-        return ResourceClosingIterator
-                .newResourceIterator( statement, map( id -> new NodeProxy( nodeActions, id ), input ) );
+       return new ResourceIterator<Node>()
+       {
+           private boolean closed;
+
+           @Override
+           public void close()
+           {
+               if ( !closed && resources != null )
+               {
+                   ResourceUtils.closeAll( resources );
+                   closed = true;
+               }
+           }
+
+           @Override
+           public boolean hasNext()
+           {
+               boolean hasNext = input.hasNext();
+               if ( !hasNext )
+               {
+                   close();
+               }
+               return hasNext;
+           }
+
+           @Override
+           public Node next()
+           {
+               try
+               {
+                   return new NodeProxy( nodeActions, input.next() );
+               }
+               catch ( NoSuchElementException e )
+               {
+                   close();
+                   throw e;
+               }
+           }
+       };
     }
 
     @Override
@@ -782,10 +854,15 @@ public class GraphDatabaseFacade implements GraphDatabaseAPI
 
     private void assertTransactionOpen()
     {
-        Optional<Status> terminationReason = spi.currentTransaction().getReasonIfTerminated();
-        if ( terminationReason.isPresent() )
+        assertTransactionOpen( spi.currentTransaction() );
+    }
+
+    private void assertTransactionOpen( KernelTransaction transaction )
+    {
+        if ( transaction.isTerminated() )
         {
-            throw new TransactionTerminatedException( terminationReason.get() );
+            Status terminationReason = transaction.getReasonIfTerminated().orElse( Status.Transaction.Terminated );
+            throw new TransactionTerminatedException( terminationReason );
         }
     }
 }

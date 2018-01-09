@@ -1,5 +1,5 @@
 Neo4j
-Copyright © 2002-2017 Network Engine for Objects in Lund AB (referred to
+Copyright © 2002-2018 Network Engine for Objects in Lund AB (referred to
 in this notice as "Neo Technology")
    [http://neotechnology.com]
 
@@ -32,6 +32,8 @@ Apache Software License, Version 2.0
   ConcurrentLinkedHashMap
   Data Mapper for Jackson
   Jackson
+  jPowerShell
+  jProcesses
   Lucene codecs
   Lucene Common Analyzers
   Lucene Core
@@ -41,6 +43,7 @@ Apache Software License, Version 2.0
   opencsv
   parboiled-core
   parboiled-scala
+  WMI4Java
 
 BSD - Scala License
   Scala Library

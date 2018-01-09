@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -30,13 +30,13 @@ import java.io.IOException;
  */
 public class MissingLogDataException extends IOException
 {
-    public MissingLogDataException()
-    {
-        super();
-    }
-
     public MissingLogDataException( String message )
     {
         super( message );
+    }
+
+    public MissingLogDataException( String message, Throwable cause )
+    {
+        super( message, cause );
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -37,8 +37,8 @@ import org.neo4j.graphdb.schema.IndexDefinition;
 import org.neo4j.test.mockito.matcher.Neo4jMatchers;
 import org.neo4j.test.rule.ImpermanentDatabaseRule;
 
-import static junit.framework.Assert.fail;
-import static junit.framework.TestCase.assertFalse;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.fail;
 
 public class BigPropertyIndexValidationIT
 {

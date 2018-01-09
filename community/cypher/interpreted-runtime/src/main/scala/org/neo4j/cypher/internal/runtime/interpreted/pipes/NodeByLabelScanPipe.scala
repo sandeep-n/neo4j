@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,19 +20,18 @@
 package org.neo4j.cypher.internal.runtime.interpreted.pipes
 
 import org.neo4j.cypher.internal.runtime.interpreted.ExecutionContext
-import org.neo4j.cypher.internal.v3_4.logical.plans.LogicalPlanId
-import org.neo4j.kernel.impl.util.ValueUtils
+import org.neo4j.cypher.internal.util.v3_4.attribution.Id
 
 case class NodeByLabelScanPipe(ident: String, label: LazyLabel)
-                              (val id: LogicalPlanId = LogicalPlanId.DEFAULT) extends Pipe  {
+                              (val id: Id = Id.INVALID_ID) extends Pipe  {
 
   protected def internalCreateResults(state: QueryState): Iterator[ExecutionContext] = {
 
     label.getOptId(state.query) match {
       case Some(labelId) =>
         val nodes = state.query.getNodesByLabel(labelId.id)
-        val baseContext = state.createOrGetInitialContext()
-        nodes.map(n => baseContext.newWith1(ident, ValueUtils.fromNodeProxy(n)))
+        val baseContext = state.createOrGetInitialContext(executionContextFactory)
+        nodes.map(n => executionContextFactory.copyWith(baseContext, ident, n))
       case None =>
         Iterator.empty
     }

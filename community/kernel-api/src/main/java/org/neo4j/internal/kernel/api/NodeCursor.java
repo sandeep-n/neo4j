@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -32,15 +32,15 @@ public interface NodeCursor extends Cursor
 
     void relationships( RelationshipGroupCursor cursor );
 
-    void outgoingRelationships( RelationshipGroupCursor groups, RelationshipTraversalCursor relationships );
-
-    void incomingRelationships( RelationshipGroupCursor groups, RelationshipTraversalCursor relationships );
-
-    void allRelationships( RelationshipGroupCursor groups, RelationshipTraversalCursor relationships );
+    void allRelationships( RelationshipTraversalCursor relationships );
 
     void properties( PropertyCursor cursor );
 
     long relationshipGroupReference();
 
+    long allRelationshipsReference();
+
     long propertiesReference();
+
+    boolean isDense();
 }

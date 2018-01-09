@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,6 +22,7 @@ package org.neo4j.cypher.internal.compatibility.v3_4.runtime.executionplan
 import java.util.concurrent.TimeUnit.{MILLISECONDS, SECONDS}
 
 import org.mockito.Mockito.when
+import org.neo4j.cypher.internal.compiler.v3_4.{NeedsReplan, FineToReuse, StatsDivergenceCalculator}
 import org.neo4j.cypher.internal.planner.v3_4.spi.{GraphStatistics, GraphStatisticsSnapshot, NodesWithLabelCardinality}
 import org.neo4j.cypher.internal.util.v3_4.LabelId
 import org.neo4j.cypher.internal.util.v3_4.test_helpers.CypherFunSuite
@@ -29,104 +30,216 @@ import org.neo4j.time.Clocks
 
 class PlanFingerprintReferenceTest extends CypherFunSuite {
 
-  test("should be stale if all properties are out of date") {
-    val snapshot = GraphStatisticsSnapshot(Map(NodesWithLabelCardinality(label(21)) -> 4.0))
-    val ttl = 1000l
-    val threshold = 0.0
-    val clock = Clocks.fakeClock()
-    val stats = mock[GraphStatistics]
-    when(stats.nodesWithLabelCardinality(label(21))).thenReturn(5.0)
-    val fingerprint = PlanFingerprint(clock.millis(), 17, snapshot)
+  test("should be stale if statistics increase enough to pass the threshold") {
+    Seq(StatsDivergenceCalculator.none, StatsDivergenceCalculator.inverse, StatsDivergenceCalculator.exponential).foreach { name =>
+      withClue(s"For decay algorithm '$name': ") {
+        val snapshot = GraphStatisticsSnapshot(Map(NodesWithLabelCardinality(label(21)) -> 5.0))
+        val divergenceCalculator = StatsDivergenceCalculator.divergenceCalculatorFor(name, 0.1, 0.05, 1000, 100000)
+        val clock = Clocks.fakeClock()
+        val stats = mock[GraphStatistics]
+        when(stats.nodesWithLabelCardinality(label(21))).thenReturn(6.0)
+        val fingerprint = PlanFingerprint(clock.millis(), 17, snapshot)
 
-    clock.forward(2, SECONDS)
+        clock.forward(2, SECONDS)
 
-    val stale = new PlanFingerprintReference(clock, ttl, threshold, fingerprint).isStale(transactionIdSupplier(42), stats)
+        val cacheCheck = new PlanFingerprintReference(clock, divergenceCalculator, fingerprint).checkPlanReusability(transactionIdSupplier(42), stats)
 
-    stale shouldBe true
+        cacheCheck shouldBe a[NeedsReplan]
+      }
+    }
   }
 
-  test("should not be stale if stats are not diverged over the threshold") {
-    val snapshot = GraphStatisticsSnapshot(Map(NodesWithLabelCardinality(label(21)) -> 5.0))
-    val ttl = 1000l
-    val threshold = 0.5
-    val clock = Clocks.fakeClock()
-    val stats = mock[GraphStatistics]
-    when(stats.nodesWithLabelCardinality(label(21))).thenReturn(5.0)
-    val fingerprint = PlanFingerprint(clock.millis(), 17, snapshot)
+  test("should be stale if statistics decrease enough to pass the threshold") {
+    Seq(StatsDivergenceCalculator.none, StatsDivergenceCalculator.inverse, StatsDivergenceCalculator.exponential).foreach { name =>
+      withClue(s"For decay algorithm '$name': ") {
+        val snapshot = GraphStatisticsSnapshot(Map(NodesWithLabelCardinality(label(21)) -> 5.0))
+        val divergenceCalculator = StatsDivergenceCalculator.divergenceCalculatorFor(name, 0.1, 0.05, 1000, 100000)
+        val clock = Clocks.fakeClock()
+        val stats = mock[GraphStatistics]
+        when(stats.nodesWithLabelCardinality(label(21))).thenReturn(4.0)
+        val fingerprint = PlanFingerprint(clock.millis(), 17, snapshot)
 
-    clock.forward(2, SECONDS)
+        clock.forward(2, SECONDS)
 
-    val stale = new PlanFingerprintReference(clock, ttl, threshold, fingerprint).isStale(transactionIdSupplier(42), stats)
+        val cacheCheck = new PlanFingerprintReference(clock, divergenceCalculator, fingerprint).checkPlanReusability(transactionIdSupplier(42), stats)
 
-    stale shouldBe false
+        cacheCheck shouldBe a[NeedsReplan]
+      }
+    }
+  }
+
+  test("should not be stale if stats have increased but not enough to pass the threshold") {
+    Seq(StatsDivergenceCalculator.none, StatsDivergenceCalculator.inverse, StatsDivergenceCalculator.exponential).foreach { name =>
+      withClue(s"For decay algorithm '$name': ") {
+        val snapshot = GraphStatisticsSnapshot(Map(NodesWithLabelCardinality(label(21)) -> 5.0))
+        val divergenceCalculator = StatsDivergenceCalculator.divergenceCalculatorFor(name, 0.5, 0.1, 1000, 100000)
+        val clock = Clocks.fakeClock()
+        val stats = mock[GraphStatistics]
+        when(stats.nodesWithLabelCardinality(label(21))).thenReturn(6.0)
+        val fingerprint = PlanFingerprint(clock.millis(), 17, snapshot)
+
+        clock.forward(2, SECONDS)
+
+        val cacheCheck = new PlanFingerprintReference(clock, divergenceCalculator, fingerprint).checkPlanReusability(transactionIdSupplier(42), stats)
+
+        cacheCheck shouldBe FineToReuse
+      }
+    }
+  }
+
+  test("should not be stale if stats have decreased but not enough to pass the threshold") {
+    Seq(StatsDivergenceCalculator.none, StatsDivergenceCalculator.inverse, StatsDivergenceCalculator.exponential).foreach { name =>
+      withClue(s"For decay algorithm '$name': ") {
+        val snapshot = GraphStatisticsSnapshot(Map(NodesWithLabelCardinality(label(21)) -> 5.0))
+        val divergenceCalculator = StatsDivergenceCalculator.divergenceCalculatorFor(name, 0.5, 0.1, 1000, 100000)
+        val clock = Clocks.fakeClock()
+        val stats = mock[GraphStatistics]
+        when(stats.nodesWithLabelCardinality(label(21))).thenReturn(4.0)
+        val fingerprint = PlanFingerprint(clock.millis(), 17, snapshot)
+
+        clock.forward(2, SECONDS)
+
+        val cacheCheck = new PlanFingerprintReference(clock, divergenceCalculator, fingerprint).checkPlanReusability(transactionIdSupplier(42), stats)
+
+        cacheCheck shouldBe FineToReuse
+      }
+    }
   }
 
   test("should not be stale if txId didn't change") {
-    val snapshot = GraphStatisticsSnapshot(Map(NodesWithLabelCardinality(label(21)) -> 5.0))
-    val ttl = 1000l
-    val threshold = 0.0
-    val clock = Clocks.fakeClock()
-    val stats = mock[GraphStatistics]
-    when(stats.nodesWithLabelCardinality(label(21))).thenReturn(5.0)
-    val fingerprint = PlanFingerprint(clock.millis(), 17, snapshot)
+    Seq(StatsDivergenceCalculator.none, StatsDivergenceCalculator.inverse, StatsDivergenceCalculator.exponential).foreach { name =>
+      withClue(s"For decay algorithm '$name': ") {
+        val snapshot = GraphStatisticsSnapshot(Map(NodesWithLabelCardinality(label(21)) -> 5.0))
+        // Create valid calculator, but test that it is never used
+        val divergenceCalculator = StatsDivergenceCalculator.divergenceCalculatorFor(name, 0.5, 0.1, 1000, 100000)
+        val clock = Clocks.fakeClock()
+        val stats = mock[GraphStatistics]
+        // even with sufficient stats change we will remain stale
+        when(stats.nodesWithLabelCardinality(label(21))).thenReturn(15.0)
+        val fingerprint = PlanFingerprint(clock.millis(), 17, snapshot)
 
-    clock.forward(2, SECONDS)
+        clock.forward(2, SECONDS)
 
-    val stale = new PlanFingerprintReference(clock, ttl, threshold, fingerprint).isStale(transactionIdSupplier(17), stats)
+        val cacheCheck = new PlanFingerprintReference(clock, divergenceCalculator, fingerprint).checkPlanReusability(transactionIdSupplier(17), stats)
 
-    stale shouldBe false
+        cacheCheck shouldBe FineToReuse
+      }
+    }
   }
 
   test("should not be stale if life time has not expired") {
-    val snapshot = GraphStatisticsSnapshot(Map(NodesWithLabelCardinality(label(21)) -> 5.0))
-    val ttl = 1000l
-    val threshold = 0.0
-    val clock = Clocks.fakeClock()
-    val stats = mock[GraphStatistics]
-    when(stats.nodesWithLabelCardinality(label(21))).thenReturn(5.0)
-    val fingerprint = PlanFingerprint(clock.millis(), 17, snapshot)
+    Seq(StatsDivergenceCalculator.none, StatsDivergenceCalculator.inverse, StatsDivergenceCalculator.exponential).foreach { name =>
+      withClue(s"For decay algorithm '$name': ") {
+        val snapshot = GraphStatisticsSnapshot(Map(NodesWithLabelCardinality(label(21)) -> 5.0))
+        // Create valid calculator, but test that it is never used
+        val divergenceCalculator = StatsDivergenceCalculator.divergenceCalculatorFor(name, 0.5, 0.1, 1000, 100000)
+        val clock = Clocks.fakeClock()
+        val stats = mock[GraphStatistics]
+        // even with sufficient stats change we will remain stale
+        when(stats.nodesWithLabelCardinality(label(21))).thenReturn(15.0)
+        val fingerprint = PlanFingerprint(clock.millis(), 17, snapshot)
 
-    clock.forward(500, MILLISECONDS)
+        clock.forward(500, MILLISECONDS)
 
-    val stale = new PlanFingerprintReference(clock, ttl, threshold, fingerprint).isStale(transactionIdSupplier(42), stats)
+        val cacheCheck = new PlanFingerprintReference(clock, divergenceCalculator, fingerprint).checkPlanReusability(transactionIdSupplier(42), stats)
 
-    stale shouldBe false
+        cacheCheck shouldBe FineToReuse
+      }
+    }
   }
 
   test("should update the timestamp if the life time is expired but transaction has not changed") {
-    val snapshot = GraphStatisticsSnapshot(Map(NodesWithLabelCardinality(label(21)) -> 5.0))
-    val ttl = 1000l
-    val threshold = 0.0
-    val clock = Clocks.fakeClock()
-    val stats = mock[GraphStatistics]
-    when(stats.nodesWithLabelCardinality(label(21))).thenReturn(5.0)
-    val fingerprint = PlanFingerprint(clock.millis(), 17, snapshot)
+    Seq(StatsDivergenceCalculator.none, StatsDivergenceCalculator.inverse, StatsDivergenceCalculator.exponential).foreach { name =>
+      withClue(s"For decay algorithm '$name': ") {
+        val snapshot = GraphStatisticsSnapshot(Map(NodesWithLabelCardinality(label(21)) -> 5.0))
+        // Create valid calculator, but test that it is never used
+        val divergenceCalculator = StatsDivergenceCalculator.divergenceCalculatorFor(name, 0.5, 0.1, 1000, 100000)
+        val clock = Clocks.fakeClock()
+        val stats = mock[GraphStatistics]
+        // even with sufficient stats change we will remain stale
+        when(stats.nodesWithLabelCardinality(label(21))).thenReturn(15.0)
+        val fingerprint = PlanFingerprint(clock.millis(), 17, snapshot)
 
-    val reference = new PlanFingerprintReference(clock, ttl, threshold, fingerprint)
+        val reference = new PlanFingerprintReference(clock, divergenceCalculator, fingerprint)
 
-    clock.forward(2, SECONDS)
-    reference.isStale(transactionIdSupplier(17), stats) shouldBe false
+        clock.forward(2, SECONDS)
+        reference.checkPlanReusability(transactionIdSupplier(17), stats) shouldBe FineToReuse
 
-    clock.forward(500, MILLISECONDS)
-    reference.isStale(transactionIdSupplier(23), stats) shouldBe false
+        clock.forward(500, MILLISECONDS)
+        reference.checkPlanReusability(transactionIdSupplier(23), stats) shouldBe FineToReuse
+      }
+    }
   }
 
   test("should update the timestamp and the txId if the life time is expired the txId is old but stats has not changed over the threshold") {
-    val snapshot = GraphStatisticsSnapshot(Map(NodesWithLabelCardinality(label(21)) -> 5.0))
-    val ttl = 1000l
-    val threshold = 0.1
-    val clock = Clocks.fakeClock()
-    val stats = mock[GraphStatistics]
-    when(stats.nodesWithLabelCardinality(label(21))).thenReturn(5.0)
-    val fingerprint = PlanFingerprint(clock.millis(), 17, snapshot)
+    Seq(StatsDivergenceCalculator.none, StatsDivergenceCalculator.inverse, StatsDivergenceCalculator.exponential).foreach { name =>
+      withClue(s"For decay algorithm '$name': ") {
+        val snapshot = GraphStatisticsSnapshot(Map(NodesWithLabelCardinality(label(21)) -> 5.0))
+        val divergenceCalculator = StatsDivergenceCalculator.divergenceCalculatorFor(name, 0.1, 0.05, 1000, 100000)
+        val clock = Clocks.fakeClock()
+        val stats = mock[GraphStatistics]
+        when(stats.nodesWithLabelCardinality(label(21))).thenReturn(5.0)
+        val fingerprint = PlanFingerprint(clock.millis(), 17, snapshot)
 
-    val reference = new PlanFingerprintReference(clock, ttl, threshold, fingerprint)
+        val reference = new PlanFingerprintReference(clock, divergenceCalculator, fingerprint)
 
-    clock.forward(2, SECONDS)
-    reference.isStale(transactionIdSupplier(23), stats) shouldBe false
+        clock.forward(2, SECONDS)
+        reference.checkPlanReusability(transactionIdSupplier(23), stats) shouldBe FineToReuse
 
-    clock.forward(2, SECONDS)
-    reference.isStale(transactionIdSupplier(23), stats) shouldBe false
+        clock.forward(2, SECONDS)
+        reference.checkPlanReusability(transactionIdSupplier(23), stats) shouldBe FineToReuse
+      }
+    }
+  }
+
+  test("should be stale if statistics increase enough to pass the decayed threshold") {
+    Seq(StatsDivergenceCalculator.none, StatsDivergenceCalculator.inverse, StatsDivergenceCalculator.exponential).foreach { name =>
+      withClue(s"For decay algorithm '$name': ") {
+        val snapshot = GraphStatisticsSnapshot(Map(NodesWithLabelCardinality(label(21)) -> 5.0))
+        val divergenceCalculator = StatsDivergenceCalculator.divergenceCalculatorFor(name, 0.5, 0.1, 1000, 100000)
+        val clock = Clocks.fakeClock()
+        val stats = mock[GraphStatistics]
+        when(stats.nodesWithLabelCardinality(label(21))).thenReturn(6.0)
+        val fingerprint = PlanFingerprint(clock.millis(), 17, snapshot)
+
+        val reference = new PlanFingerprintReference(clock, divergenceCalculator, fingerprint)
+
+        clock.forward(2, SECONDS)
+        reference.checkPlanReusability(transactionIdSupplier(23), stats) shouldBe FineToReuse
+
+        clock.forward(100, SECONDS)
+        val result = reference.checkPlanReusability(transactionIdSupplier(73), stats)
+        if (name == StatsDivergenceCalculator.none)
+          result shouldBe FineToReuse
+        else
+          result shouldBe a[NeedsReplan]
+      }
+    }
+  }
+
+  test("should be stale if statistics decrease enough to pass the decayed threshold") {
+    Seq(StatsDivergenceCalculator.none, StatsDivergenceCalculator.inverse, StatsDivergenceCalculator.exponential).foreach { name =>
+      withClue(s"For decay algorithm '$name': ") {
+        val snapshot = GraphStatisticsSnapshot(Map(NodesWithLabelCardinality(label(21)) -> 5.0))
+        val divergenceCalculator = StatsDivergenceCalculator.divergenceCalculatorFor(name, 0.5, 0.1, 1000, 100000)
+        val clock = Clocks.fakeClock()
+        val stats = mock[GraphStatistics]
+        when(stats.nodesWithLabelCardinality(label(21))).thenReturn(4.0)
+        val fingerprint = PlanFingerprint(clock.millis(), 17, snapshot)
+
+        val reference = new PlanFingerprintReference(clock, divergenceCalculator, fingerprint)
+
+        clock.forward(2, SECONDS)
+        reference.checkPlanReusability(transactionIdSupplier(23), stats) shouldBe FineToReuse
+
+        clock.forward(100, SECONDS)
+        val result = reference.checkPlanReusability(transactionIdSupplier(73), stats)
+        if (name == StatsDivergenceCalculator.none)
+          result shouldBe FineToReuse
+        else
+          result shouldBe a[NeedsReplan]
+      }
+    }
   }
 
   implicit def liftToOption[T](item: T): Option[T] = Option(item)

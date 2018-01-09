@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,8 +22,8 @@ package org.neo4j.values.virtual;
 import org.junit.Test;
 
 import static org.junit.Assert.fail;
-import static org.neo4j.values.virtual.VirtualValueTestUtil.assertEqual;
-import static org.neo4j.values.virtual.VirtualValueTestUtil.assertNotEqual;
+import static org.neo4j.values.utils.AnyValueTestUtil.assertEqual;
+import static org.neo4j.values.utils.AnyValueTestUtil.assertNotEqual;
 import static org.neo4j.values.virtual.VirtualValueTestUtil.edge;
 import static org.neo4j.values.virtual.VirtualValueTestUtil.edges;
 import static org.neo4j.values.virtual.VirtualValueTestUtil.node;
@@ -85,18 +85,10 @@ public class GraphElementValueTest
                 path( node( 1L ), edge( 2L, 1L, 3L ), node( 3L ) ) );
     }
 
-    @Test
+    @Test( expected = AssertionError.class )
     public void pathShouldNotOnlyContainRelationship()
     {
-        try
-        {
-            VirtualValues.path( nodes(), edges( 1L ) );
-            fail();
-        }
-        catch ( AssertionError e )
-        {
-            // ignore
-        }
+        VirtualValues.path( nodes(), edges( 1L ) );
     }
 
     @Test
@@ -113,37 +105,21 @@ public class GraphElementValueTest
         }
     }
 
-    @Test
-    public void pathShouldHandleNull()
+    @Test( expected = AssertionError.class )
+    public void pathShouldHandleNulls()
     {
-        try
-        {
-            VirtualValues.path( null, null );
-            fail();
-        }
-        catch ( AssertionError e )
-        {
-            // ignore
-        }
+        VirtualValues.path( null, null );
+    }
 
-        try
-        {
-            VirtualValues.path( nodes( 1L ), null );
-            fail();
-        }
-        catch ( AssertionError e )
-        {
-            // ignore
-        }
+    @Test( expected = AssertionError.class )
+    public void pathShouldHandleNullEdge()
+    {
+        VirtualValues.path( nodes( 1L ), null );
+    }
 
-        try
-        {
-            VirtualValues.path( null, edges( 1L ) );
-            fail();
-        }
-        catch ( AssertionError e )
-        {
-            // ignore
-        }
+    @Test( expected = AssertionError.class )
+    public void pathShouldHandleNullNodes()
+    {
+        VirtualValues.path( null, edges( 1L ) );
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -59,6 +59,7 @@ public class DeferringStatementLocksTest
         statementLocks.prepareForCommit( LockTracer.NONE );
 
         // THEN
+        verify( client ).prepare();
         verifyNoMoreInteractions( client );
     }
 
@@ -76,6 +77,7 @@ public class DeferringStatementLocksTest
         statementLocks.prepareForCommit( LockTracer.NONE );
 
         // THEN
+        verify( client ).prepare();
         verify( client ).acquireExclusive( LockTracer.NONE, ResourceTypes.NODE, 1 );
         verify( client ).acquireExclusive( LockTracer.NONE, ResourceTypes.RELATIONSHIP, 42 );
         verifyNoMoreInteractions( client );

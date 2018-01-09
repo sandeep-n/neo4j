@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,8 +19,7 @@
  */
 package org.neo4j.kernel.impl.api.security;
 
-import org.neo4j.kernel.api.exceptions.InvalidArgumentsException;
-import org.neo4j.kernel.api.security.AccessMode;
+import org.neo4j.internal.kernel.api.security.AccessMode;
 
 /**
  * Access mode that restricts the original access mode with the restricting mode. Allows things that both the
@@ -58,7 +57,7 @@ public class RestrictedAccessMode extends WrappedAccessMode
     }
 
     @Override
-    public boolean allowsProcedureWith( String[] allowed ) throws InvalidArgumentsException
+    public boolean allowsProcedureWith( String[] allowed )
     {
         return false;
     }

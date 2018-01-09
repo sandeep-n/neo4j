@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -202,7 +202,7 @@ public class ValueAsObjectCopyTest
         return new AsObjectCopyTest( value, asObject );
     }
 
-    private class AsObjectCopyTest
+    private static class AsObjectCopyTest
     {
         private final Value value;
         private final Object expected;

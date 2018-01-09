@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -53,14 +53,14 @@ class LabelScanLeafPlannerTest extends CypherFunSuite with LogicalPlanningTestSu
 
     val semanticTable = new SemanticTable()
 
-    implicit val context = newMockedLogicalPlanningContext(
+    val context = newMockedLogicalPlanningContext(
       semanticTable = semanticTable,
       planContext = newMockedPlanContext,
       metrics = factory.newMetrics(statistics, mock[ExpressionEvaluator])
     )
 
     // when
-    val resultPlans = labelScanLeafPlanner(qg)
+    val resultPlans = labelScanLeafPlanner(qg, context)
 
     // then
     resultPlans should equal(Seq(
@@ -87,14 +87,14 @@ class LabelScanLeafPlannerTest extends CypherFunSuite with LogicalPlanningTestSu
     implicit val semanticTable = newMockedSemanticTable
     when(semanticTable.id(labelName)).thenReturn(Some(labelId))
 
-    implicit val context = newMockedLogicalPlanningContext(
+    val context = newMockedLogicalPlanningContext(
       semanticTable = semanticTable,
       planContext = newMockedPlanContext,
       metrics = factory.newMetrics(statistics, mock[ExpressionEvaluator])
     )
 
     // when
-    val resultPlans = labelScanLeafPlanner(qg)
+    val resultPlans = labelScanLeafPlanner(qg, context)
 
     // then
     resultPlans should equal(

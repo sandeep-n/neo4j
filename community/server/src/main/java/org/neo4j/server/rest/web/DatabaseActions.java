@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -1106,7 +1106,7 @@ public class DatabaseActions
             @Override
             public Iterator<Representation> iterator()
             {
-                return newResourceIterator( () -> paths.forEach( Path::close ), super.iterator() );
+                return newResourceIterator( super.iterator(), () -> paths.forEach( Path::close ) );
             }
         };
         return new ListRepresentation( returnType.repType, result );

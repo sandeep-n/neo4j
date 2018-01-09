@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -26,19 +26,19 @@ import org.neo4j.cypher.internal.runtime.interpreted.IsMap
 import org.neo4j.cypher.internal.runtime.interpreted.pipes.QueryState
 import org.neo4j.values.AnyValue
 import org.neo4j.values.storable.Values
-import org.neo4j.values.virtual.{EdgeValue, NodeValue}
+import org.neo4j.values.virtual.{VirtualEdgeValue, VirtualNodeValue}
 
 case class Property(mapExpr: Expression, propertyKey: KeyToken)
   extends Expression with Product with Serializable
 {
   def apply(ctx: ExecutionContext, state: QueryState): AnyValue = mapExpr(ctx, state) match {
     case n if n == Values.NO_VALUE => Values.NO_VALUE
-    case n: NodeValue =>
+    case n: VirtualNodeValue =>
       propertyKey.getOptId(state.query) match {
         case None => Values.NO_VALUE
         case Some(propId) => state.query.nodeOps.getProperty(n.id(), propId)
       }
-    case r: EdgeValue =>
+    case r: VirtualEdgeValue =>
       propertyKey.getOptId(state.query) match {
         case None => Values.NO_VALUE
         case Some(propId) => state.query.relationshipOps.getProperty(r.id(), propId)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -110,7 +110,7 @@ public abstract class NativeSchemaNumberIndexPopulatorTest<KEY extends SchemaNum
         try ( StoreChannel r = fs.open( indexFile, OpenMode.READ ) )
         {
             byte[] firstBytes = new byte[someBytes.length];
-            r.read( ByteBuffer.wrap( firstBytes ) );
+            r.readAll( ByteBuffer.wrap( firstBytes ) );
             assertNotEquals( "Expected previous file content to have been cleared but was still there",
                     someBytes, firstBytes );
         }

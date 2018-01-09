@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,10 +24,12 @@ import java.util.concurrent.atomic.AtomicInteger
 import org.neo4j.cypher.internal.planner.v3_4.spi.IndexDescriptor
 import org.neo4j.cypher.internal.runtime.{Operations, QueryContext, QueryStatistics}
 import org.neo4j.cypher.internal.v3_4.expressions.SemanticDirection
-import org.neo4j.graphdb.{Node, PropertyContainer, Relationship}
 import org.neo4j.values.storable.Value
+import org.neo4j.values.virtual.{EdgeValue, NodeValue}
 
 class UpdateCountingQueryContext(inner: QueryContext) extends DelegatingQueryContext(inner) {
+
+  override def createNewQueryContext(): QueryContext = inner.createNewQueryContext()
 
   private val nodesCreated = new Counter
   private val relationshipsCreated = new Counter
@@ -42,6 +44,8 @@ class UpdateCountingQueryContext(inner: QueryContext) extends DelegatingQueryCon
   private val uniqueConstraintsRemoved = new Counter
   private val propertyExistenceConstraintsAdded = new Counter
   private val propertyExistenceConstraintsRemoved = new Counter
+  private val nodekeyConstraintsAdded = new Counter
+  private val nodekeyConstraintsRemoved = new Counter
 
   def getStatistics = QueryStatistics(
     nodesCreated = nodesCreated.count,
@@ -56,7 +60,9 @@ class UpdateCountingQueryContext(inner: QueryContext) extends DelegatingQueryCon
     uniqueConstraintsAdded = uniqueConstraintsAdded.count,
     uniqueConstraintsRemoved = uniqueConstraintsRemoved.count,
     existenceConstraintsAdded = propertyExistenceConstraintsAdded.count,
-    existenceConstraintsRemoved = propertyExistenceConstraintsRemoved.count)
+    existenceConstraintsRemoved = propertyExistenceConstraintsRemoved.count,
+    nodekeyConstraintsAdded = nodekeyConstraintsAdded.count,
+    nodekeyConstraintsRemoved = nodekeyConstraintsRemoved.count)
 
   override def getOptStatistics = Some(getStatistics)
 
@@ -70,21 +76,16 @@ class UpdateCountingQueryContext(inner: QueryContext) extends DelegatingQueryCon
     inner.createNodeId()
   }
 
-  override def nodeOps: Operations[Node] =
-    new CountingOps[Node](inner.nodeOps, nodesDeleted)
+  override def nodeOps: Operations[NodeValue] =
+    new CountingOps[NodeValue](inner.nodeOps, nodesDeleted)
 
-  override def relationshipOps: Operations[Relationship] =
-    new CountingOps[Relationship](inner.relationshipOps, relationshipsDeleted)
+  override def relationshipOps: Operations[EdgeValue] =
+    new CountingOps[EdgeValue](inner.relationshipOps, relationshipsDeleted)
 
   override def setLabelsOnNode(node: Long, labelIds: Iterator[Int]): Int = {
     val added = inner.setLabelsOnNode(node, labelIds)
     labelsAdded.increase(added)
     added
-  }
-
-  override def createRelationship(start: Node, end: Node, relType: String) = {
-    relationshipsCreated.increase()
-    inner.createRelationship(start, end, relType)
   }
 
   override def createRelationship(start: Long, end: Long, relType: Int) = {
@@ -107,6 +108,17 @@ class UpdateCountingQueryContext(inner: QueryContext) extends DelegatingQueryCon
   override def dropIndexRule(descriptor: IndexDescriptor) {
     inner.dropIndexRule(descriptor)
     indexesRemoved.increase()
+  }
+
+  override def createNodeKeyConstraint(descriptor: IndexDescriptor): Boolean = {
+    val result = inner.createNodeKeyConstraint(descriptor)
+    if ( result ) nodekeyConstraintsAdded.increase()
+    result
+  }
+
+  override def dropNodeKeyConstraint(descriptor: IndexDescriptor): Unit = {
+    inner.dropNodeKeyConstraint(descriptor)
+    nodekeyConstraintsRemoved.increase()
   }
 
   override def createUniqueConstraint(descriptor: IndexDescriptor): Boolean = {
@@ -161,7 +173,7 @@ class UpdateCountingQueryContext(inner: QueryContext) extends DelegatingQueryCon
     }
   }
 
-  private class CountingOps[T <: PropertyContainer](inner: Operations[T], deletes: Counter)
+  private class CountingOps[T](inner: Operations[T], deletes: Counter)
     extends DelegatingOperations[T](inner) {
 
     override def delete(id: Long) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -39,7 +39,9 @@ import org.neo4j.io.pagecache.PageCache;
 import org.neo4j.io.pagecache.PageCursor;
 import org.neo4j.io.pagecache.PagedFile;
 import org.neo4j.io.pagecache.impl.DelegatingPageCursor;
+import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.store.format.standard.Standard;
+import org.neo4j.kernel.impl.store.id.DefaultIdGeneratorFactory;
 import org.neo4j.kernel.impl.store.record.MetaDataRecord;
 import org.neo4j.kernel.impl.store.record.RecordLoad;
 import org.neo4j.kernel.impl.transaction.log.TransactionIdStore;
@@ -107,13 +109,6 @@ public class MetaDataStoreTest
                 };
             }
         };
-    }
-
-    private MetaDataStore newMetaDataStore() throws IOException
-    {
-        LogProvider logProvider = NullLogProvider.getInstance();
-        StoreFactory storeFactory = new StoreFactory( STORE_DIR, pageCacheWithFakeOverflow, fs, logProvider );
-        return storeFactory.openNeoStores( true, StoreType.META_DATA ).getMetaDataStore();
     }
 
     @Test
@@ -322,6 +317,22 @@ public class MetaDataStoreTest
         {
             assertThat( e, instanceOf( IllegalStateException.class ) );
         }
+    }
+
+    @Test
+    public void currentCommittingTransactionId() throws IOException
+    {
+        MetaDataStore metaDataStore = newMetaDataStore();
+        metaDataStore.nextCommittingTransactionId();
+        long lastCommittingTxId = metaDataStore.nextCommittingTransactionId();
+        assertEquals( lastCommittingTxId, metaDataStore.committingTransactionId() );
+
+        metaDataStore.nextCommittingTransactionId();
+        metaDataStore.nextCommittingTransactionId();
+
+        lastCommittingTxId = metaDataStore.nextCommittingTransactionId();
+        assertEquals( lastCommittingTxId, metaDataStore.committingTransactionId() );
+        metaDataStore.close();
     }
 
     @Test
@@ -765,4 +776,13 @@ public class MetaDataStoreTest
             store.logRecords( NullLogger.getInstance() );
         }
     }
+
+    private MetaDataStore newMetaDataStore() throws IOException
+    {
+        LogProvider logProvider = NullLogProvider.getInstance();
+        StoreFactory storeFactory = new StoreFactory( STORE_DIR, Config.defaults(), new DefaultIdGeneratorFactory( fs ),
+                pageCacheWithFakeOverflow, fs, logProvider );
+        return storeFactory.openNeoStores( true, StoreType.META_DATA ).getMetaDataStore();
+    }
+
 }

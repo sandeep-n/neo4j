@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -102,14 +102,14 @@ public interface NotificationDetail
             return createNotificationDetail( labels, "indexed label", "indexed labels" );
         }
 
-        public static NotificationDetail startDeprecated( String message )
+        public static NotificationDetail message( String name, String message )
         {
             return new NotificationDetail()
             {
                 @Override
                 public String name()
                 {
-                    return "START";
+                    return name;
                 }
 
                 @Override

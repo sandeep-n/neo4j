@@ -1,5 +1,5 @@
 Neo4j
-Copyright © 2002-2017 Network Engine for Objects in Lund AB (referred to
+Copyright © 2002-2018 Network Engine for Objects in Lund AB (referred to
 in this notice as "Neo Technology")
    [http://neotechnology.com]
 
@@ -29,6 +29,10 @@ Apache Software License, Version 2.0
   Apache Commons Collections
   Graphite Integration for Metrics
   Metrics Core
+  Prometheus Java Simpleclient
+  Prometheus Java Simpleclient Common
+  Prometheus Java Simpleclient Dropwizard
+  Prometheus Java Simpleclient Httpserver
 
 MIT License
   SLF4J API Module

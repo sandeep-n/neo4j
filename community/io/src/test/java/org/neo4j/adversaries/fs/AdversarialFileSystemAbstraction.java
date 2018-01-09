@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -183,6 +183,15 @@ public class AdversarialFileSystemAbstraction implements FileSystemAbstraction
                 SecurityException.class, IllegalArgumentException.class, FileNotFoundException.class,
                 NullPointerException.class, IOException.class );
         delegate.moveToDirectory( file, toDirectory );
+    }
+
+    @Override
+    public void copyToDirectory( File file, File toDirectory ) throws IOException
+    {
+        adversary.injectFailure(
+                SecurityException.class, IllegalArgumentException.class, FileNotFoundException.class,
+                NullPointerException.class, IOException.class );
+        delegate.copyToDirectory( file, toDirectory );
     }
 
     @Override

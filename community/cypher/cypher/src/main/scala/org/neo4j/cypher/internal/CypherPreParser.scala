@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,8 +19,8 @@
  */
 package org.neo4j.cypher.internal
 
-import org.neo4j.cypher.internal.util.v3_4.InputPosition
 import org.neo4j.cypher.internal.frontend.v3_4.parser.Base
+import org.neo4j.cypher.internal.util.v3_4.InputPosition
 import org.parboiled.scala._
 
 final case class PreParsedStatement(statement: String, options: Seq[PreParserOption], offset: InputPosition)
@@ -56,6 +56,7 @@ case object CypherPreParser extends Parser with Base {
     option("runtime", "interpreted") ~ push(InterpretedRuntimeOption)
       | option("runtime", "compiled") ~ push(CompiledRuntimeOption)
       | option("runtime", "slotted") ~ push(SlottedRuntimeOption)
+      | option("runtime", "morsel") ~ push(MorselRuntimeOption)
   )
 
   def StrategyOption: Rule1[UpdateStrategyOption] = rule("strategy option")(

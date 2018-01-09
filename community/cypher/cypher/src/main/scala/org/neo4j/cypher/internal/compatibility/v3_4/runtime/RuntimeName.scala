@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -30,6 +30,10 @@ case object InterpretedRuntimeName extends RuntimeName {
 
 case object SlottedRuntimeName extends RuntimeName {
   override val name = "SLOTTED"
+}
+
+case object MorselRuntimeName extends RuntimeName {
+  override val name = "MORSEL"
 }
 
 case object CompiledRuntimeName extends RuntimeName {

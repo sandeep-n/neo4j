@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -256,7 +256,7 @@ public class IndexProviderShellApp extends TransactionProvidingApp
         Class<? extends PropertyContainer> entityType = getEntityType( parser );
         if ( getIndex( indexName, entityType, null ) != null )
         {
-            out.println( entityType.getClass().getSimpleName() + " index '" + indexName + "' already exists" );
+            out.println( entityType.getSimpleName() + " index '" + indexName + "' already exists" );
             return;
         }
 

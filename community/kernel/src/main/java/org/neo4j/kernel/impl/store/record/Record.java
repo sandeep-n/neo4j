@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -49,8 +49,8 @@ public enum Record
     public static final byte HAS_SECONDARY_UNIT = 8;
     public static final byte USES_FIXED_REFERENCE_FORMAT = 16;
 
-    private byte byteValue;
-    private int intValue;
+    private final byte byteValue;
+    private final int intValue;
 
     Record( Record from )
     {

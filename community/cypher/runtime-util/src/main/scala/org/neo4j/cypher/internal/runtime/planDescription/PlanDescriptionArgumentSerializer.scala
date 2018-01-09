@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -64,7 +64,9 @@ object PlanDescriptionArgumentSerializer {
       case Version(version) => version
       case Planner(planner) => planner
       case PlannerImpl(plannerName) => plannerName
+      case PlannerVersion(value) => value
       case Runtime(runtime) => runtime
+      case RuntimeVersion(value) => value
       case SourceCode(className, sourceCode) => sourceCode
       case ByteCode(className, byteCode) => byteCode
       case RuntimeImpl(runtimeName) => runtimeName

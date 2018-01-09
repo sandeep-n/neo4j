@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -29,19 +29,19 @@ import java.util.concurrent.TimeUnit;
 import org.neo4j.causalclustering.core.consensus.roles.Role;
 import org.neo4j.causalclustering.discovery.Cluster;
 import org.neo4j.causalclustering.discovery.CoreClusterMember;
+import org.neo4j.function.ThrowingSupplier;
 import org.neo4j.graphdb.Label;
 import org.neo4j.graphdb.Node;
 import org.neo4j.test.causalclustering.ClusterRule;
 
 import static java.util.stream.Collectors.toList;
-import static org.junit.Assert.assertEquals;
 import static org.neo4j.test.assertion.Assert.assertEventually;
 
 public class ClusterLeaderStepDownIT
 {
     @Rule
     public final ClusterRule clusterRule =
-            new ClusterRule( getClass() ).withNumberOfCoreMembers( 8 ).withNumberOfReadReplicas( 0 );
+            new ClusterRule().withNumberOfCoreMembers( 8 ).withNumberOfReadReplicas( 0 );
 
     @Test
     public void leaderShouldStepDownWhenFollowersAreGone() throws Throwable
@@ -57,13 +57,13 @@ public class ClusterLeaderStepDownIT
             tx.success();
         } );
 
-        List<CoreClusterMember> followers =
-                cluster.coreMembers().stream().filter( m -> m.raft().currentRole() != Role.LEADER ).collect( toList() );
-        assertEquals( 7, followers.size() );
+        ThrowingSupplier<List<CoreClusterMember>,Exception> followers = () -> cluster.coreMembers().stream().filter(
+                m -> m.raft().currentRole() != Role.LEADER ).collect( toList() );
+        assertEventually( "All followers visible", followers, Matchers.hasSize( 7 ), 2, TimeUnit.MINUTES );
 
         //when
         //shutdown 4 servers, leaving 4 remaining and therefore not a quorum.
-        followers.subList( 0, 4 ).forEach( CoreClusterMember::shutdown );
+        followers.get().subList( 0, 4 ).forEach( CoreClusterMember::shutdown );
 
         //then
         assertEventually( "Leader should have stepped down.", () -> leader.raft().isLeader(), Matchers.is( false ), 2,

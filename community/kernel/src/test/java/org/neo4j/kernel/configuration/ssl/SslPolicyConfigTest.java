@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -32,6 +32,7 @@ import org.neo4j.ssl.ClientAuth;
 import org.neo4j.test.rule.TestDirectory;
 
 import static java.util.Arrays.asList;
+import static java.util.Collections.singletonList;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -85,7 +86,7 @@ public class SslPolicyConfigTest
         assertEquals( null, privateKeyPassword );
         assertFalse( allowKeyGeneration );
         assertFalse( trustAll );
-        assertEquals( asList( "TLSv1.2", "TLSv1.1", "TLSv1" ), tlsVersions );
+        assertEquals( singletonList( "TLSv1.2" ), tlsVersions );
         assertNull( ciphers );
         assertEquals( ClientAuth.REQUIRE, clientAuth );
     }

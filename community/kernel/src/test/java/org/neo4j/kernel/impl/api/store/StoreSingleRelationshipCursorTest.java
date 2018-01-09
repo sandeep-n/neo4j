@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,11 +25,13 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.RuleChain;
 
+import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.locking.LockService;
 import org.neo4j.kernel.impl.store.NeoStores;
 import org.neo4j.kernel.impl.store.RecordCursors;
 import org.neo4j.kernel.impl.store.RelationshipStore;
 import org.neo4j.kernel.impl.store.StoreFactory;
+import org.neo4j.kernel.impl.store.id.DefaultIdGeneratorFactory;
 import org.neo4j.kernel.impl.store.record.RelationshipRecord;
 import org.neo4j.kernel.impl.util.InstanceCache;
 import org.neo4j.logging.NullLogProvider;
@@ -108,8 +110,10 @@ public class StoreSingleRelationshipCursorTest
 
     private StoreFactory getStoreFactory()
     {
-        return new StoreFactory( testDirectory.directory(), pageCacheRule.getPageCache( fileSystemRule.get() ),
-                fileSystemRule.get(), NullLogProvider.getInstance() );
+        return new StoreFactory(
+                testDirectory.directory(), Config.defaults(), new DefaultIdGeneratorFactory( fileSystemRule.get() ),
+                pageCacheRule.getPageCache( fileSystemRule.get() ), fileSystemRule.get(),
+                NullLogProvider.getInstance() );
     }
 
     private StoreSingleRelationshipCursor createRelationshipCursor()

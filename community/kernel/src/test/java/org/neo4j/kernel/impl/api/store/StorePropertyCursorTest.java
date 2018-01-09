@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -38,6 +38,7 @@ import java.util.function.Consumer;
 import org.neo4j.cursor.Cursor;
 import org.neo4j.graphdb.mockfs.EphemeralFileSystemAbstraction;
 import org.neo4j.io.pagecache.PageCache;
+import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.store.DynamicArrayStore;
 import org.neo4j.kernel.impl.store.DynamicRecordAllocator;
 import org.neo4j.kernel.impl.store.DynamicStringStore;
@@ -49,6 +50,7 @@ import org.neo4j.kernel.impl.store.RecordCursors;
 import org.neo4j.kernel.impl.store.RecordStore;
 import org.neo4j.kernel.impl.store.StoreFactory;
 import org.neo4j.kernel.impl.store.format.standard.PropertyRecordFormat;
+import org.neo4j.kernel.impl.store.id.DefaultIdGeneratorFactory;
 import org.neo4j.kernel.impl.store.record.AbstractBaseRecord;
 import org.neo4j.kernel.impl.store.record.DynamicRecord;
 import org.neo4j.kernel.impl.store.record.PropertyBlock;
@@ -58,6 +60,8 @@ import org.neo4j.storageengine.api.PropertyItem;
 import org.neo4j.test.MockedNeoStores;
 import org.neo4j.test.rule.PageCacheRule;
 import org.neo4j.test.rule.fs.EphemeralFileSystemRule;
+import org.neo4j.values.storable.CoordinateReferenceSystem;
+import org.neo4j.values.storable.PointValue;
 import org.neo4j.values.storable.Value;
 import org.neo4j.values.storable.Values;
 
@@ -95,6 +99,8 @@ public class StorePropertyCursorTest
             new Object[]{"notsoshort", PropertyType.SHORT_STRING},
             new Object[]{"alongershortstring", PropertyType.SHORT_STRING},
             new Object[]{"areallylongshortstringbutstillnotsobig", PropertyType.SHORT_STRING},
+            new Object[]{Values.pointValue( CoordinateReferenceSystem.WGS84, 1.234, 4.321 ), PropertyType.GEOMETRY},
+            new Object[]{Values.pointValue( CoordinateReferenceSystem.Cartesian, 1.234, 4.321, -6.543 ), PropertyType.GEOMETRY},
             new Object[]{new double[]{0.0d}, PropertyType.SHORT_ARRAY},
             new Object[]{new double[]{1.2d}, PropertyType.SHORT_ARRAY},
             new Object[]{new double[]{1.2d, 1.4d}, PropertyType.SHORT_ARRAY},
@@ -102,6 +108,15 @@ public class StorePropertyCursorTest
             new Object[]{new double[]{1.2d, 1.4d, 1.6d, 1.8d}, PropertyType.ARRAY},
             new Object[]{new double[]{1.2d, 1.4d, 1.6d, 1.8d, 2.2d, 2.4d, 2.6d, 2.8d, 3.2d, 3.4d, 3.6d, 3.8d},
                     PropertyType.ARRAY},
+            new Object[]{new PointValue[]{
+                    Values.pointValue( CoordinateReferenceSystem.WGS84, 1.234, 4.321 ),
+                    Values.pointValue( CoordinateReferenceSystem.WGS84, 4.321, -6.543 )
+            }, PropertyType.ARRAY},
+            new Object[]{new PointValue[]{
+                    Values.pointValue( CoordinateReferenceSystem.Cartesian, 3.987, 1.234, 4.321 ),
+                    Values.pointValue( CoordinateReferenceSystem.Cartesian, 1.234, 4.321, -6.543 )
+            }, PropertyType.ARRAY},
+
             new Object[]{"thisisaveryveryveryverylongstringwhichisnotgonnafiteverintothepropertyblock",
                     PropertyType.STRING},
             new Object[]{new BigProperty(
@@ -289,7 +304,10 @@ public class StorePropertyCursorTest
                 fs.deleteRecursively( storeDir );
             }
             fs.mkdirs( storeDir );
-            neoStores = new StoreFactory( storeDir, pageCache, fs, NullLogProvider.getInstance() )
+            Config config = Config.defaults();
+            DefaultIdGeneratorFactory idGeneratorFactory = new DefaultIdGeneratorFactory( fs );
+            NullLogProvider logProvider = NullLogProvider.getInstance();
+            neoStores = new StoreFactory( storeDir, config, idGeneratorFactory, pageCache, fs, logProvider )
                     .openAllNeoStores( true );
             propertyStore = neoStores.getPropertyStore();
         }
@@ -825,7 +843,7 @@ public class StorePropertyCursorTest
         DynamicRecordAllocator arrayAllocator = store.getArrayStore();
 
         PropertyBlock block = new PropertyBlock();
-        PropertyStore.encodeValue( block, keyId, Values.of( value ), stringAllocator, arrayAllocator );
+        PropertyStore.encodeValue( block, keyId, Values.of( value ), stringAllocator, arrayAllocator, true );
 
         PropertyRecord record = new PropertyRecord( store.nextId() );
         record.addPropertyBlock( block );
@@ -842,9 +860,9 @@ public class StorePropertyCursorTest
         DynamicRecordAllocator arrayAllocator = store.getArrayStore();
 
         PropertyBlock block1 = new PropertyBlock();
-        PropertyStore.encodeValue( block1, keyId1, Values.of( value1 ), stringAllocator, arrayAllocator );
+        PropertyStore.encodeValue( block1, keyId1, Values.of( value1 ), stringAllocator, arrayAllocator, true );
         PropertyBlock block2 = new PropertyBlock();
-        PropertyStore.encodeValue( block2, keyId2, Values.of( value2 ), stringAllocator, arrayAllocator );
+        PropertyStore.encodeValue( block2, keyId2, Values.of( value2 ), stringAllocator, arrayAllocator, true );
 
         PropertyRecord record = new PropertyRecord( store.nextId() );
         record.addPropertyBlock( block1 );

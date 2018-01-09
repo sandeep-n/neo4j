@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,11 +20,10 @@
 package org.neo4j.cypher.internal.runtime.interpreted.pipes
 
 import org.neo4j.collection.primitive.{Primitive, PrimitiveLongObjectMap}
-import org.neo4j.cypher.internal.util.v3_4.InternalException
 import org.neo4j.cypher.internal.runtime.interpreted.ExecutionContext
-import org.neo4j.cypher.internal.v3_4.logical.plans.LogicalPlanId
+import org.neo4j.cypher.internal.util.v3_4.InternalException
+import org.neo4j.cypher.internal.util.v3_4.attribution.Id
 import org.neo4j.cypher.internal.v3_4.expressions.SemanticDirection
-import org.neo4j.kernel.impl.util.ValueUtils
 import org.neo4j.values.virtual.{EdgeValue, NodeValue}
 
 case class FullPruningVarLengthExpandPipe(source: Pipe,
@@ -35,7 +34,7 @@ case class FullPruningVarLengthExpandPipe(source: Pipe,
                                           min: Int,
                                           max: Int,
                                           filteringStep: VarLengthPredicate = VarLengthPredicate.NONE)
-                                         (val id: LogicalPlanId = LogicalPlanId.DEFAULT) extends PipeWithSource(source) with Pipe {
+                                         (val id: Id = Id.INVALID_ID) extends PipeWithSource(source) with Pipe {
   self =>
 
   assert(min <= max)
@@ -246,7 +245,7 @@ case class FullPruningVarLengthExpandPipe(source: Pipe,
       */
     def ensureExpanded(queryState: QueryState, row: ExecutionContext, node: NodeValue) = {
       if ( rels == null ) {
-        val allRels = queryState.query.getRelationshipsForIds(node.id(), dir, types.types(queryState.query)).map(ValueUtils.fromRelationshipProxy)
+        val allRels = queryState.query.getRelationshipsForIds(node.id(), dir, types.types(queryState.query))
         rels = allRels.filter(r => {
           filteringStep.filterRelationship(row, queryState)(r) &&
             filteringStep.filterNode(row, queryState)(r.otherNode(node))
@@ -295,7 +294,7 @@ case class FullPruningVarLengthExpandPipe(source: Pipe,
         inputRow = null
         null
       }
-      else inputRow.newWith1(self.toName, endNode)
+      else executionContextFactory.copyWith(inputRow, self.toName, endNode)
     }
 
     def push( pruningDFS: PruningDFS ): NodeValue = {

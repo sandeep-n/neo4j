@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -28,7 +28,6 @@ import org.neo4j.helpers.collection.Pair;
 import org.neo4j.kernel.api.KernelTransaction;
 import org.neo4j.kernel.api.TransactionHook;
 import org.neo4j.kernel.api.TransactionHook.Outcome;
-import org.neo4j.kernel.api.exceptions.TransactionHookException;
 import org.neo4j.storageengine.api.StorageStatement;
 import org.neo4j.storageengine.api.StoreReadLayer;
 import org.neo4j.storageengine.api.txstate.ReadableTransactionState;
@@ -58,7 +57,8 @@ public class TransactionHooks
         TransactionHooksState hookState = new TransactionHooksState();
         for ( TransactionHook hook : hooks )
         {
-            hookState.add( hook, hook.beforeCommit( state, tx, storeReadLayer, storageStatement ) );
+            Outcome outcome = hook.beforeCommit( state, tx, storeReadLayer, storageStatement );
+            hookState.add( hook, outcome );
         }
         return hookState;
     }
@@ -72,7 +72,9 @@ public class TransactionHooks
         }
         for ( Pair<TransactionHook, Outcome> hookAndOutcome : hooksState.hooksWithOutcome() )
         {
-            hookAndOutcome.first().afterCommit( state, tx, hookAndOutcome.other() );
+            TransactionHook hook = hookAndOutcome.first();
+            Outcome outcome = hookAndOutcome.other();
+            hook.afterCommit( state, tx, outcome );
         }
     }
 
@@ -92,18 +94,18 @@ public class TransactionHooks
     public static class TransactionHooksState
     {
         private final List<Pair<TransactionHook, Outcome>> hooksWithAttachment = new ArrayList<>();
-        private TransactionHookException failure;
+        private Throwable failure;
 
         public void add( TransactionHook hook, Outcome outcome )
         {
             hooksWithAttachment.add( Pair.of( hook, outcome ) );
             if ( outcome != null && !outcome.isSuccessful() )
             {
-                failure = new TransactionHookException( outcome.failure(), "Transaction handler failed." );
+                failure = outcome.failure();
             }
         }
 
-        public Iterable<Pair<TransactionHook, Outcome>> hooksWithOutcome()
+        Iterable<Pair<TransactionHook, Outcome>> hooksWithOutcome()
         {
             return hooksWithAttachment;
         }
@@ -113,7 +115,7 @@ public class TransactionHooks
             return failure != null;
         }
 
-        public TransactionHookException failure()
+        public Throwable failure()
         {
             return failure;
         }

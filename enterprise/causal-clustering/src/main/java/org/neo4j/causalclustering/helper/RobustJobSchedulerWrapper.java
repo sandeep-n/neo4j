@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -74,34 +74,6 @@ public class RobustJobSchedulerWrapper
         {
             log.error( "Uncaught error rethrown", t );
             throw t;
-        }
-    }
-
-    /**
-     * Note that because of the cancellation, the effects of the job
-     * are not necessarily visible after this call, which is different
-     * from a pure waitForTermination call.
-     *
-     * @param job The job to terminate.
-     */
-    public void cancelAndWaitTermination( JobScheduler.JobHandle job )
-    {
-        try
-        {
-            job.cancel( true );
-
-            try
-            {
-                job.waitTermination();
-            }
-            catch ( CancellationException e )
-            {
-                // expected sometimes because of cancellation above
-            }
-        }
-        catch ( Throwable e )
-        {
-            log.warn( "Termination experienced exception", e );
         }
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -27,9 +27,9 @@ import org.neo4j.cypher.internal.runtime.{RuntimeJavaValueConverter, isGraphKern
 import org.neo4j.graphdb.Label._
 import org.neo4j.graphdb._
 import org.neo4j.kernel.GraphDatabaseQueryService
-import org.neo4j.kernel.api.KernelTransaction.Type
+import org.neo4j.internal.kernel.api.Transaction.Type
 import org.neo4j.kernel.api.Statement
-import org.neo4j.kernel.api.security.SecurityContext.AUTH_DISABLED
+import org.neo4j.internal.kernel.api.security.SecurityContext.AUTH_DISABLED
 import org.neo4j.kernel.impl.core.ThreadToStatementContextBridge
 import org.neo4j.kernel.impl.coreapi.{InternalTransaction, PropertyContainerLocker}
 import org.neo4j.kernel.impl.factory.GraphDatabaseFacade

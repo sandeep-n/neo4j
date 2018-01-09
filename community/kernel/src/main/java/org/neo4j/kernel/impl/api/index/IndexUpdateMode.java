@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,10 +24,34 @@ public enum IndexUpdateMode
     /**
      * Used when the db is online
      */
-    ONLINE,
+    ONLINE( false, true ),
+
+    /**
+     * Used when flipping from populating to online
+     */
+    ONLINE_IDEMPOTENT( true, true ),
 
     /**
      * Used when the db is recoverying
      */
-    RECOVERY
+    RECOVERY( true, false );
+
+    private final boolean idempotency;
+    private final boolean refresh;
+
+    IndexUpdateMode( boolean idempotency, boolean refresh )
+    {
+        this.idempotency = idempotency;
+        this.refresh = refresh;
+    }
+
+    public boolean requiresIdempotency()
+    {
+        return idempotency;
+    }
+
+    public boolean requiresRefresh()
+    {
+        return refresh;
+    }
 }

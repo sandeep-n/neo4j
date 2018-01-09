@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,6 +25,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -111,8 +112,8 @@ public class Arguments
         if ( !positionalArgs.isEmpty() )
         {
             sb.append( " " );
-            positionalArgs.sort( ( l, r ) -> Integer.compare( l.position(), r.position() ) );
-            sb.append( positionalArgs.stream().map( a -> a.usage() ).collect( Collectors.joining( " " ) ) );
+            positionalArgs.sort( Comparator.comparingInt( PositionalArgument::position ) );
+            sb.append( positionalArgs.stream().map( PositionalArgument::usage ).collect( Collectors.joining( " " ) ) );
         }
 
         return sb.toString().trim();

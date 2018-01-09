@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -27,7 +27,7 @@ import static org.junit.Assert.assertSame;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.neo4j.kernel.api.KernelTransactionFactory.kernelTransaction;
-import static org.neo4j.kernel.api.security.SecurityContext.AUTH_DISABLED;
+import static org.neo4j.internal.kernel.api.security.SecurityContext.AUTH_DISABLED;
 
 public class TransactionStatementSharingTest
 {

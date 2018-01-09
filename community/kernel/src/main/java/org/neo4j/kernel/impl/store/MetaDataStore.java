@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -33,6 +33,7 @@ import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.store.format.RecordFormat;
 import org.neo4j.kernel.impl.store.format.standard.MetaDataRecordFormat;
 import org.neo4j.kernel.impl.store.id.IdGeneratorFactory;
+import org.neo4j.kernel.impl.store.id.IdSequence;
 import org.neo4j.kernel.impl.store.id.IdType;
 import org.neo4j.kernel.impl.store.record.MetaDataRecord;
 import org.neo4j.kernel.impl.store.record.NeoStoreRecord;
@@ -718,6 +719,14 @@ public class MetaDataStore extends CommonAbstractStore<MetaDataRecord,NoStoreHea
     }
 
     @Override
+    public long committingTransactionId()
+    {
+        assertNotClosed();
+        checkInitialized( lastCommittingTxField.get() );
+        return lastCommittingTxField.get();
+    }
+
+    @Override
     public void transactionCommitted( long transactionId, long checksum, long commitTimestamp )
     {
         assertNotClosed();
@@ -892,6 +901,11 @@ public class MetaDataStore extends CommonAbstractStore<MetaDataRecord,NoStoreHea
 
     @Override
     public void prepareForCommit( MetaDataRecord record )
+    {   // No need to do anything with these records before commit
+    }
+
+    @Override
+    public void prepareForCommit( MetaDataRecord record, IdSequence idSequence )
     {   // No need to do anything with these records before commit
     }
 }

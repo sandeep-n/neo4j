@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -77,9 +77,9 @@ public class LuceneFulltextTestSupport
         transactionIdStore = dbRule.resolveDependency( TransactionIdStore.class );
     }
 
-    protected FulltextProvider createProvider() throws IOException
+    protected FulltextProviderImpl createProvider() throws IOException
     {
-        return new FulltextProvider( db, LOG, availabilityGuard, scheduler, transactionIdStore,
+        return new FulltextProviderImpl( db, LOG, availabilityGuard, scheduler, transactionIdStore,
                 fs, storeDir, analyzer );
     }
 

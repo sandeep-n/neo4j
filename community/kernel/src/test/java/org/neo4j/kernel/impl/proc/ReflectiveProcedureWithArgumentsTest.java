@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,7 +19,6 @@
  */
 package org.neo4j.kernel.impl.proc;
 
-import junit.framework.TestCase;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -42,6 +41,7 @@ import org.neo4j.procedure.Name;
 import org.neo4j.procedure.Procedure;
 
 import static org.hamcrest.Matchers.equalTo;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.neo4j.helpers.collection.Iterators.asList;
 import static org.neo4j.kernel.api.proc.ProcedureSignature.procedureSignature;
@@ -58,7 +58,7 @@ public class ReflectiveProcedureWithArgumentsTest
         List<CallableProcedure> procedures = compile( ClassWithProcedureWithSimpleArgs.class );
 
         // Then
-        TestCase.assertEquals( 1, procedures.size() );
+        assertEquals( 1, procedures.size() );
         assertThat( procedures.get( 0 ).signature(), equalTo(
                 procedureSignature( "org", "neo4j", "kernel", "impl", "proc", "listCoolPeople" )
                         .in( "name", Neo4jTypes.NTString )

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -54,8 +54,11 @@ import org.neo4j.kernel.impl.store.format.RecordFormats;
 import org.neo4j.kernel.impl.store.format.standard.StandardV2_3;
 import org.neo4j.kernel.impl.store.format.standard.StandardV3_0;
 import org.neo4j.kernel.impl.store.format.standard.StandardV3_2;
-import org.neo4j.kernel.impl.transaction.log.PhysicalLogFiles;
+import org.neo4j.kernel.impl.store.format.standard.StandardV3_4;
+import org.neo4j.kernel.impl.transaction.log.ReadableClosablePositionAwareChannel;
 import org.neo4j.kernel.impl.transaction.log.entry.VersionAwareLogEntryReader;
+import org.neo4j.kernel.impl.transaction.log.files.LogFiles;
+import org.neo4j.kernel.impl.transaction.log.files.LogFilesBuilder;
 import org.neo4j.kernel.monitoring.Monitors;
 import org.neo4j.kernel.recovery.LogTailScanner;
 import org.neo4j.logging.NullLogProvider;
@@ -105,8 +108,9 @@ public class StoreMigrationIT
         PageCache pageCache = pageCacheRule.getPageCache( fs );
         File dir = TestDirectory.testDirectory( StoreMigrationIT.class ).prepareDirectoryForTest( "migration" );
         StoreVersionCheck storeVersionCheck = new StoreVersionCheck( pageCache );
-        PhysicalLogFiles logFiles = new PhysicalLogFiles( dir, fs );
-        LogTailScanner tailScanner = new LogTailScanner( logFiles, fs, new VersionAwareLogEntryReader<>(), new Monitors() );
+        VersionAwareLogEntryReader<ReadableClosablePositionAwareChannel> logEntryReader = new VersionAwareLogEntryReader<>();
+        LogFiles logFiles = LogFilesBuilder.logFilesBasedOnlyBuilder( dir, fs ).withLogEntryReader( logEntryReader ).build();
+        LogTailScanner tailScanner = new LogTailScanner( logFiles, logEntryReader, new Monitors() );
         List<Object[]> data = new ArrayList<>();
         ArrayList<RecordFormats> recordFormatses = new ArrayList<>();
         RecordFormatSelector.allFormats().forEach( f -> addIfNotThere( f, recordFormatses ) );
@@ -196,6 +200,21 @@ public class StoreMigrationIT
         public RecordFormats newInstance()
         {
             return StandardV3_2.RECORD_FORMATS;
+        }
+    }
+
+    @Service.Implementation( RecordFormats.Factory.class )
+    public static class Standard34Factory extends RecordFormats.Factory
+    {
+        public Standard34Factory()
+        {
+            super( StandardV3_4.STORE_VERSION );
+        }
+
+        @Override
+        public RecordFormats newInstance()
+        {
+            return StandardV3_4.RECORD_FORMATS;
         }
     }
 

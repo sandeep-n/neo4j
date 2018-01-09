@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -54,9 +54,9 @@ public final class Suppliers
      * @param <T> The object type
      * @return A {@link Supplier} returning the specified object instance
      */
-    public static <T> Supplier<T> lazySingleton( final Supplier<T> supplier )
+    public static <T> Lazy<T> lazySingleton( final Supplier<T> supplier )
     {
-        return new Supplier<T>()
+        return new Lazy<T>()
         {
             volatile T instance;
 
@@ -165,4 +165,8 @@ public final class Suppliers
             return String.format( "%s on %s", predicate, input );
         }
     }
+
+    public interface Lazy<T> extends Supplier<T>
+    {
+    };
 }

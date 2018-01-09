@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -44,6 +44,7 @@ public class PhysicalTransactionCursor<T extends ReadableClosablePositionAwareCh
     public PhysicalTransactionCursor( T channel, LogEntryReader<T> entryReader ) throws IOException
     {
         this.channel = channel;
+        channel.getCurrentPosition( lastGoodPositionMarker );
         this.logEntryCursor =
                 new LogEntryCursor( (LogEntryReader<ReadableClosablePositionAwareChannel>) entryReader, channel );
     }
@@ -57,6 +58,10 @@ public class PhysicalTransactionCursor<T extends ReadableClosablePositionAwareCh
     @Override
     public boolean next() throws IOException
     {
+        // Clear the previous deserialized transaction so that it won't have to be kept in heap while deserializing
+        // the next one. Could be problematic if both are really big.
+        current = null;
+
         while ( true )
         {
             if ( !logEntryCursor.next() )

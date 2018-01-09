@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,6 +24,7 @@ import org.neo4j.kernel.impl.store.record.RelationshipGroupRecord;
 import org.neo4j.unsafe.impl.batchimport.staging.BatchFeedStep;
 import org.neo4j.unsafe.impl.batchimport.staging.ReadRecordsStep;
 import org.neo4j.unsafe.impl.batchimport.staging.Stage;
+import org.neo4j.unsafe.impl.batchimport.stats.StatsProvider;
 
 import static org.neo4j.unsafe.impl.batchimport.RecordIdIterator.allInReversed;
 
@@ -38,12 +39,14 @@ import static org.neo4j.unsafe.impl.batchimport.RecordIdIterator.allInReversed;
  */
 public class ScanAndCacheGroupsStage extends Stage
 {
+    public static final String NAME = "Gather";
+
     public ScanAndCacheGroupsStage( Configuration config, RecordStore<RelationshipGroupRecord> store,
-            RelationshipGroupCache cache )
+            RelationshipGroupCache cache, StatsProvider... additionalStatsProviders )
     {
-        super( "Gather", config );
+        super( NAME, null, config, 0 );
         add( new BatchFeedStep( control(), config, allInReversed( store, config ), store.getRecordSize() ) );
         add( new ReadRecordsStep<>( control(), config, false, store, null ) );
-        add( new CacheGroupsStep( control(), config, cache ) );
+        add( new CacheGroupsStep( control(), config, cache, additionalStatsProviders ) );
     }
 }

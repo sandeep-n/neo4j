@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -48,12 +48,6 @@ public class PhysicalLogVersionedStoreChannel implements LogVersionedStoreChanne
     }
 
     @Override
-    public int write( ByteBuffer src, long position ) throws IOException
-    {
-        throw new UnsupportedOperationException( "Not needed" );
-    }
-
-    @Override
     public void writeAll( ByteBuffer src, long position ) throws IOException
     {
         throw new UnsupportedOperationException( "Not needed" );
@@ -68,6 +62,12 @@ public class PhysicalLogVersionedStoreChannel implements LogVersionedStoreChanne
 
     @Override
     public int read( ByteBuffer dst, long position ) throws IOException
+    {
+        throw new UnsupportedOperationException( "Not needed" );
+    }
+
+    @Override
+    public void readAll( ByteBuffer dst ) throws IOException
     {
         throw new UnsupportedOperationException( "Not needed" );
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,12 +19,12 @@
  */
 package org.neo4j.cypher.internal.compatibility.v3_4.runtime.slotted
 
+import org.neo4j.cypher.internal.compatibility.v3_4.runtime.SlotAllocation.PhysicalPlan
 import org.neo4j.cypher.internal.compatibility.v3_4.runtime._
 import org.neo4j.cypher.internal.compatibility.v3_4.runtime.executionplan.builders.prepare.KeyTokenResolver
 import org.neo4j.cypher.internal.compatibility.v3_4.runtime.pipes.DropResultPipe
 import org.neo4j.cypher.internal.compatibility.v3_4.runtime.slotted.pipes._
 import org.neo4j.cypher.internal.compatibility.v3_4.runtime.slotted.{expressions => slottedExpressions}
-import org.neo4j.cypher.internal.compiler.v3_4.planner.CantCompileQueryException
 import org.neo4j.cypher.internal.frontend.v3_4.phases.Monitors
 import org.neo4j.cypher.internal.frontend.v3_4.semantics.SemanticTable
 import org.neo4j.cypher.internal.ir.v3_4.{IdName, VarPatternLength}
@@ -35,9 +35,10 @@ import org.neo4j.cypher.internal.runtime.interpreted.commands.expressions.{Aggre
 import org.neo4j.cypher.internal.runtime.interpreted.commands.predicates.{Predicate, True}
 import org.neo4j.cypher.internal.runtime.interpreted.commands.{expressions => commandExpressions}
 import org.neo4j.cypher.internal.runtime.interpreted.pipes.{ColumnOrder => _, _}
+import org.neo4j.cypher.internal.util.v3_4.AssertionUtils._
 import org.neo4j.cypher.internal.util.v3_4.InternalException
 import org.neo4j.cypher.internal.util.v3_4.symbols._
-import org.neo4j.cypher.internal.v3_4.expressions.SignedDecimalIntegerLiteral
+import org.neo4j.cypher.internal.v3_4.expressions.{Equals, SignedDecimalIntegerLiteral}
 import org.neo4j.cypher.internal.v3_4.logical.plans
 import org.neo4j.cypher.internal.v3_4.logical.plans._
 import org.neo4j.cypher.internal.v3_4.{expressions => frontEndAst}
@@ -45,7 +46,7 @@ import org.neo4j.cypher.internal.v3_4.{expressions => frontEndAst}
 class SlottedPipeBuilder(fallback: PipeBuilder,
                          expressionConverters: ExpressionConverters,
                          monitors: Monitors,
-                         pipelines: Map[LogicalPlanId, PipelineInformation],
+                         physicalPlan: PhysicalPlan,
                          readOnly: Boolean,
                          rewriteAstExpression: (frontEndAst.Expression) => frontEndAst.Expression)
                         (implicit context: PipeExecutionBuilderContext, planContext: PlanContext)
@@ -57,121 +58,123 @@ class SlottedPipeBuilder(fallback: PipeBuilder,
   override def build(plan: LogicalPlan): Pipe = {
     implicit val table: SemanticTable = context.semanticTable
 
-    val id = plan.assignedId
-    val pipelineInformation = pipelines(plan.assignedId)
+    val id = plan.id
+    val slots = physicalPlan.slotConfigurations(plan.id)
+    val argumentSize = physicalPlan.argumentSizes(plan.id)
 
-    plan match {
+    val pipe = plan match {
       case AllNodesScan(IdName(column), _) =>
-        AllNodesScanSlottedPipe(column, pipelineInformation)(id)
+        AllNodesScanSlottedPipe(column, slots, argumentSize)(id)
 
       case NodeIndexScan(IdName(column), label, propertyKeys, _) =>
-        NodeIndexScanSlottedPipe(column, label, propertyKeys, pipelineInformation)(id)
+        NodeIndexScanSlottedPipe(column, label, propertyKeys, slots, argumentSize)(id)
 
       case NodeIndexSeek(IdName(column), label, propertyKeys, valueExpr, _) =>
         val indexSeekMode = IndexSeekModeFactory(unique = false, readOnly = readOnly).fromQueryExpression(valueExpr)
         NodeIndexSeekSlottedPipe(column, label, propertyKeys,
-                                  valueExpr.map(convertExpressions), indexSeekMode, pipelineInformation)(id)
+                                  valueExpr.map(convertExpressions), indexSeekMode, slots, argumentSize)(id)
 
       case NodeUniqueIndexSeek(IdName(column), label, propertyKeys, valueExpr, _) =>
         val indexSeekMode = IndexSeekModeFactory(unique = true, readOnly = readOnly).fromQueryExpression(valueExpr)
         NodeIndexSeekSlottedPipe(column, label, propertyKeys,
-                                  valueExpr.map(convertExpressions), indexSeekMode, pipelineInformation)(id = id)
+                                  valueExpr.map(convertExpressions), indexSeekMode, slots, argumentSize)(id = id)
 
       case NodeByLabelScan(IdName(column), label, _) =>
-        NodesByLabelScanSlottedPipe(column, LazyLabel(label), pipelineInformation)(id)
+        NodesByLabelScanSlottedPipe(column, LazyLabel(label), slots, argumentSize)(id)
 
-      case _:SingleRow =>
-        SingleRowSlottedPipe(pipelineInformation)(id)
+      case _: Argument =>
+        ArgumentSlottedPipe(slots, argumentSize)(id)
 
       case _ =>
-        throw new CantCompileQueryException(s"Unsupported logical plan operator: $plan")
-
+        fallback.build(plan)
     }
+    pipe.setExecutionContextFactory(SlottedExecutionContextFactory(slots))
+    pipe
   }
 
   override def build(plan: LogicalPlan, source: Pipe): Pipe = {
     implicit val table: SemanticTable = context.semanticTable
 
-    val id = plan.assignedId
-    val pipeline = pipelines(plan.assignedId)
+    val id = plan.id
+    val slots = physicalPlan.slotConfigurations(plan.id)
 
-    plan match {
+    val pipe = plan match {
       case ProduceResult(_, columns) =>
-        val runtimeColumns = createProjectionsForResult(columns, pipeline)
+        val runtimeColumns = createProjectionsForResult(columns, slots)
         ProduceResultSlottedPipe(source, runtimeColumns)(id)
 
       case Expand(_, IdName(from), dir, types, IdName(to), IdName(relName), ExpandAll) =>
-        val fromSlot = pipeline.getLongOffsetFor(from)
-        val relSlot = pipeline.getLongOffsetFor(relName)
-        val toSlot = pipeline.getLongOffsetFor(to)
-        ExpandAllSlottedPipe(source, fromSlot, relSlot, toSlot, dir, LazyTypes(types.toArray), pipeline)(id)
+        val fromSlot = slots(from)
+        val relOffset = slots.getLongOffsetFor(relName)
+        val toOffset = slots.getLongOffsetFor(to)
+        ExpandAllSlottedPipe(source, fromSlot, relOffset, toOffset, dir, LazyTypes(types.toArray), slots)(id)
 
       case Expand(_, IdName(from), dir, types, IdName(to), IdName(relName), ExpandInto) =>
-        val fromOffset = pipeline.getLongOffsetFor(from)
-        val relOffset = pipeline.getLongOffsetFor(relName)
-        val toOffset = pipeline.getLongOffsetFor(to)
-        ExpandIntoSlottedPipe(source, fromOffset, relOffset, toOffset, dir, LazyTypes(types.toArray), pipeline)(id)
+        val fromSlot = slots(from)
+        val relOffset = slots.getLongOffsetFor(relName)
+        val toSlot = slots(to)
+        ExpandIntoSlottedPipe(source, fromSlot, relOffset, toSlot, dir, LazyTypes(types.toArray), slots)(id)
 
       case OptionalExpand(_, IdName(fromName), dir, types, IdName(toName), IdName(relName), ExpandAll, predicates) =>
-        val fromOffset = pipeline.getLongOffsetFor(fromName)
-        val relOffset = pipeline.getLongOffsetFor(relName)
-        val toOffset = pipeline.getLongOffsetFor(toName)
+        val fromSlot = slots(fromName)
+        val relOffset = slots.getLongOffsetFor(relName)
+        val toOffset = slots.getLongOffsetFor(toName)
         val predicate: Predicate = predicates.map(buildPredicate).reduceOption(_ andWith _).getOrElse(True())
-        OptionalExpandAllSlottedPipe(source, fromOffset, relOffset, toOffset, dir, LazyTypes(types.toArray), predicate,
-                                      pipeline)(id)
+        OptionalExpandAllSlottedPipe(source, fromSlot, relOffset, toOffset, dir, LazyTypes(types.toArray), predicate,
+          slots)(id)
 
       case OptionalExpand(_, IdName(fromName), dir, types, IdName(toName), IdName(relName), ExpandInto, predicates) =>
-        val fromOffset = pipeline.getLongOffsetFor(fromName)
-        val relOffset = pipeline.getLongOffsetFor(relName)
-        val toOffset = pipeline.getLongOffsetFor(toName)
+        val fromSlot = slots(fromName)
+        val relOffset = slots.getLongOffsetFor(relName)
+        val toSlot = slots(toName)
         val predicate = predicates.map(buildPredicate).reduceOption(_ andWith _).getOrElse(True())
-        OptionalExpandIntoSlottedPipe(source, fromOffset, relOffset, toOffset, dir, LazyTypes(types.toArray), predicate,
-                                       pipeline)(id)
+        OptionalExpandIntoSlottedPipe(source, fromSlot, relOffset, toSlot, dir, LazyTypes(types.toArray), predicate,
+          slots)(id)
 
       case VarExpand(sourcePlan, IdName(fromName), dir, projectedDir, types, IdName(toName), IdName(relName),
                      VarPatternLength(min, max), expansionMode, IdName(tempNode), IdName(tempEdge), nodePredicate,
                      edgePredicate, _) =>
-
         val shouldExpandAll = expansionMode match {
           case ExpandAll => true
           case ExpandInto => false
         }
-        val fromOffset = pipeline.getLongOffsetFor(fromName)
-        val toOffset = pipeline.getLongOffsetFor(toName)
-        val relOffset = pipeline.getReferenceOffsetFor(relName)
+        val fromSlot = slots(fromName)
+        val relOffset = slots.getReferenceOffsetFor(relName)
+        val toSlot = slots(toName)
 
-        // The node/edge predicates are evaluated on the incoming pipeline, not the produced one
-        val incomingPipeline = pipelines(sourcePlan.assignedId)
-        val tempNodeOffset = incomingPipeline.getLongOffsetFor(tempNode)
-        val tempEdgeOffset = incomingPipeline.getLongOffsetFor(tempEdge)
-        val sizeOfTemporaryStorage = 2
-        VarLengthExpandSlottedPipe(source, fromOffset, relOffset, toOffset, dir, projectedDir, LazyTypes(types.toArray), min,
-                                    max, shouldExpandAll, pipeline,
+        // The node/edge predicates are evaluated on the source pipeline, not the produced one
+        val sourceSlots = physicalPlan.slotConfigurations(sourcePlan.id)
+        val tempNodeOffset = sourceSlots.getLongOffsetFor(tempNode)
+        val tempEdgeOffset = sourceSlots.getLongOffsetFor(tempEdge)
+        val argumentSize = SlotConfiguration.Size(sourceSlots.numberOfLongs - 2, sourceSlots.numberOfReferences)
+        VarLengthExpandSlottedPipe(source, fromSlot, relOffset, toSlot, dir, projectedDir, LazyTypes(types.toArray), min,
+                                    max, shouldExpandAll, slots,
                                     tempNodeOffset = tempNodeOffset,
                                     tempEdgeOffset = tempEdgeOffset,
                                     nodePredicate = buildPredicate(nodePredicate),
                                     edgePredicate = buildPredicate(edgePredicate),
-                                    longsToCopy = incomingPipeline.numberOfLongs - sizeOfTemporaryStorage)(id)
+                                    argumentSize = argumentSize)(id)
 
       case Optional(inner, symbols) =>
         val nullableKeys = inner.availableSymbols -- symbols
-        val nullableOffsets = nullableKeys.map(k => pipeline.getLongOffsetFor(k.name))
-        OptionalSlottedPipe(source, nullableOffsets.toSeq, pipeline)(id)
+        val nullableSlots: Array[Slot] = nullableKeys.map(k => slots.get(k.name).get).toArray
+        val argumentSize = physicalPlan.argumentSizes(plan.id)
+        OptionalSlottedPipe(source, nullableSlots, slots, argumentSize)(id)
 
       case Projection(_, expressions) =>
         val expressionsWithSlots: Map[Int, Expression] = expressions collect {
-          case (k, e) if refSlotAndNotAlias(pipeline, k) =>
-            val slot = pipeline.get(k).get
+          case (k, e) if refSlotAndNotAlias(slots, k) =>
+            val slot = slots.get(k).get
             slot.offset -> convertExpressions(e)
         }
         ProjectionSlottedPipe(source, expressionsWithSlots)(id)
 
       case CreateNode(_, idName, labels, props) =>
-        CreateNodeSlottedPipe(source, idName.name, pipeline, labels.map(LazyLabel.apply),
+        CreateNodeSlottedPipe(source, idName.name, slots, labels.map(LazyLabel.apply),
                                props.map(convertExpressions))(id)
 
       case MergeCreateNode(_, idName, labels, props) =>
-        MergeCreateNodeSlottedPipe(source, idName.name, pipeline, labels.map(LazyLabel.apply), props.map(convertExpressions))(id)
+        MergeCreateNodeSlottedPipe(source, idName.name, slots, labels.map(LazyLabel.apply), props.map(convertExpressions))(id)
 
       case EmptyResult(_) =>
         EmptyResultPipe(source)(id)
@@ -180,60 +183,54 @@ class SlottedPipeBuilder(fallback: PipeBuilder,
         DropResultPipe(source)(id)
 
       case UnwindCollection(_, IdName(name), expression) =>
-        val offset = pipeline.getReferenceOffsetFor(name)
-        UnwindSlottedPipe(source, expressionConverters.toCommandExpression(expression), offset, pipeline)(id)
+        val offset = slots.getReferenceOffsetFor(name)
+        UnwindSlottedPipe(source, convertExpressions(expression), offset, slots)(id)
 
       // Aggregation without grouping, such as RETURN count(*)
       case Aggregation(_, groupingExpressions, aggregationExpression) if groupingExpressions.isEmpty =>
         val aggregation = aggregationExpression.map {
           case (key, expression) =>
-            pipeline.getReferenceOffsetFor(key) -> expressionConverters.toCommandExpression(expression)
+            slots.getReferenceOffsetFor(key) -> convertExpressions(expression)
               .asInstanceOf[AggregationExpression]
         }
-        EagerAggregationWithoutGroupingSlottedPipe(source,
-          pipeline,
-          aggregation)(id)
+        EagerAggregationWithoutGroupingSlottedPipe(source, slots, aggregation)(id)
 
       case Aggregation(_, groupingExpressions, aggregationExpression) =>
         val grouping = groupingExpressions.map {
           case (key, expression) =>
-            pipeline.getReferenceOffsetFor(key) -> expressionConverters.toCommandExpression(expression)
+            slots(key) -> convertExpressions(expression)
         }
         val aggregation = aggregationExpression.map {
           case (key, expression) =>
-            pipeline.getReferenceOffsetFor(key) -> expressionConverters.toCommandExpression(expression)
+            slots.getReferenceOffsetFor(key) -> convertExpressions(expression)
               .asInstanceOf[AggregationExpression]
         }
-        EagerAggregationSlottedPipe(source,
-                                     pipeline,
-                                     grouping,
-                                     aggregation)(id)
+        EagerAggregationSlottedPipe(source, slots, grouping, aggregation)(id)
 
       case Distinct(_, groupingExpressions) =>
         val grouping = groupingExpressions.map {
           case (key, expression) =>
-            pipeline.getReferenceOffsetFor(key) -> expressionConverters.toCommandExpression(expression)
+            slots(key) -> convertExpressions(expression)
         }
-
-        DistinctSlottedPipe(source, pipeline, grouping)(id)
+        DistinctSlottedPipe(source, slots, grouping)(id)
 
       case CreateRelationship(_, idName, IdName(startNode), typ, IdName(endNode), props) =>
-        val fromOffset = pipeline.getLongOffsetFor(startNode)
-        val endOffset = pipeline.getLongOffsetFor(endNode)
-        CreateRelationshipSlottedPipe(source, idName.name, fromOffset, LazyType(typ)(context.semanticTable), endOffset,
-                                       pipeline, props.map(convertExpressions))(id = id)
+        val fromSlot = slots(startNode)
+        val toSlot = slots(endNode)
+        CreateRelationshipSlottedPipe(source, idName.name, fromSlot, LazyType(typ)(context.semanticTable), toSlot,
+          slots, props.map(convertExpressions))(id = id)
 
       case MergeCreateRelationship(_, idName, IdName(startNode), typ, IdName(endNode), props) =>
-        val fromOffset = pipeline.getLongOffsetFor(startNode)
-        val endOffset = pipeline.getLongOffsetFor(endNode)
-        MergeCreateRelationshipSlottedPipe(source, idName.name, fromOffset, LazyType(typ)(context.semanticTable),
-                                            endOffset, pipeline, props.map(convertExpressions))(id = id)
+        val fromSlot = slots(startNode)
+        val toSlot = slots(endNode)
+        MergeCreateRelationshipSlottedPipe(source, idName.name, fromSlot, LazyType(typ)(context.semanticTable),
+          toSlot, slots, props.map(convertExpressions))(id = id)
 
       case Top(_, sortItems, SignedDecimalIntegerLiteral("1")) =>
-        Top1SlottedPipe(source, sortItems.map(translateColumnOrder(pipeline, _)).toList)(id = id)
+        Top1SlottedPipe(source, sortItems.map(translateColumnOrder(slots, _)).toList)(id = id)
 
       case Top(_, sortItems, limit) =>
-        TopNSlottedPipe(source, sortItems.map(translateColumnOrder(pipeline, _)).toList, convertExpressions(limit))(id = id)
+        TopNSlottedPipe(source, sortItems.map(translateColumnOrder(slots, _)).toList, convertExpressions(limit))(id = id)
 
       case Limit(_, count, IncludeTies) =>
         (source, count) match {
@@ -251,45 +248,68 @@ class SlottedPipeBuilder(fallback: PipeBuilder,
         fallback.build(plan, source)
 
       case Sort(_, sortItems) =>
-        SortSlottedPipe(source, sortItems.map(translateColumnOrder(pipeline, _)), pipeline)(id = id)
+        SortSlottedPipe(source, sortItems.map(translateColumnOrder(slots, _)), slots)(id = id)
 
       case Eager(_) =>
-        EagerSlottedPipe(source, pipeline)(id)
+        EagerSlottedPipe(source, slots)(id)
+
+      case _: DeleteNode |
+           _: DeleteRelationship |
+           _: DeletePath |
+           _: DeleteExpression |
+           _: DetachDeleteNode |
+           _: DetachDeletePath |
+           _: DetachDeleteExpression =>
+        fallback.build(plan, source)
+
+      case _: SetLabels |
+           _: SetNodeProperty |
+           _: SetNodePropertiesFromMap |
+           _: SetRelationshipPropery |
+           _: SetRelationshipPropertiesFromMap |
+           _: SetProperty |
+           _: RemoveLabels =>
+        fallback.build(plan, source)
+
+      case _: LockNodes =>
+        fallback.build(plan, source)
 
       case _ =>
-        throw new CantCompileQueryException(s"Unsupported logical plan operator: $plan")
+        fallback.build(plan, source)
+        //throw new CantCompileQueryException(s"Unsupported logical plan operator: $plan")
     }
+    pipe.setExecutionContextFactory(SlottedExecutionContextFactory(slots))
+    pipe
   }
 
-  private def refSlotAndNotAlias(pipeline: PipelineInformation, k: String) = {
-    !pipeline.isAlias(k) &&
-      pipeline.get(k).forall(_.isInstanceOf[RefSlot])
+  private def refSlotAndNotAlias(slots: SlotConfiguration, k: String) = {
+    !slots.isAlias(k) &&
+      slots.get(k).forall(_.isInstanceOf[RefSlot])
   }
 
-  private def translateColumnOrder(pipeline: PipelineInformation, s: plans.ColumnOrder): pipes.ColumnOrder = s match {
-    case plans.Ascending(IdName(name)) => {
-      pipeline.get(name) match {
+  private def translateColumnOrder(slots: SlotConfiguration, s: plans.ColumnOrder): pipes.ColumnOrder = s match {
+    case plans.Ascending(IdName(name)) =>
+      slots.get(name) match {
         case Some(slot) => pipes.Ascending(slot)
-        case None => throw new InternalException(s"Did not find `$name` in the pipeline information")
+        case None => throw new InternalException(s"Did not find `$name` in the slot configuration")
       }
-    }
-    case plans.Descending(IdName(name)) => {
-      pipeline.get(name) match {
+
+    case plans.Descending(IdName(name)) =>
+      slots.get(name) match {
         case Some(slot) => pipes.Descending(slot)
-        case None => throw new InternalException(s"Did not find `$name` in the pipeline information")
+        case None => throw new InternalException(s"Did not find `$name` in the slot configuration")
       }
-    }
   }
 
-  private def createProjectionsForResult(columns: Seq[String], pipelineInformation1: PipelineInformation) = {
+  private def createProjectionsForResult(columns: Seq[String], slots: SlotConfiguration) = {
     val runtimeColumns: Seq[(String, commandExpressions.Expression)] =
-      columns.map(createProjectionForIdentifier(pipelineInformation1))
+      columns.map(createProjectionForIdentifier(slots))
     runtimeColumns
   }
 
-  private def createProjectionForIdentifier(pipelineInformation1: PipelineInformation)(identifier: String) = {
-    val slot = pipelineInformation1.get(identifier).getOrElse(
-      throw new InternalException(s"Did not find `$identifier` in the pipeline information")
+  private def createProjectionForIdentifier(slots: SlotConfiguration)(identifier: String) = {
+    val slot = slots.get(identifier).getOrElse(
+      throw new InternalException(s"Did not find `$identifier` in the slot configuration")
     )
     identifier -> SlottedPipeBuilder.projectSlotExpression(slot)
   }
@@ -305,62 +325,194 @@ class SlottedPipeBuilder(fallback: PipeBuilder,
   override def build(plan: LogicalPlan, lhs: Pipe, rhs: Pipe): Pipe = {
     implicit val table: SemanticTable = context.semanticTable
 
-    val id = plan.assignedId
-    val pipeline = pipelines(plan.assignedId)
+    val slotConfigs = physicalPlan.slotConfigurations
+    val id = plan.id
+    val slots = slotConfigs(plan.id)
 
-    plan match {
+    val pipe = plan match {
       case Apply(_, _) =>
         ApplySlottedPipe(lhs, rhs)(id)
 
-      case _: SemiApply |
-           _: AntiSemiApply =>
+      case _: AbstractSemiApply |
+           _: AbstractSelectOrSemiApply =>
         fallback.build(plan, lhs, rhs)
 
       case RollUpApply(_, rhsPlan, collectionName, identifierToCollect, nullables) =>
-        val rhsPipeline = pipelines(rhsPlan.assignedId)
-        val identifierToCollectExpression = createProjectionForIdentifier(rhsPipeline)(identifierToCollect.name)
-        val collectionRefSlotOffset = pipeline.getReferenceOffsetFor(collectionName.name)
+        val rhsSlots = slotConfigs(rhsPlan.id)
+        val identifierToCollectExpression = createProjectionForIdentifier(rhsSlots)(identifierToCollect.name)
+        val collectionRefSlotOffset = slots.getReferenceOffsetFor(collectionName.name)
         RollUpApplySlottedPipe(lhs, rhs, collectionRefSlotOffset, identifierToCollectExpression,
-          nullables.map(_.name), pipeline)(id = id)
+          nullables.map(_.name), slots)(id = id)
 
       case _: CartesianProduct =>
+        val argumentSize = physicalPlan.argumentSizes(plan.id)
         val lhsPlan = plan.lhs.get
-        val lhsPipeline = pipelines(lhsPlan.assignedId)
-        CartesianProductSlottedPipe(lhs, rhs, lhsPipeline.numberOfLongs, lhsPipeline.numberOfReferences, pipeline)(id)
+        val lhsSlots = slotConfigs(lhsPlan.id)
+
+        // Verify the assumption that the only shared slots we have are arguments which are identical on both lhs and rhs.
+        // This assumption enables us to use array copy within CartesianProductSlottedPipe.
+        ifAssertionsEnabled(verifyOnlyArgumentsAreSharedSlots(plan, physicalPlan))
+
+        CartesianProductSlottedPipe(lhs, rhs, lhsSlots.numberOfLongs, lhsSlots.numberOfReferences, slots, argumentSize)(id)
+
+      case joinPlan: NodeHashJoin =>
+        val argumentSize = physicalPlan.argumentSizes(plan.id)
+        val leftNodes: Array[Int] = joinPlan.nodes.map(k => slots.getLongOffsetFor(k.name)).toArray
+        val rhsSlots = slotConfigs(joinPlan.right.id)
+        val rightNodes: Array[Int] = joinPlan.nodes.map(k => rhsSlots.getLongOffsetFor(k.name)).toArray
+        val copyLongsFromRHS = collection.mutable.ArrayBuffer.newBuilder[(Int,Int)]
+        val copyRefsFromRHS = collection.mutable.ArrayBuffer.newBuilder[(Int,Int)]
+
+        // Verify the assumption that the argument slots are the same on both sides
+        ifAssertionsEnabled(verifyArgumentsAreTheSameOnBothSides(plan, physicalPlan))
+
+        // When executing the HashJoin, the LHS will be copied to the first slots in the produced row, and any additional RHS columns that are not
+        // part of the join comparison
+        rhsSlots.foreachSlotOrdered {
+          case (key, LongSlot(offset, _, _)) if offset >= argumentSize.nLongs =>
+            copyLongsFromRHS += ((offset, slots.getLongOffsetFor(key)))
+          case (key, RefSlot(offset, _, _)) if offset >= argumentSize.nReferences =>
+            copyRefsFromRHS += ((offset, slots.getReferenceOffsetFor(key)))
+          case _ => // do nothing, already added by lhs
+        }
+        NodeHashJoinSlottedPipe(leftNodes, rightNodes, lhs, rhs, slots, copyLongsFromRHS.result().toArray, copyRefsFromRHS.result().toArray)(id)
+
+      case ValueHashJoin(lhsPlan, _, Equals(lhsAstExp, rhsAstExp)) =>
+        val argumentSize = physicalPlan.argumentSizes(plan.id)
+        val lhsCmdExp = convertExpressions(lhsAstExp)
+        val rhsCmdExp = convertExpressions(rhsAstExp)
+        val lhsSlots = slotConfigs(lhsPlan.id)
+        val longOffset = lhsSlots.numberOfLongs
+        val refOffset = lhsSlots.numberOfReferences
+
+        // Verify the assumption that the only shared slots we have are arguments which are identical on both lhs and rhs.
+        // This assumption enables us to use array copy within CartesianProductSlottedPipe.
+        ifAssertionsEnabled(verifyOnlyArgumentsAreSharedSlots(plan, physicalPlan))
+
+        ValueHashJoinSlottedPipe(lhsCmdExp, rhsCmdExp, lhs, rhs, slots, longOffset, refOffset, argumentSize)(id)
 
       case ConditionalApply(_, _, items) =>
-        val (longIds , refIds) = items.partition(idName => pipeline.get(idName.name) match {
+        val (longIds , refIds) = items.partition(idName => slots.get(idName.name) match {
           case Some(s: LongSlot) => true
           case Some(s: RefSlot) => false
           case _ => throw new InternalException("We expect only an existing LongSlot or RefSlot here")
         })
-        val longOffsets = longIds.map(e => pipeline.getLongOffsetFor(e.name))
-        val refOffsets = refIds.map(e => pipeline.getReferenceOffsetFor(e.name))
-        ConditionalApplySlottedPipe(lhs, rhs, longOffsets, refOffsets, negated = false, pipeline)(id)
+        val longOffsets = longIds.map(e => slots.getLongOffsetFor(e.name))
+        val refOffsets = refIds.map(e => slots.getReferenceOffsetFor(e.name))
+        ConditionalApplySlottedPipe(lhs, rhs, longOffsets, refOffsets, negated = false, slots)(id)
 
       case AntiConditionalApply(_, _, items) =>
-        val (longIds , refIds) = items.partition(idName => pipeline.get(idName.name) match {
+        val (longIds , refIds) = items.partition(idName => slots.get(idName.name) match {
           case Some(s: LongSlot) => true
           case Some(s: RefSlot) => false
           case _ => throw new InternalException("We expect only an existing LongSlot or RefSlot here")
         })
-        val longOffsets = longIds.map(e => pipeline.getLongOffsetFor(e.name))
-        val refOffsets = refIds.map(e => pipeline.getReferenceOffsetFor(e.name))
-        ConditionalApplySlottedPipe(lhs, rhs, longOffsets, refOffsets, negated = true, pipeline)(id)
+        val longOffsets = longIds.map(e => slots.getLongOffsetFor(e.name))
+        val refOffsets = refIds.map(e => slots.getReferenceOffsetFor(e.name))
+        ConditionalApplySlottedPipe(lhs, rhs, longOffsets, refOffsets, negated = true, slots)(id)
+
+      case ForeachApply(_, _, variable, expression) =>
+        val innerVariableSlot = slots.get(variable).getOrElse(throw new InternalException(s"Foreach variable '$variable' has no slot"))
+        ForeachSlottedPipe(lhs, rhs, innerVariableSlot, convertExpressions(expression))(id)
 
       case Union(_, _) =>
-        val lhsInfo = pipelines(lhs.id)
-        val rhsInfo = pipelines(rhs.id)
+        val lhsSlots = slotConfigs(lhs.id)
+        val rhsSlots = slotConfigs(rhs.id)
         UnionSlottedPipe(lhs, rhs,
-          SlottedPipeBuilder.computeUnionMapping(lhsInfo, pipeline),
-          SlottedPipeBuilder.computeUnionMapping(rhsInfo, pipeline))(id = id)
+          SlottedPipeBuilder.computeUnionMapping(lhsSlots, slots),
+          SlottedPipeBuilder.computeUnionMapping(rhsSlots, slots))(id = id)
 
-      case _ => throw new CantCompileQueryException(s"Unsupported logical plan operator: $plan")
+      case _: AssertSameNode =>
+        fallback.build(plan, lhs, rhs)
+
+      case _ =>
+        fallback.build(plan, lhs, rhs)
+        //throw new CantCompileQueryException(s"Unsupported logical plan operator: $plan")
+    }
+    pipe.setExecutionContextFactory(SlottedExecutionContextFactory(slots))
+    pipe
+  }
+
+  // Verifies the assumption that all shared slots are arguments with slot offsets within the first argument size number of slots
+  // and the number of shared slots are identical to the argument size.
+  private def verifyOnlyArgumentsAreSharedSlots(plan: LogicalPlan, physicalPlan: PhysicalPlan) = {
+    val argumentSize = physicalPlan.argumentSizes(plan.id)
+    val lhsPlan = plan.lhs.get
+    val rhsPlan = plan.rhs.get
+    val lhsSlots = physicalPlan.slotConfigurations(lhsPlan.id)
+    val rhsSlots = physicalPlan.slotConfigurations(rhsPlan.id)
+    val (sharedSlots, rhsUniqueSlots) = rhsSlots.partitionSlots {
+      case (k, slot) =>
+        lhsSlots.get(k).isDefined
+    }
+    val (sharedLongSlots, sharedRefSlots) = sharedSlots.partition(_._2.isLongSlot)
+
+    val longSlotsOk = sharedLongSlots.forall {
+      case (key, slot) => slot.offset < argumentSize.nLongs
+    } && sharedLongSlots.size == argumentSize.nLongs
+
+    val refSlotsOk = sharedRefSlots.forall {
+      case (key, slot) => slot.offset < argumentSize.nReferences
+    } && sharedRefSlots.size == argumentSize.nReferences
+
+    if (!longSlotsOk || !refSlotsOk) {
+      val longSlotsMessage = if (longSlotsOk) "" else s"#long arguments=${argumentSize.nLongs} shared long slots: $sharedLongSlots "
+      val refSlotsMessage = if (refSlotsOk) "" else s"#ref arguments=${argumentSize.nReferences} shared ref slots: $sharedRefSlots "
+      throw new InternalException(s"Unexpected slot configuration. Shared slots not only within argument size: $longSlotsMessage$refSlotsMessage")
+    }
+  }
+
+  private def verifyArgumentsAreTheSameOnBothSides(plan: LogicalPlan, physicalPlan: PhysicalPlan) = {
+    val argumentSize = physicalPlan.argumentSizes(plan.id)
+    val lhsPlan = plan.lhs.get
+    val rhsPlan = plan.rhs.get
+    val lhsSlots = physicalPlan.slotConfigurations(lhsPlan.id)
+    val rhsSlots = physicalPlan.slotConfigurations(rhsPlan.id)
+    val (lhsLongSlots, lhsRefSlots) = lhsSlots.partitionSlots((_, slot) => slot.isLongSlot)
+    val (rhsLongSlots, rhsRefSlots) = rhsSlots.partitionSlots((_, slot) => slot.isLongSlot)
+
+    val lhsArgLongSlots = lhsLongSlots.filter { case (_, slot) => slot.offset < argumentSize.nLongs } sortBy(_._1)
+    val lhsArgRefSlots = lhsRefSlots.filter { case (_, slot) => slot.offset < argumentSize.nReferences } sortBy(_._1)
+    val rhsArgLongSlots = rhsLongSlots.filter { case (_, slot) => slot.offset < argumentSize.nLongs } sortBy(_._1)
+    val rhsArgRefSlots = rhsRefSlots.filter { case (_, slot) => slot.offset < argumentSize.nReferences } sortBy(_._1)
+
+    val sizesAreTheSame =
+      lhsArgLongSlots.size == rhsArgLongSlots.size && lhsArgLongSlots.size == argumentSize.nLongs &&
+      lhsArgRefSlots.size == rhsArgRefSlots.size && lhsArgRefSlots.size == argumentSize.nReferences
+
+    def sameSlotsInOrder(a: Seq[(String, Slot)], b: Seq[(String, Slot)]): Boolean =
+      a.zip(b) forall {
+        case ((k1, slot1), (k2, slot2)) =>
+          k1 == k2 && slot1.offset == slot2.offset && slot1.isTypeCompatibleWith(slot2)
+      }
+
+    val longSlotsOk = sizesAreTheSame && sameSlotsInOrder(lhsArgLongSlots, rhsArgLongSlots)
+    val refSlotsOk = sizesAreTheSame && sameSlotsInOrder(lhsArgRefSlots, rhsArgRefSlots)
+
+    if (!longSlotsOk || !refSlotsOk) {
+      val longSlotsMessage = if (longSlotsOk) "" else s"#long arguments=${argumentSize.nLongs} lhs: $lhsLongSlots rhs: $rhsArgLongSlots "
+      val refSlotsMessage = if (refSlotsOk) "" else s"#ref arguments=${argumentSize.nReferences} lhs: $lhsRefSlots rhs: $rhsArgRefSlots "
+      throw new InternalException(s"Unexpected slot configuration. Arguments differ between lhs and rhs: $longSlotsMessage$refSlotsMessage")
     }
   }
 }
 
 object SlottedPipeBuilder {
+
+  case class Factory(physicalPlan: PhysicalPlan)
+    extends PipeBuilderFactory {
+    def apply(monitors: Monitors, recurse: LogicalPlan => Pipe, readOnly: Boolean,
+              expressionConverters: ExpressionConverters)
+             (implicit context: PipeExecutionBuilderContext, planContext: PlanContext): PipeBuilder = {
+
+      val expressionToExpression = recursePipes(recurse, planContext) _
+
+      val fallback = CommunityPipeBuilder(monitors, recurse, readOnly, expressionConverters, expressionToExpression)
+
+      new SlottedPipeBuilder(fallback, expressionConverters, monitors, physicalPlan, readOnly, expressionToExpression)
+    }
+  }
+
   private def projectSlotExpression(slot: Slot): Expression = slot match {
     case LongSlot(offset, false, CTNode) =>
       slottedExpressions.NodeFromSlot(offset)
@@ -384,7 +536,7 @@ object SlottedPipeBuilder {
   //between the output and the input (lhs and rhs) and it may be the case that
   //we have a reference slot in the output but a long slot on one of the inputs,
   //e.g. MATCH (n) RETURN n UNION RETURN 42 AS n
-  def computeUnionMapping(in: PipelineInformation, out: PipelineInformation): RowMapping = {
+  def computeUnionMapping(in: SlotConfiguration, out: SlotConfiguration): RowMapping = {
     val overlaps: Boolean = out.mapSlot {
       //For long slots we need to make sure both offset and types match
       //e.g we cannot allow mixing a node long slot with a relationship
@@ -405,7 +557,8 @@ object SlottedPipeBuilder {
         incoming
     }
     else {
-      //find columns where output is a reference slot but where the input is a long slot
+    //find columns where output is a reference slot but where the input is a long slot
+
       val mapSlots: Iterable[(ExecutionContext, ExecutionContext, QueryState) => Unit] = out.mapSlot {
         case (k, v: LongSlot) =>
           val sourceOffset = in.getLongOffsetFor(k)
@@ -425,10 +578,23 @@ object SlottedPipeBuilder {
       }
       //Create a new context and apply all transformations
       (incoming: ExecutionContext, state: QueryState) =>
-        val outgoing = PrimitiveExecutionContext(out)
+        val outgoing = SlottedExecutionContext(out)
         mapSlots.foreach(f => f(incoming, outgoing, state))
         outgoing
     }
 
+  }
+
+  def translateColumnOrder(slots: SlotConfiguration, s: plans.ColumnOrder): pipes.ColumnOrder = s match {
+    case plans.Ascending(IdName(name)) =>
+      slots.get(name) match {
+        case Some(slot) => pipes.Ascending(slot)
+        case None => throw new InternalException(s"Did not find `$name` in the pipeline information")
+      }
+    case plans.Descending(IdName(name)) =>
+      slots.get(name) match {
+        case Some(slot) => pipes.Descending(slot)
+        case None => throw new InternalException(s"Did not find `$name` in the pipeline information")
+      }
   }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,6 +21,7 @@ package org.neo4j.kernel.impl.util;
 
 import java.util.Map;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -48,6 +49,12 @@ public class CountingJobScheduler implements JobScheduler
     public ThreadFactory threadFactory( Group group )
     {
         return delegate.threadFactory( group );
+    }
+
+    @Override
+    public ExecutorService workStealingExecutor( Group group, int parallelism )
+    {
+        return delegate.workStealingExecutor( group, parallelism );
     }
 
     @Override

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -80,7 +80,7 @@ object GeneratedQueryStructure extends CodeStructure[GeneratedQuery] {
 
     private var _source: Option[(String, String)] = None
 
-    override def apply(typeName: String, sourceCode: String): Unit =  _source = Some(typeName, sourceCode)
+    override def apply(typeName: String, sourceCode: String): Unit =  _source = Some((typeName, sourceCode))
 
     def source: Option[(String, String)] = _source
   }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -33,9 +33,13 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.function.BiConsumer;
 
+import org.neo4j.function.ThrowingConsumer;
+import org.neo4j.function.ThrowingFunction;
 import org.neo4j.graphdb.ResourceIterator;
 import org.neo4j.helpers.collection.Iterators;
+import org.neo4j.internal.kernel.api.InternalIndexState;
 import org.neo4j.internal.kernel.api.TokenNameLookup;
+import org.neo4j.internal.kernel.api.schema.LabelSchemaDescriptor;
 import org.neo4j.kernel.api.exceptions.index.IndexActivationFailedKernelException;
 import org.neo4j.kernel.api.exceptions.index.IndexEntryConflictException;
 import org.neo4j.kernel.api.exceptions.index.IndexNotFoundKernelException;
@@ -43,10 +47,8 @@ import org.neo4j.kernel.api.exceptions.index.IndexPopulationFailedKernelExceptio
 import org.neo4j.kernel.api.exceptions.schema.UniquePropertyValueValidationException;
 import org.neo4j.kernel.api.index.IndexEntryUpdate;
 import org.neo4j.kernel.api.index.IndexUpdater;
-import org.neo4j.kernel.api.index.InternalIndexState;
 import org.neo4j.kernel.api.index.SchemaIndexProvider;
 import org.neo4j.kernel.api.index.SchemaIndexProvider.Descriptor;
-import org.neo4j.kernel.api.schema.LabelSchemaDescriptor;
 import org.neo4j.kernel.api.schema.index.IndexDescriptor;
 import org.neo4j.kernel.impl.api.SchemaState;
 import org.neo4j.kernel.impl.api.index.sampling.IndexSamplingController;
@@ -65,7 +67,7 @@ import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static org.neo4j.helpers.Exceptions.launderedException;
 import static org.neo4j.helpers.collection.Iterables.asList;
-import static org.neo4j.kernel.api.index.InternalIndexState.FAILED;
+import static org.neo4j.internal.kernel.api.InternalIndexState.FAILED;
 import static org.neo4j.kernel.impl.api.index.IndexPopulationFailure.failure;
 
 /**
@@ -76,11 +78,11 @@ import static org.neo4j.kernel.impl.api.index.IndexPopulationFailure.failure;
  * <p>
  * <h3>Recovery procedure</h3>
  * <p>
- * Each index has a state, as defined in {@link org.neo4j.kernel.api.index.InternalIndexState}, which is used during
- * recovery. If an index is anything but {@link org.neo4j.kernel.api.index.InternalIndexState#ONLINE}, it will simply be
+ * Each index has a state, as defined in {@link InternalIndexState}, which is used during
+ * recovery. If an index is anything but {@link InternalIndexState#ONLINE}, it will simply be
  * destroyed and re-created.
  * <p>
- * If, however, it is {@link org.neo4j.kernel.api.index.InternalIndexState#ONLINE}, the index provider is required to
+ * If, however, it is {@link InternalIndexState#ONLINE}, the index provider is required to
  * also guarantee that the index had been flushed to disk.
  */
 public class IndexingService extends LifecycleAdapter implements IndexingUpdateService
@@ -111,6 +113,8 @@ public class IndexingService extends LifecycleAdapter implements IndexingUpdateS
     {
         void populationCompleteOn( IndexDescriptor descriptor );
 
+        void indexPopulationScanStarting();
+
         void indexPopulationScanComplete();
 
         void awaitingPopulationOfRecoveredIndex( long indexId, IndexDescriptor descriptor );
@@ -120,6 +124,11 @@ public class IndexingService extends LifecycleAdapter implements IndexingUpdateS
     {
         @Override
         public void populationCompleteOn( IndexDescriptor descriptor )
+        {   // Do nothing
+        }
+
+        @Override
+        public void indexPopulationScanStarting()
         {   // Do nothing
         }
 
@@ -218,6 +227,10 @@ public class IndexingService extends LifecycleAdapter implements IndexingUpdateS
     public void start() throws Exception
     {
         state = State.STARTING;
+
+        // Recovery will not do refresh (update read views) while applying recovered transactions and instead
+        // do it at one point after recovery... i.e. here
+        indexMapRef.indexMapSnapshot().forEachIndexProxy( indexProxyOperation( "refresh", proxy -> proxy.refresh() ) );
 
         final Map<Long,RebuildingIndexDescriptor> rebuildingDescriptors = new HashMap<>();
         indexMapRef.modify( indexMap ->
@@ -440,56 +453,9 @@ public class IndexingService extends LifecycleAdapter implements IndexingUpdateS
      */
     public void createIndexes( IndexRule... rules ) throws IOException
     {
-        indexMapRef.modify( indexMap ->
-        {
-            IndexPopulationJob populationJob = null;
-
-            for ( IndexRule rule : rules )
-            {
-                long ruleId = rule.getId();
-                IndexProxy index = indexMap.getIndexProxy( ruleId );
-                if ( index != null && state == State.NOT_STARTED )
-                {
-                    // During recovery we might run into this scenario:
-                    // - We're starting recovery on a database, where init() is called and all indexes that
-                    //   are found in the store, instantiated and put into the IndexMap. Among them is index X.
-                    // - While we recover the database we bump into a transaction creating index Y, with the
-                    //   same IndexDescriptor, i.e. same label/property, as X. This is possible since this took
-                    //   place before the creation of X.
-                    // - When Y is dropped in between this creation and the creation of X (it will have to be
-                    //   otherwise X wouldn't have had an opportunity to be created) the index is removed from
-                    //   the IndexMap, both by id AND descriptor.
-                    //
-                    // Because of the scenario above we need to put this created index into the IndexMap
-                    // again, otherwise it will disappear from the IndexMap (at least for lookup by descriptor)
-                    // and not be able to accept changes applied from recovery later on.
-                    indexMap.putIndexProxy( ruleId, index );
-                    continue;
-                }
-                final IndexDescriptor descriptor = rule.getIndexDescriptor();
-                SchemaIndexProvider.Descriptor providerDescriptor = rule.getProviderDescriptor();
-                boolean flipToTentative = rule.canSupportUniqueConstraint();
-                if ( state == State.RUNNING )
-                {
-                    populationJob = populationJob == null ? newIndexPopulationJob() : populationJob;
-                    index = indexProxyCreator.createPopulatingIndexProxy(
-                            ruleId, descriptor, providerDescriptor, flipToTentative, monitor, populationJob );
-                    index.start();
-                }
-                else
-                {
-                    index = indexProxyCreator.createRecoveringIndexProxy( descriptor, providerDescriptor );
-                }
-
-                indexMap.putIndexProxy( rule.getId(), index );
-            }
-
-            if ( populationJob != null )
-            {
-                startIndexPopulation( populationJob );
-            }
-            return indexMap;
-        } );
+        IndexPopulationStarter populationStarter = new IndexPopulationStarter( rules );
+        indexMapRef.modify( populationStarter );
+        populationStarter.startPopulation();
     }
 
     private void processUpdate( IndexUpdaterMap updaterMap, IndexEntryUpdate<LabelSchemaDescriptor> indexUpdate )
@@ -606,29 +572,28 @@ public class IndexingService extends LifecycleAdapter implements IndexingUpdateS
 
     public void forceAll()
     {
-        indexMapRef.indexMapSnapshot().forEachIndexProxy( forceIndexProxy() );
+        indexMapRef.indexMapSnapshot().forEachIndexProxy( indexProxyOperation( "force", proxy -> proxy.force() ) );
     }
 
-    private BiConsumer<Long,IndexProxy> forceIndexProxy()
+    private BiConsumer<Long,IndexProxy> indexProxyOperation( String name, ThrowingConsumer<IndexProxy,Exception> operation )
     {
         return ( id, indexProxy ) ->
         {
             try
             {
-                indexProxy.force();
+                operation.accept( indexProxy );
             }
             catch ( Exception e )
             {
                 try
                 {
                     IndexProxy proxy = indexMapRef.getIndexProxy( id );
-                    throw new UnderlyingStorageException( "Unable to force " + proxy, e );
+                    throw new UnderlyingStorageException( "Unable to " + name + " " + proxy, e );
                 }
                 catch ( IndexNotFoundKernelException infe )
                 {
-                    // index was dropped while we where try to flush it, we can continue to flush other indexes
+                    // index was dropped while trying to operate on it, we can continue to other indexes
                 }
-
             }
         };
     }
@@ -704,6 +669,10 @@ public class IndexingService extends LifecycleAdapter implements IndexingUpdateS
 
     private void logIndexStateSummary( String method, Map<InternalIndexState,List<IndexLogRecord>> indexStates )
     {
+        if ( indexStates.isEmpty() )
+        {
+            return;
+        }
         int mostPopularStateCount = Integer.MIN_VALUE;
         InternalIndexState mostPopularState = null;
         for ( Map.Entry<InternalIndexState,List<IndexLogRecord>> indexStateEntry : indexStates.entrySet() )
@@ -727,7 +696,71 @@ public class IndexingService extends LifecycleAdapter implements IndexingUpdateS
         log.info( format( "IndexingService.%s: indexes not specifically mentioned above are %s", method, mostPopularState ) );
     }
 
-    private final class IndexLogRecord
+    private final class IndexPopulationStarter implements ThrowingFunction<IndexMap,IndexMap,IOException>
+    {
+        private final IndexRule[] rules;
+        private IndexPopulationJob populationJob;
+
+        IndexPopulationStarter( IndexRule[] rules )
+        {
+            this.rules = rules;
+        }
+
+        @Override
+        public IndexMap apply( IndexMap indexMap ) throws IOException
+        {
+            for ( IndexRule rule : rules )
+            {
+                long ruleId = rule.getId();
+                IndexProxy index = indexMap.getIndexProxy( ruleId );
+                if ( index != null && state == State.NOT_STARTED )
+                {
+                    // During recovery we might run into this scenario:
+                    // - We're starting recovery on a database, where init() is called and all indexes that
+                    //   are found in the store, instantiated and put into the IndexMap. Among them is index X.
+                    // - While we recover the database we bump into a transaction creating index Y, with the
+                    //   same IndexDescriptor, i.e. same label/property, as X. This is possible since this took
+                    //   place before the creation of X.
+                    // - When Y is dropped in between this creation and the creation of X (it will have to be
+                    //   otherwise X wouldn't have had an opportunity to be created) the index is removed from
+                    //   the IndexMap, both by id AND descriptor.
+                    //
+                    // Because of the scenario above we need to put this created index into the IndexMap
+                    // again, otherwise it will disappear from the IndexMap (at least for lookup by descriptor)
+                    // and not be able to accept changes applied from recovery later on.
+                    indexMap.putIndexProxy( ruleId, index );
+                    continue;
+                }
+                final IndexDescriptor descriptor = rule.getIndexDescriptor();
+                Descriptor providerDescriptor = rule.getProviderDescriptor();
+                boolean flipToTentative = rule.canSupportUniqueConstraint();
+                if ( state == State.RUNNING )
+                {
+                    populationJob = populationJob == null ? newIndexPopulationJob() : populationJob;
+                    index = indexProxyCreator.createPopulatingIndexProxy(
+                            ruleId, descriptor, providerDescriptor, flipToTentative, monitor, populationJob );
+                    index.start();
+                }
+                else
+                {
+                    index = indexProxyCreator.createRecoveringIndexProxy( descriptor, providerDescriptor );
+                }
+
+                indexMap.putIndexProxy( rule.getId(), index );
+            }
+            return indexMap;
+        }
+
+        void startPopulation()
+        {
+            if ( populationJob != null )
+            {
+                startIndexPopulation( populationJob );
+            }
+        }
+    }
+
+    private static final class IndexLogRecord
     {
         private final long indexId;
         private final IndexDescriptor descriptor;

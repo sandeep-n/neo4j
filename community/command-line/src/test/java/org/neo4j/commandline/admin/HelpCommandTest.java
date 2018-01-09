@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -36,6 +36,7 @@ import org.neo4j.commandline.arguments.Arguments;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -63,6 +64,7 @@ public class HelpCommandTest
         try
         {
             helpCommand.execute( "foobar" );
+            fail();
         }
         catch ( IncorrectUsage e )
         {
@@ -88,6 +90,7 @@ public class HelpCommandTest
         try
         {
             helpCommand.execute( "foobar" );
+            fail();
         }
         catch ( IncorrectUsage e )
         {

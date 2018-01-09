@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,18 +17,16 @@
 package org.neo4j.cypher.internal.frontend.v3_4.phases
 
 import org.neo4j.cypher.internal.frontend.v3_4.ast.conditions._
-import org.neo4j.cypher.internal.frontend.v3_4.ast.rewriters.ASTRewriter
+import org.neo4j.cypher.internal.frontend.v3_4.ast.rewriters.{ASTRewriter, LiteralExtraction}
 import org.neo4j.cypher.internal.frontend.v3_4.helpers.rewriting.RewriterStepSequencer
 import org.neo4j.cypher.internal.frontend.v3_4.phases.CompilationPhaseTracer.CompilationPhase.AST_REWRITE
-import org.neo4j.cypher.internal.frontend.v3_4.rewriters.LiteralExtraction
 import org.neo4j.cypher.internal.v3_4.expressions.NotEquals
 
-case class AstRewriting(
-                         sequencer: String => RewriterStepSequencer,
-                         literalExtraction: LiteralExtraction
-                       ) extends Phase[BaseContext, BaseState, BaseState] {
+case class AstRewriting(sequencer: String => RewriterStepSequencer, literalExtraction: LiteralExtraction,
+                        getDegreeRewriting: Boolean = true// This does not really belong in the front end. Should move to a planner rewriter
+) extends Phase[BaseContext, BaseState, BaseState] {
 
-  private val astRewriter = new ASTRewriter(sequencer, literalExtraction)
+  private val astRewriter = new ASTRewriter(sequencer, literalExtraction, getDegreeRewriting)
 
   override def process(in: BaseState, context: BaseContext): BaseState = {
 

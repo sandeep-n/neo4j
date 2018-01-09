@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -116,4 +116,10 @@ public interface RecordFormats
      * @return true if both formats have the same set of capabilities of the given {@code type}.
      */
     boolean hasSameCapabilities( RecordFormats other, CapabilityType type );
+
+    /**
+     * Record format name
+     * @return name of record format
+     */
+    String name();
 }

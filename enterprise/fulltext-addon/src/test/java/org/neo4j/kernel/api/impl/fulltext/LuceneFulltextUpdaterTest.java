@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -722,7 +722,7 @@ public class LuceneFulltextUpdaterTest extends LuceneFulltextTestSupport
     @Test
     public void shouldBeAbleToDropAndReaddIndex() throws Exception
     {
-        try ( FulltextProvider provider = createProvider() )
+        try ( FulltextProviderImpl provider = createProvider() )
         {
             provider.createIndex( "nodes", NODES, singletonList( "prop" ) );
             provider.registerTransactionEventHandler();

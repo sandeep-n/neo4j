@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -103,10 +103,12 @@ public class ThreadAheadReadableTest
         private int bytesRead;
         private volatile int readsCompleted;
         private final CharReadable actual;
+        private final long bytes;
 
         TrackingReader( int length )
         {
-            this.actual = Readables.wrap( new CharArrayReader( chars( 0, length ) ) );
+            this.bytes = length * 2;
+            this.actual = Readables.wrap( new CharArrayReader( chars( 0, length ) ), length * 2 );
         }
 
         @Override
@@ -158,6 +160,12 @@ public class ThreadAheadReadableTest
         public String sourceDescription()
         {
             return getClass().getSimpleName();
+        }
+
+        @Override
+        public long length()
+        {
+            return bytes;
         }
     }
 

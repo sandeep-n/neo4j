@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -29,7 +29,6 @@ import org.neo4j.helpers.progress.ProgressListener;
 import org.neo4j.unsafe.impl.batchimport.InputIterable;
 import org.neo4j.unsafe.impl.batchimport.InputIterator;
 import org.neo4j.unsafe.impl.batchimport.Utils.CompareType;
-import org.neo4j.unsafe.impl.batchimport.cache.IntArray;
 import org.neo4j.unsafe.impl.batchimport.cache.LongArray;
 import org.neo4j.unsafe.impl.batchimport.cache.LongBitsManipulator;
 import org.neo4j.unsafe.impl.batchimport.cache.MemoryStatsVisitor;
@@ -829,21 +828,6 @@ public class EncodingIdMapper implements IdMapper
         return lowestFound;
     }
 
-    static boolean compareDataCache( LongArray dataCache, IntArray tracker, int a, int b, CompareType compareType )
-    {
-        int indexA = tracker.get( a );
-        int indexB = tracker.get( b );
-        if ( indexA == ID_NOT_FOUND || indexB == ID_NOT_FOUND )
-        {
-            return false;
-        }
-
-        return unsignedCompare(
-                clearCollision( dataCache.get( indexA ) ),
-                clearCollision( dataCache.get( indexB ) ),
-                compareType );
-    }
-
     @Override
     public void acceptMemoryStatsVisitor( MemoryStatsVisitor visitor )
     {
@@ -872,12 +856,22 @@ public class EncodingIdMapper implements IdMapper
     public void close()
     {
         dataCache.close();
-        trackerCache.close();
+        if ( trackerCache != null )
+        {
+            trackerCache.close();
+        }
         if ( collisionSourceDataCache != null )
         {
             collisionTrackerCache.close();
             collisionSourceDataCache.close();
         }
         collisionNodeIdCache.close();
+    }
+
+    @Override
+    public long calculateMemoryUsage( long numberOfNodes )
+    {
+        int trackerSize = numberOfNodes > TrackerFactories.HIGHEST_ID_FOR_SMALL_TRACKER ? BigIdTracker.ID_SIZE : IntTracker.ID_SIZE;
+        return numberOfNodes * (Long.BYTES /*data*/ + trackerSize /*tracker*/);
     }
 }

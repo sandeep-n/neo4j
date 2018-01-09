@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -55,7 +55,7 @@ public class IndexPopulationIT
     @ClassRule
     public static final TestDirectory directory = TestDirectory.testDirectory();
 
-    private static final int TEST_TIMEOUT = 30_000;
+    private static final int TEST_TIMEOUT = 120_000;
     private static GraphDatabaseService database;
     private static ExecutorService executorService;
 

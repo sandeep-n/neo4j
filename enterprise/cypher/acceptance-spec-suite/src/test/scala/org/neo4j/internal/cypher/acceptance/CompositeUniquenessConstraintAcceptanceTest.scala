@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,7 +22,7 @@ package org.neo4j.internal.cypher.acceptance
 import org.neo4j.cypher._
 import org.neo4j.cypher.internal.javacompat.GraphDatabaseCypherService
 import org.neo4j.graphdb.config.Setting
-import org.neo4j.internal.cypher.acceptance.CypherComparisonSupport.Versions.{Default, v3_4}
+import org.neo4j.internal.cypher.acceptance.CypherComparisonSupport.Versions.{Default, V3_3, V3_4}
 import org.neo4j.internal.cypher.acceptance.CypherComparisonSupport._
 import org.neo4j.test.TestEnterpriseGraphDatabaseFactory
 
@@ -37,7 +37,7 @@ class CompositeUniquenessConstraintAcceptanceTest extends ExecutionEngineFunSuit
 
   test("should be able to create and remove single property uniqueness constraint") {
 
-    val testconfiguration = TestConfiguration(Versions(v3_4, Default), Planners.Default, Runtimes(Runtimes.ProcedureOrSchema))
+    val testconfiguration = Configs.Procs
     // When
     executeWith(testconfiguration, "CREATE CONSTRAINT ON (n:Person) ASSERT (n.email) IS UNIQUE")
 
@@ -52,12 +52,12 @@ class CompositeUniquenessConstraintAcceptanceTest extends ExecutionEngineFunSuit
   }
 
   val singlePropertyUniquenessFailConf =
-    TestConfiguration(Versions(v3_4, Default), Planners(Planners.Default, Planners.Cost), Runtimes.all)
+    TestConfiguration(Versions(V3_4, V3_3, Default), Planners(Planners.Default, Planners.Cost), Runtimes.all)
 
   test("should fail to to create composite uniqueness constraints") {
     // When
 
-    failWithError(singlePropertyUniquenessFailConf,
+    failWithError(singlePropertyUniquenessFailConf + Configs.Morsel,
       "CREATE CONSTRAINT ON (n:Person) ASSERT (n.firstname,n.lastname) IS UNIQUE",
       List("Only single property uniqueness constraints are supported"))
 
@@ -67,7 +67,7 @@ class CompositeUniquenessConstraintAcceptanceTest extends ExecutionEngineFunSuit
 
   test("should fail to to drop composite uniqueness constraints") {
     // When
-    failWithError(singlePropertyUniquenessFailConf + TestScenario(Versions.Default, Planners.Default, Runtimes.ProcedureOrSchema),
+    failWithError(singlePropertyUniquenessFailConf + Configs.Morsel + TestScenario(Versions.Default, Planners.Default, Runtimes.ProcedureOrSchema),
       "DROP CONSTRAINT ON (n:Person) ASSERT (n.firstname,n.lastname) IS UNIQUE",
       List("Only single property uniqueness constraints are supported"))
 

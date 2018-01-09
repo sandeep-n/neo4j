@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,23 +23,25 @@ import java.net.URL
 
 import org.neo4j.collection.primitive.PrimitiveLongIterator
 import org.neo4j.cypher.internal.planner.v3_4.spi.IndexDescriptor
-import org.neo4j.cypher.internal.runtime.interpreted.pipes.matching.PatternNode
 import org.neo4j.cypher.internal.runtime._
 import org.neo4j.cypher.internal.runtime.interpreted.{DelegatingOperations, DelegatingQueryTransactionalContext}
 import org.neo4j.cypher.internal.v3_4.expressions.SemanticDirection
 import org.neo4j.cypher.internal.v3_4.logical.plans.QualifiedName
-import org.neo4j.graphdb.{Node, Path, PropertyContainer, Relationship}
+import org.neo4j.graphdb.{Node, Path, PropertyContainer}
+import org.neo4j.internal.kernel.api.IndexReference
 import org.neo4j.kernel.impl.api.store.RelationshipIterator
+import org.neo4j.kernel.impl.core.NodeManager
 import org.neo4j.values.AnyValue
 import org.neo4j.values.storable.Value
-import org.neo4j.values.virtual.EdgeValue
+import org.neo4j.values.virtual.{EdgeValue, ListValue, NodeValue}
 
 import scala.collection.Iterator
 
 class ExceptionTranslatingQueryContext(val inner: QueryContext) extends QueryContext with ExceptionTranslationSupport {
-  override type EntityAccessor = inner.EntityAccessor
 
-  override def entityAccessor: EntityAccessor = inner.entityAccessor
+  override def entityAccessor: NodeManager = inner.entityAccessor
+
+  override def resources: CloseableResource = inner.resources
 
   override def transactionalContext =
     new ExceptionTranslatingTransactionalContext(inner.transactionalContext)
@@ -53,10 +55,7 @@ class ExceptionTranslatingQueryContext(val inner: QueryContext) extends QueryCon
   override def createNodeId(): Long =
     translateException(inner.createNodeId())
 
-  override def createRelationship(start: Node, end: Node, relType: String): Relationship =
-    translateException(inner.createRelationship(start, end, relType))
-
-  override def getLabelsForNode(node: Long): Iterator[Int] =
+  override def getLabelsForNode(node: Long): ListValue =
     translateException(inner.getLabelsForNode(node))
 
   override def getLabelName(id: Int): String =
@@ -71,17 +70,14 @@ class ExceptionTranslatingQueryContext(val inner: QueryContext) extends QueryCon
   override def getOrCreateLabelId(labelName: String): Int =
     translateException(inner.getOrCreateLabelId(labelName))
 
-  override def nodeOps: Operations[Node] =
-    new ExceptionTranslatingOperations[Node](inner.nodeOps)
+  override def nodeOps: Operations[NodeValue] =
+    new ExceptionTranslatingOperations[NodeValue](inner.nodeOps)
 
-  override def relationshipOps: Operations[Relationship] =
-    new ExceptionTranslatingOperations[Relationship](inner.relationshipOps)
+  override def relationshipOps: Operations[EdgeValue] =
+    new ExceptionTranslatingOperations[EdgeValue](inner.relationshipOps)
 
   override def removeLabelsFromNode(node: Long, labelIds: Iterator[Int]): Int =
     translateException(inner.removeLabelsFromNode(node, labelIds))
-
-  override def getPropertiesForNode(node: Long): Iterator[Int] =
-    translateException(inner.getPropertiesForNode(node))
 
   override def getPropertiesForRelationship(relId: Long): Iterator[Int] =
     translateException(inner.getPropertiesForRelationship(relId))
@@ -104,10 +100,10 @@ class ExceptionTranslatingQueryContext(val inner: QueryContext) extends QueryCon
   override def dropIndexRule(descriptor: IndexDescriptor) =
     translateException(inner.dropIndexRule(descriptor))
 
-  override def indexSeek(index: IndexDescriptor, values: Seq[Any]): Iterator[Node] =
+  override def indexSeek(index: IndexReference, values: Seq[Any]): Iterator[NodeValue] =
     translateException(inner.indexSeek(index, values))
 
-  override def getNodesByLabel(id: Int): Iterator[Node] =
+  override def getNodesByLabel(id: Int): Iterator[NodeValue] =
     translateException(inner.getNodesByLabel(id))
 
   override def getNodesByLabelPrimitive(id: Int): PrimitiveLongIterator =
@@ -184,7 +180,7 @@ class ExceptionTranslatingQueryContext(val inner: QueryContext) extends QueryCon
   override def getRelTypeName(id: Int) =
     translateException(inner.getRelTypeName(id))
 
-  override def lockingUniqueIndexSeek(index: IndexDescriptor, values: Seq[Any]) =
+  override def lockingUniqueIndexSeek(index: IndexReference, values: Seq[Any]) =
     translateException(inner.lockingUniqueIndexSeek(index, values))
 
   override def getImportURL(url: URL) =
@@ -208,22 +204,22 @@ class ExceptionTranslatingQueryContext(val inner: QueryContext) extends QueryCon
   override def getRelationshipsForIdsPrimitive(node: Long, dir: SemanticDirection, types: Option[Array[Int]]): RelationshipIterator =
     translateException(inner.getRelationshipsForIdsPrimitive(node, dir, types))
 
-  override def getRelationshipFor(relationshipId: Long, typeId: Int, startNodeId: Long, endNodeId: Long): Relationship =
+  override def getRelationshipFor(relationshipId: Long, typeId: Int, startNodeId: Long, endNodeId: Long): EdgeValue =
     translateException(inner.getRelationshipFor(relationshipId, typeId, startNodeId, endNodeId))
 
-  override def indexSeekByRange(index: IndexDescriptor, value: Any) =
+  override def indexSeekByRange(index: IndexReference, value: Any) =
     translateException(inner.indexSeekByRange(index, value))
 
-  override def indexScanByContains(index: IndexDescriptor, value: String) =
+  override def indexScanByContains(index: IndexReference, value: String) =
     translateException(inner.indexScanByContains(index, value))
 
-  override def indexScanByEndsWith(index: IndexDescriptor, value: String) =
+  override def indexScanByEndsWith(index: IndexReference, value: String) =
     translateException(inner.indexScanByEndsWith(index, value))
 
-  override def indexScan(index: IndexDescriptor) =
+  override def indexScan(index: IndexReference) =
     translateException(inner.indexScan(index))
 
-  override def indexScanPrimitive(index: IndexDescriptor) =
+  override def indexScanPrimitive(index: IndexReference) =
     translateException(inner.indexScanPrimitive(index))
 
   override def nodeIsDense(node: Long) =
@@ -261,7 +257,7 @@ class ExceptionTranslatingQueryContext(val inner: QueryContext) extends QueryCon
 
   override def assertSchemaWritesAllowed(): Unit = translateException(inner.assertSchemaWritesAllowed())
 
-  class ExceptionTranslatingOperations[T <: PropertyContainer](inner: Operations[T])
+  class ExceptionTranslatingOperations[T](inner: Operations[T])
     extends DelegatingOperations[T](inner) {
     override def delete(id: Long) =
       translateException(inner.delete(id))
@@ -306,5 +302,10 @@ class ExceptionTranslatingQueryContext(val inner: QueryContext) extends QueryCon
   class ExceptionTranslatingTransactionalContext(inner: QueryTransactionalContext) extends DelegatingQueryTransactionalContext(inner) {
     override def close(success: Boolean) { translateException(super.close(success)) }
   }
+
+  override def createNewQueryContext() = new ExceptionTranslatingQueryContext(inner.createNewQueryContext())
+
+  override def indexReference(label: Int, properties: Int*): IndexReference =
+    translateException(inner.indexReference(label, properties:_*))
 }
 

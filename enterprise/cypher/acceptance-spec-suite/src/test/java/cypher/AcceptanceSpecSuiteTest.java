@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -34,7 +34,7 @@ import static cypher.SpecSuiteConstants.DB_CONFIG;
 import static cypher.SpecSuiteConstants.GLUE_PATH;
 import static cypher.SpecSuiteConstants.HTML_REPORT;
 import static cypher.SpecSuiteConstants.JSON_REPORT;
-import static junit.framework.TestCase.fail;
+import static org.junit.Assert.fail;
 
 @RunWith( Enclosed.class )
 public class AcceptanceSpecSuiteTest
@@ -152,6 +152,23 @@ public class AcceptanceSpecSuiteTest
     public static class CostSlotted extends Base
     {
     }
+
+//    @RunWith( Cucumber.class )
+//    @CucumberOptions(
+//            plugin = {
+//                    DB_CONFIG + "cost-morsel.json",
+//                    HTML_REPORT + SUITE_NAME + "/cost-morsel",
+//                    JSON_REPORT + SUITE_NAME + "/cost-morsel",
+//                    BLACKLIST_PLUGIN + "cost-morsel.txt"
+//            },
+//            glue = { GLUE_PATH },
+//            features = { FEATURE_PATH + FEATURE_TO_RUN },
+//            tags = { "~@pending" },
+//            strict = true
+//    )
+//    public static class CostMorsel extends Base
+//    {
+//    }
 
     @RunWith( Cucumber.class )
     @CucumberOptions(

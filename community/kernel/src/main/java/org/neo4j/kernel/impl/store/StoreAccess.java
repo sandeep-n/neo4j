@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -70,11 +70,6 @@ public class StoreAccess
     {
         this.neoStores = store;
         this.counts = store.getCounts();
-    }
-
-    public StoreAccess( FileSystemAbstraction fileSystem, PageCache pageCache, File storeDir )
-    {
-        this( fileSystem, pageCache, storeDir, Config.defaults() );
     }
 
     public StoreAccess( FileSystemAbstraction fileSystem, PageCache pageCache, File storeDir, Config config )

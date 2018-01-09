@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -74,6 +74,7 @@ import org.neo4j.test.DoubleLatch;
 import org.neo4j.test.rule.concurrent.ThreadingRule;
 import org.neo4j.values.AnyValue;
 import org.neo4j.values.storable.TextValue;
+import org.neo4j.values.storable.CoordinateReferenceSystem;
 import org.neo4j.values.virtual.ListValue;
 import org.neo4j.values.virtual.MapValue;
 
@@ -938,13 +939,7 @@ public abstract class ProcedureInteractionTestBase<S>
             }
 
             @Override
-            protected Point newGeographicPoint( double longitude, double latitude, String name, int code, String href )
-            {
-                return null;
-            }
-
-            @Override
-            protected Point newCartesianPoint( double x, double y, String name, int code, String href )
+            protected Point newPoint( CoordinateReferenceSystem crs, double[] coordinate )
             {
                 return null;
             }

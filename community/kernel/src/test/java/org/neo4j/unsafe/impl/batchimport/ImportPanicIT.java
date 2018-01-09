@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -124,7 +124,7 @@ public class ImportPanicIT
         {
             try
             {
-                return Readables.wrap( fs.openAsReader( file, StandardCharsets.UTF_8 ) );
+                return Readables.files( StandardCharsets.UTF_8, file );
             }
             catch ( IOException e )
             {

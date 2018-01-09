@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -49,12 +49,6 @@ public class FileHeader
     }
 
     @Override
-    public String toString()
-    {
-        return String.format( "FileHeader{fileName='%s'}", fileName );
-    }
-
-    @Override
     public boolean equals( Object o )
     {
         if ( this == o )
@@ -66,12 +60,18 @@ public class FileHeader
             return false;
         }
         FileHeader that = (FileHeader) o;
-        return Objects.equals( fileName, that.fileName );
+        return requiredAlignment == that.requiredAlignment && Objects.equals( fileName, that.fileName );
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash( fileName );
+        return Objects.hash( fileName, requiredAlignment );
+    }
+
+    @Override
+    public String toString()
+    {
+        return "FileHeader{" + "fileName='" + fileName + '\'' + ", requiredAlignment=" + requiredAlignment + '}';
     }
 }

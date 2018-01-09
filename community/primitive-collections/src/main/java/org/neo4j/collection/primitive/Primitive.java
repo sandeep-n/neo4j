@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,6 +24,7 @@ import org.neo4j.collection.primitive.hopscotch.IntKeyObjectValueTable;
 import org.neo4j.collection.primitive.hopscotch.IntKeyTable;
 import org.neo4j.collection.primitive.hopscotch.IntKeyUnsafeTable;
 import org.neo4j.collection.primitive.hopscotch.LongKeyIntValueTable;
+import org.neo4j.collection.primitive.hopscotch.LongKeyLongValueTable;
 import org.neo4j.collection.primitive.hopscotch.LongKeyLongValueUnsafeTable;
 import org.neo4j.collection.primitive.hopscotch.LongKeyObjectValueTable;
 import org.neo4j.collection.primitive.hopscotch.LongKeyTable;
@@ -59,6 +60,16 @@ public class Primitive
     {
     }
 
+    public static PrimitiveLongList longList()
+    {
+        return new PrimitiveLongList();
+    }
+
+    public static PrimitiveLongList longList( int size )
+    {
+        return new PrimitiveLongList( size );
+    }
+
     // Some example would be...
     public static PrimitiveLongSet longSet()
     {
@@ -90,6 +101,16 @@ public class Primitive
     public static PrimitiveLongIntMap longIntMap( int initialCapacity )
     {
         return new PrimitiveLongIntHashMap( new LongKeyIntValueTable( initialCapacity ), NO_MONITOR );
+    }
+
+    public static PrimitiveLongLongMap longLongMap()
+    {
+        return longLongMap( DEFAULT_HEAP_CAPACITY );
+    }
+
+    public static PrimitiveLongLongMap longLongMap( int initialCapacity )
+    {
+        return new PrimitiveLongLongHashMap( new LongKeyLongValueTable( initialCapacity ), NO_MONITOR );
     }
 
     public static PrimitiveLongLongMap offHeapLongLongMap()

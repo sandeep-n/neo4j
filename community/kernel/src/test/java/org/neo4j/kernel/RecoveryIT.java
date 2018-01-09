@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -54,6 +54,7 @@ import org.neo4j.graphdb.mockfs.EphemeralFileSystemAbstraction;
 import org.neo4j.helpers.collection.Iterables;
 import org.neo4j.helpers.collection.Iterators;
 import org.neo4j.io.ByteUnit;
+import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.io.pagecache.IOLimiter;
 import org.neo4j.io.pagecache.PageCache;
 import org.neo4j.io.pagecache.tracing.PageCacheTracer;
@@ -71,13 +72,17 @@ import org.neo4j.kernel.impl.store.NeoStores;
 import org.neo4j.kernel.impl.store.RecordStore;
 import org.neo4j.kernel.impl.store.StoreFactory;
 import org.neo4j.kernel.impl.store.StoreType;
+import org.neo4j.kernel.impl.store.id.DefaultIdGeneratorFactory;
 import org.neo4j.kernel.impl.store.record.AbstractBaseRecord;
 import org.neo4j.kernel.impl.store.record.RecordLoad;
-import org.neo4j.kernel.impl.storemigration.LogFiles;
+import org.neo4j.kernel.impl.storemigration.ExistingTargetStrategy;
+import org.neo4j.kernel.impl.storemigration.FileOperation;
 import org.neo4j.kernel.impl.transaction.command.Command;
 import org.neo4j.kernel.impl.transaction.log.TransactionIdStore;
 import org.neo4j.kernel.impl.transaction.log.checkpoint.CheckPointer;
 import org.neo4j.kernel.impl.transaction.log.checkpoint.SimpleTriggerInfo;
+import org.neo4j.kernel.impl.transaction.log.files.LogFiles;
+import org.neo4j.kernel.impl.transaction.log.files.LogFilesBuilder;
 import org.neo4j.kernel.internal.DatabaseHealth;
 import org.neo4j.kernel.internal.GraphDatabaseAPI;
 import org.neo4j.kernel.monitoring.Monitors;
@@ -465,13 +470,16 @@ public class RecoveryIT
 
     private void assertSameStoreContents( EphemeralFileSystemAbstraction fs1, EphemeralFileSystemAbstraction fs2, File storeDir )
     {
+        NullLogProvider logProvider = NullLogProvider.getInstance();
         try (
                 PageCache pageCache1 = new ConfiguringPageCacheFactory( fs1, defaults(), PageCacheTracer.NULL,
                         PageCursorTracerSupplier.NULL, NullLog.getInstance() ).getOrCreatePageCache();
                 PageCache pageCache2 = new ConfiguringPageCacheFactory( fs2, defaults(), PageCacheTracer.NULL,
                         PageCursorTracerSupplier.NULL, NullLog.getInstance() ).getOrCreatePageCache();
-                NeoStores store1 = new StoreFactory( storeDir, pageCache1, fs1, NullLogProvider.getInstance() ).openAllNeoStores();
-                NeoStores store2 = new StoreFactory( storeDir, pageCache2, fs2, NullLogProvider.getInstance() ).openAllNeoStores();
+                NeoStores store1 = new StoreFactory( storeDir, defaults(), new DefaultIdGeneratorFactory( fs1 ),
+                        pageCache1, fs1, logProvider ).openAllNeoStores();
+                NeoStores store2 = new StoreFactory( storeDir, defaults(), new DefaultIdGeneratorFactory( fs2 ),
+                        pageCache2, fs2, logProvider ).openAllNeoStores();
                 )
         {
             for ( StoreType storeType : StoreType.values() )
@@ -789,7 +797,21 @@ public class RecoveryIT
     private File copyTransactionLogs() throws IOException
     {
         File restoreDbStoreDir = this.directory.directory( "restore-db" );
-        LogFiles.move( fileSystemRule.get(), this.directory.graphDbDir(), restoreDbStoreDir );
+        move( fileSystemRule.get(), this.directory.graphDbDir(), restoreDbStoreDir );
         return restoreDbStoreDir;
+    }
+
+    private static void move( FileSystemAbstraction fs, File fromDirectory, File toDirectory ) throws IOException
+    {
+        assert fs.isDirectory( fromDirectory );
+        assert fs.isDirectory( toDirectory );
+
+        LogFiles transactionLogFiles = LogFilesBuilder.logFilesBasedOnlyBuilder( fromDirectory, fs ).build();
+        File[] logFiles = transactionLogFiles.logFiles();
+        for ( File logFile : logFiles )
+        {
+            FileOperation.MOVE.perform( fs, logFile.getName(), fromDirectory, false, toDirectory,
+                    ExistingTargetStrategy.FAIL );
+        }
     }
 }

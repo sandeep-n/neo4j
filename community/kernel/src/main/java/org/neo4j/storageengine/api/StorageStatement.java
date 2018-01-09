@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,14 +19,26 @@
  */
 package org.neo4j.storageengine.api;
 
+import java.nio.ByteBuffer;
 import java.util.function.IntPredicate;
 
 import org.neo4j.cursor.Cursor;
+import org.neo4j.io.pagecache.PageCursor;
 import org.neo4j.kernel.api.AssertOpen;
 import org.neo4j.kernel.api.exceptions.index.IndexNotFoundKernelException;
 import org.neo4j.kernel.api.schema.index.IndexDescriptor;
 import org.neo4j.kernel.impl.locking.Lock;
+import org.neo4j.kernel.impl.store.InvalidRecordException;
+import org.neo4j.kernel.impl.store.RecordCursor;
 import org.neo4j.kernel.impl.store.RecordCursors;
+import org.neo4j.kernel.impl.store.RecordStore;
+import org.neo4j.kernel.impl.store.record.AbstractBaseRecord;
+import org.neo4j.kernel.impl.store.record.DynamicRecord;
+import org.neo4j.kernel.impl.store.record.NodeRecord;
+import org.neo4j.kernel.impl.store.record.PropertyRecord;
+import org.neo4j.kernel.impl.store.record.RecordLoad;
+import org.neo4j.kernel.impl.store.record.RelationshipGroupRecord;
+import org.neo4j.kernel.impl.store.record.RelationshipRecord;
 import org.neo4j.storageengine.api.schema.IndexReader;
 import org.neo4j.storageengine.api.schema.LabelScanReader;
 
@@ -104,13 +116,13 @@ public interface StorageStatement extends AutoCloseable
             Direction direction, IntPredicate relTypeFilter );
 
     /**
-     -     * Acquires {@link Cursor} capable of {@link Cursor#get() serving} {@link RelationshipItem} for selected
-     -     * relationships. No relationship is selected when this method returns, a call to {@link Cursor#next()}
-     -     * will have to be made to place the cursor over the first item and then more calls to move the cursor
-     -     * through the selection.
-     -     *
-     -     * @return a {@link Cursor} over all stored relationships.
-     -     */
+     * Acquires {@link Cursor} capable of {@link Cursor#get() serving} {@link RelationshipItem} for selected
+     * relationships. No relationship is selected when this method returns, a call to {@link Cursor#next()}
+     * will have to be made to place the cursor over the first item and then more calls to move the cursor
+     * through the selection.
+     *
+     * @return a {@link Cursor} over all stored relationships.
+     */
     Cursor<RelationshipItem> relationshipsGetAllCursor();
 
     Cursor<PropertyItem> acquirePropertyCursor( long propertyId, Lock shortLivedReadLock, AssertOpen assertOpen );
@@ -175,4 +187,103 @@ public interface StorageStatement extends AutoCloseable
      * @return a reserved relationship id for future use.
      */
     long reserveRelationship();
+
+    Nodes nodes();
+
+    Relationships relationships();
+
+    Groups groups();
+
+    Properties properties();
+
+    interface RecordReads<RECORD>
+    {
+        /**
+         * Open a new PageCursor for reading nodes.
+         * <p>
+         * DANGER: make sure to always close this cursor.
+         *
+         * @param reference the initial node reference to access.
+         * @return the opened PageCursor
+         */
+        PageCursor openPageCursorForReading( long reference );
+
+        /**
+         * Load a node {@code record} with the node corresponding to the given node {@code reference}.
+         * <p>
+         * The provided page cursor will be used to get the record, and in doing this it will be redirected to the
+         * correct page if needed.
+         *
+         * @param reference the record reference, understood to be the absolute reference to the store.
+         * @param record the record to fill.
+         * @param mode loading behaviour, read more in {@link RecordStore#getRecord(long, AbstractBaseRecord, RecordLoad)}.
+         * @param cursor the PageCursor to use for record loading.
+         * @throws InvalidRecordException if record not in use and the {@code mode} allows for throwing.
+         */
+        void getRecordByCursor( long reference, RECORD record, RecordLoad mode, PageCursor cursor )
+                throws InvalidRecordException;
+
+        long getHighestPossibleIdInUse();
+    }
+
+    interface Nodes extends RecordReads<NodeRecord>
+    {
+        /**
+         * @return a new Record cursor for accessing DynamicRecords containing labels. This comes acquired.
+         */
+        RecordCursor<DynamicRecord> newLabelCursor();
+    }
+
+    interface Relationships extends RecordReads<RelationshipRecord>
+    {
+    }
+
+    interface Groups extends RecordReads<RelationshipGroupRecord>
+    {
+    }
+
+    interface Properties extends RecordReads<PropertyRecord>
+    {
+        /**
+         * Open a new PageCursor for reading strings.
+         * <p>
+         * DANGER: make sure to always close this cursor.
+         *
+         * @param reference the initial string reference to access.
+         * @return the opened PageCursor
+         */
+        PageCursor openStringPageCursor( long reference );
+
+        /**
+         * Open a new PageCursor for reading arrays.
+         * <p>
+         * DANGER: make sure to always close this cursor.
+         *
+         * @param reference the initial array reference to access.
+         * @return the opened PageCursor
+         */
+        PageCursor openArrayPageCursor( long reference );
+
+        /**
+         * Loads a string into the given buffer. If that is too small we recreate the buffer. The buffer is returned
+         * in write mode, and needs to be flipped before reading.
+         *
+         * @param reference the initial string reference to load
+         * @param buffer the buffer to load into
+         * @param page the page cursor to be used
+         * @return the ByteBuffer of the string
+         */
+        ByteBuffer loadString( long reference, ByteBuffer buffer, PageCursor page );
+
+        /**
+         * Loads a array into the given buffer. If that is too small we recreate the buffer. The buffer is returned
+         * in write mode, and needs to be flipped before reading.
+         *
+         * @param reference the initial array reference to load
+         * @param buffer the buffer to load into
+         * @param page the page cursor to be used
+         * @return the ByteBuffer of the array
+         */
+        ByteBuffer loadArray( long reference, ByteBuffer buffer, PageCursor page );
+    }
 }

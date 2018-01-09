@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,7 +22,7 @@ package org.neo4j.causalclustering.core.consensus.log;
 
 import java.util.Iterator;
 import java.util.Objects;
-import java.util.function.Predicate;
+import java.util.function.LongPredicate;
 
 import org.neo4j.helpers.collection.LruCache;
 import org.neo4j.kernel.impl.transaction.log.LogPosition;
@@ -66,7 +66,7 @@ public class RaftLogMetadataCache
         remove( key -> key >= startingFrom );
     }
 
-    private void remove( Predicate<Long> predicate )
+    private void remove( LongPredicate predicate )
     {
         Iterator<Long> keys = raftLogEntryCache.keySet().iterator();
 

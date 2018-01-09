@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,7 +23,7 @@ import org.neo4j.cypher.ExecutionEngineFunSuite
 import org.neo4j.internal.cypher.acceptance.CypherComparisonSupport.{ComparePlansWithAssertion, Configs}
 
 class ValueHashJoinImplementationAcceptanceTest extends ExecutionEngineFunSuite with CypherComparisonSupport {
-  val expectedToSucceed: CypherComparisonSupport.TestConfiguration = Configs.CommunityInterpreted
+  val expectedToSucceed: CypherComparisonSupport.TestConfiguration = Configs.Interpreted
   val expectPlansToFail = Configs.AllRulePlanners + Configs.Cost2_3
 
   test("find friends of others") {

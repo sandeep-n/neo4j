@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -27,8 +27,8 @@ import org.neo4j.cypher.internal.planner.v3_4.spi._
 import org.neo4j.cypher.internal.util.v3_4.CypherExecutionException
 import org.neo4j.cypher.internal.util.v3_4.symbols._
 import org.neo4j.cypher.internal.v3_4.logical.plans._
+import org.neo4j.internal.kernel.api.InternalIndexState
 import org.neo4j.internal.kernel.api.exceptions.KernelException
-import org.neo4j.kernel.api.index.InternalIndexState
 import org.neo4j.kernel.api.proc.Neo4jTypes.AnyType
 import org.neo4j.kernel.api.proc.{Neo4jTypes, QualifiedName => KernelQualifiedName}
 import org.neo4j.kernel.api.schema.SchemaDescriptorFactory
@@ -38,7 +38,13 @@ import org.neo4j.procedure.Mode
 
 import scala.collection.JavaConverters._
 
-class TransactionBoundPlanContext(tc: TransactionalContextWrapper, logger: InternalNotificationLogger)
+object TransactionBoundPlanContext {
+  def apply(tc: TransactionalContextWrapper, logger: InternalNotificationLogger) =
+    new TransactionBoundPlanContext(tc, logger, InstrumentedGraphStatistics(TransactionBoundGraphStatistics(tc.readOperations),
+      new MutableGraphStatisticsSnapshot()))
+}
+
+class TransactionBoundPlanContext(tc: TransactionalContextWrapper, logger: InternalNotificationLogger, graphStatistics: GraphStatistics)
   extends TransactionBoundTokenContext(tc.statement) with PlanContext with IndexDescriptorCompatibility {
 
   def indexesGetForLabel(labelId: Int): Iterator[IndexDescriptor] = {
@@ -119,9 +125,7 @@ class TransactionBoundPlanContext(tc: TransactionalContextWrapper, logger: Inter
     tc.statement.readOperations().schemaStateGetOrCreate(key, javaCreator)
   }
 
-  val statistics: GraphStatistics =
-    InstrumentedGraphStatistics(TransactionBoundGraphStatistics(tc.readOperations),
-                                new MutableGraphStatisticsSnapshot())
+  val statistics: GraphStatistics = graphStatistics
 
   val txIdProvider = LastCommittedTxIdProvider(tc.graph)
 

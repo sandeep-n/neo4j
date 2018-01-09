@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,10 +20,6 @@
 package org.neo4j.unsafe.impl.batchimport.input.csv;
 
 import org.junit.Test;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
-
-import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -156,6 +152,6 @@ public class InputGroupsDeserializerTest
 
     private DataFactory<InputNode> data( String string )
     {
-        return DataFactories.data( NO_NODE_DECORATOR, Suppliers.singleton( wrap( new StringReader( string ) ) ) );
+        return DataFactories.data( NO_NODE_DECORATOR, Suppliers.singleton( wrap( string ) ) );
     }
 }

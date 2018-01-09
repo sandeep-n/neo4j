@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -61,6 +61,20 @@ public class Util
         {
             throw new IllegalArgumentException( "Unable to parse path: " + file, e );
         }
+    }
+
+    public static boolean isSameOrChildFile( File parent, File candidate )
+    {
+        Path canonicalCandidate = canonicalPath( candidate );
+        Path canonicalParentPath = canonicalPath( parent );
+        return canonicalCandidate.startsWith( canonicalParentPath );
+    }
+
+    public static boolean isSameOrChildPath( Path parent, Path candidate )
+    {
+        Path normalizedCandidate = candidate.normalize();
+        Path normalizedParent = parent.normalize();
+        return normalizedCandidate.startsWith( normalizedParent );
     }
 
     public static void checkLock( Path databaseDirectory ) throws CommandFailed

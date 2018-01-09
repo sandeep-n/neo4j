@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -27,23 +27,15 @@ import java.util.List;
 import java.util.function.IntPredicate;
 
 import org.neo4j.collection.primitive.PrimitiveLongCollections;
-import org.neo4j.collection.primitive.PrimitiveLongIterator;
+import org.neo4j.collection.primitive.PrimitiveLongResourceCollections;
 import org.neo4j.collection.primitive.PrimitiveLongResourceIterator;
 import org.neo4j.helpers.collection.Visitor;
-import org.neo4j.kernel.api.index.IndexPopulator;
-import org.neo4j.kernel.api.index.SchemaIndexProvider;
 import org.neo4j.kernel.api.labelscan.LabelScanStore;
 import org.neo4j.kernel.api.labelscan.NodeLabelUpdate;
-import org.neo4j.kernel.api.schema.index.IndexDescriptor;
-import org.neo4j.kernel.impl.api.index.FailedIndexProxyFactory;
-import org.neo4j.kernel.impl.api.index.FlippableIndexProxy;
-import org.neo4j.kernel.impl.api.index.IndexStoreView;
-import org.neo4j.kernel.impl.api.index.MultipleIndexPopulator;
 import org.neo4j.kernel.impl.api.index.NodeUpdates;
 import org.neo4j.kernel.impl.locking.LockService;
 import org.neo4j.kernel.impl.store.NodeStore;
 import org.neo4j.kernel.impl.store.PropertyStore;
-import org.neo4j.logging.LogProvider;
 import org.neo4j.storageengine.api.schema.LabelScanReader;
 
 import static org.junit.Assert.assertThat;
@@ -69,7 +61,7 @@ public class LabelScanViewNodeStoreScanTest
     @Test
     public void iterateOverLabeledNodeIds() throws Exception
     {
-        PrimitiveLongIterator labeledNodes = PrimitiveLongCollections.iterator( 1, 2, 4, 8 );
+        PrimitiveLongResourceIterator labeledNodes = PrimitiveLongResourceCollections.iterator( null, 1, 2, 4, 8 );
 
         when( nodeStore.getHighId() ).thenReturn( 15L );
         when( labelScanReader.nodesWithAnyOfLabels( 1, 2 ) ).thenReturn( labeledNodes );
@@ -84,33 +76,9 @@ public class LabelScanViewNodeStoreScanTest
         assertThat( visitedNodeIds, Matchers.hasItems( 1L, 2L, 4L, 8L ) );
     }
 
-    private MultipleIndexPopulator.IndexPopulation getPopulation( LabelScanTestMultipleIndexPopulator indexPopulator )
-    {
-        return indexPopulator.createPopulation( mock( IndexPopulator.class ), 1, null, null, null, null, null );
-    }
-
     private LabelScanViewNodeStoreScan<Exception> getLabelScanViewStoreScan( int[] labelIds )
     {
         return new LabelScanViewNodeStoreScan<>( nodeStore, LockService.NO_LOCK_SERVICE, propertyStore,
                 labelScanStore, labelUpdateVisitor, propertyUpdateVisitor, labelIds, propertyKeyIdFilter );
     }
-
-    private class LabelScanTestMultipleIndexPopulator extends MultipleIndexPopulator
-    {
-        LabelScanTestMultipleIndexPopulator( IndexStoreView storeView, LogProvider logProvider )
-        {
-            super( storeView, logProvider );
-        }
-
-        @Override
-        public IndexPopulation createPopulation( IndexPopulator populator, long indexId,
-                IndexDescriptor descriptor, SchemaIndexProvider.Descriptor providerDescriptor,
-                FlippableIndexProxy flipper, FailedIndexProxyFactory failedIndexProxyFactory,
-                String indexUserDescription )
-        {
-            return super.createPopulation( populator, indexId, descriptor, providerDescriptor, flipper,
-                            failedIndexProxyFactory, indexUserDescription );
-        }
-    }
-
 }

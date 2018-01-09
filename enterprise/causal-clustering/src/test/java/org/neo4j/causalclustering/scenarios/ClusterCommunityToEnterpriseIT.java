@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -60,7 +60,8 @@ public class ClusterCommunityToEnterpriseIT
         fsa = fileSystemRule.get();
 
         cluster = new Cluster( testDir.directory( "cluster" ), 3, 0,
-                new SharedDiscoveryService(), emptyMap(), emptyMap(), emptyMap(), emptyMap(), HighLimit.NAME, IpFamily.IPV4, false );
+                new SharedDiscoveryService(), emptyMap(), emptyMap(), emptyMap(), emptyMap(), HighLimit.NAME,
+                IpFamily.IPV4, false );
     }
 
     @After

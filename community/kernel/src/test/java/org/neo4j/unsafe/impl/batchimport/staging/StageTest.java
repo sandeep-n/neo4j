@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -28,7 +28,6 @@ import org.neo4j.unsafe.impl.batchimport.Configuration;
 import org.neo4j.unsafe.impl.batchimport.stats.Keys;
 
 import static org.junit.Assert.assertEquals;
-
 import static org.neo4j.unsafe.impl.batchimport.Configuration.DEFAULT;
 import static org.neo4j.unsafe.impl.batchimport.staging.Step.ORDER_SEND_DOWNSTREAM;
 
@@ -46,7 +45,7 @@ public class StageTest
                 return 10;
             }
         };
-        Stage stage = new Stage( "Test stage", config, ORDER_SEND_DOWNSTREAM );
+        Stage stage = new Stage( "Test stage", null, config, ORDER_SEND_DOWNSTREAM );
         long batches = 1000;
         final long items = batches * config.batchSize();
         stage.add( new PullingProducerStep( stage.control(), config )

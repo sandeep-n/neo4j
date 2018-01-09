@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -53,7 +53,7 @@ public class ClusterLocksIT
     private static final long TIMEOUT_MILLIS = 120_000;
 
     public final ExpectedException expectedException = ExpectedException.none();
-    public final ClusterRule clusterRule = new ClusterRule( getClass() );
+    public final ClusterRule clusterRule = new ClusterRule();
 
     @Rule
     public final RuleChain rules = RuleChain.outerRule( expectedException ).around( clusterRule );

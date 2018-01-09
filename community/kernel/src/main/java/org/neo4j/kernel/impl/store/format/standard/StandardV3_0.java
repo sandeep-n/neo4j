@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -38,7 +38,7 @@ public class StandardV3_0 extends BaseRecordFormats
 {
     public static final String STORE_VERSION = StoreVersion.STANDARD_V3_0.versionString();
     public static final RecordFormats RECORD_FORMATS = new StandardV3_0();
-    public static final String NAME = "standard";
+    public static final String NAME = "standardV3_0_0";
 
     public StandardV3_0()
     {
@@ -98,5 +98,11 @@ public class StandardV3_0 extends BaseRecordFormats
     public FormatFamily getFormatFamily()
     {
         return StandardFormatFamily.INSTANCE;
+    }
+
+    @Override
+    public String name()
+    {
+        return NAME;
     }
 }

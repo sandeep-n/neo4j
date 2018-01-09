@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -155,6 +155,10 @@ public enum PropertyType
             {
                 return headOf( recordBytes, DynamicArrayStore.NUMBER_HEADER_SIZE );
             }
+            else if ( itemType <= GEOMETRY.byteValue() )
+            {
+                return headOf( recordBytes, DynamicArrayStore.GEOMETRY_HEADER_SIZE );
+            }
             throw new IllegalArgumentException( "Unknown array type " + itemType );
         }
 
@@ -189,6 +193,20 @@ public enum PropertyType
         public int calculateNumberOfBlocksUsed( long firstBlock )
         {
             return ShortArray.calculateNumberOfBlocksUsed( firstBlock );
+        }
+    },
+    GEOMETRY( 13 )
+    {
+        @Override
+        public Value value( PropertyBlock block, PropertyStore store )
+        {
+            return GeometryType.decode( block );
+        }
+
+        @Override
+        public int calculateNumberOfBlocksUsed( long firstBlock )
+        {
+            return GeometryType.calculateNumberOfBlocksUsed( firstBlock );
         }
     };
 
@@ -259,6 +277,8 @@ public enum PropertyType
             return SHORT_STRING;
         case 12:
             return SHORT_ARRAY;
+        case 13:
+            return GEOMETRY;
         default:
             return null;
         }

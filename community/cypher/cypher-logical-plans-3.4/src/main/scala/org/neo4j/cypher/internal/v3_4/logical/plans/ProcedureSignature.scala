@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -18,6 +18,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.neo4j.cypher.internal.v3_4.logical.plans
+
+import java.util
 
 import org.neo4j.cypher.internal.util.v3_4.symbols.CypherType
 import org.neo4j.cypher.internal.frontend.v3_4.ast.UnresolvedCall
@@ -70,7 +72,20 @@ case class FieldSignature(name: String, typ: CypherType, default: Option[CypherV
   }
 }
 
-sealed trait  ProcedureAccessMode
+sealed trait ProcedureAccessMode {
+  def allowed: Array[String]
+
+  override def hashCode() = this.allowed.toSet.hashCode()
+
+  override def equals(obj: scala.Any) = {
+    if(obj.getClass != this.getClass) {
+      false
+    } else {
+      val other = obj.asInstanceOf[ProcedureAccessMode]
+      this.allowed.toSet.equals(other.allowed.toSet)
+    }
+  }
+}
 
 case class ProcedureReadOnlyAccess(allowed: Array[String]) extends ProcedureAccessMode
 case class ProcedureReadWriteAccess(allowed: Array[String]) extends ProcedureAccessMode

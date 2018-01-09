@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,24 +19,44 @@
  */
 package org.neo4j.internal.kernel.api;
 
+import org.neo4j.internal.kernel.api.exceptions.KernelException;
+
 /**
- * Defines the read operations of the Kernel API.
+ * Defines the graph read operations of the Kernel.
  */
 public interface Read
 {
     /**
-     * TODO: this method needs a better definition.
-     *
-     * @param predicates
-     *         predicates describing what to look for in the index.
-     * @param cursor
-     *         the cursor to use for consuming the results.
+     * @param index {@link IndexReference} referencing index to query.
+     * @param cursor the cursor to use for consuming the results.
+     * @param indexOrder requested {@link IndexOrder} of result. Must be among the capabilities of
+     * {@link IndexReference referenced index}, or {@link IndexOrder#NONE}.
+     * @param query Combination of {@link IndexQuery index queries} to run against referenced index.
      */
-    void nodeIndexSeek( IndexReference index, NodeValueIndexCursor cursor, IndexPredicate... predicates );
+    void nodeIndexSeek( IndexReference index, NodeValueIndexCursor cursor, IndexOrder indexOrder, IndexQuery... query )
+            throws KernelException;
 
-    void nodeIndexScan( IndexReference index, NodeValueIndexCursor cursor );
+    /**
+     * @param index {@link IndexReference} referencing index to query.
+     * @param cursor the cursor to use for consuming the results.
+     * @param indexOrder requested {@link IndexOrder} of result. Must be among the capabilities of
+     * {@link IndexReference referenced index}, or {@link IndexOrder#NONE}.
+     */
+    void nodeIndexScan( IndexReference index, NodeValueIndexCursor cursor, IndexOrder indexOrder ) throws KernelException;
 
     void nodeLabelScan( int label, NodeLabelIndexCursor cursor );
+
+    /**
+     * Scan for nodes that have a <i>disjunction</i> of the specified labels.
+     * i.e. MATCH (n) WHERE n:Label1 OR n:Label2 OR ...
+     */
+    void nodeLabelUnionScan( NodeLabelIndexCursor cursor, int... labels );
+
+    /**
+     * Scan for nodes that have a <i>conjunction</i> of the specified labels.
+     * i.e. MATCH (n) WHERE n:Label1 AND n:Label2 AND ...
+     */
+    void nodeLabelIntersectionScan( NodeLabelIndexCursor cursor, int... labels );
 
     Scan<NodeLabelIndexCursor> nodeLabelScan( int label );
 
@@ -52,6 +72,13 @@ public interface Read
      * @param cursor the cursor to use for consuming the results.
      */
     void singleNode( long reference, NodeCursor cursor );
+
+    /**
+     * Checks if a node exists in the database
+     * @param id The id of the node to check
+     * @return <tt>true</tt> if the node exists, otherwise <tt>false</tt>
+     */
+    boolean nodeExists( long id );
 
     /**
      * @param reference
@@ -92,20 +119,26 @@ public interface Read
     void relationships( long nodeReference, long reference, RelationshipTraversalCursor cursor );
 
     /**
+     * @param nodeReference
+     *         the owner of the properties.
      * @param reference
      *         a reference from {@link NodeCursor#propertiesReference()}.
      * @param cursor
      *         the cursor to use for consuming the results.
      */
-    void nodeProperties( long reference, PropertyCursor cursor );
+    void nodeProperties( long nodeReference, long reference, PropertyCursor cursor );
 
     /**
+     * @param relationshipReference
+     *         the owner of the properties.
      * @param reference
      *         a reference from {@link RelationshipDataAccessor#propertiesReference()}.
      * @param cursor
      *         the cursor to use for consuming the results.
      */
-    void relationshipProperties( long reference, PropertyCursor cursor );
+    void relationshipProperties( long relationshipReference, long reference, PropertyCursor cursor );
+
+    void graphProperties( PropertyCursor cursor );
 
     // hints to the page cache about data we will be accessing in the future:
 

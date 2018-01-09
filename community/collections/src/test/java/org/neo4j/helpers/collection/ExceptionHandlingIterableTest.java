@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -39,6 +39,7 @@ public class ExceptionHandlingIterableTest
             throw new RuntimeException( "exception on iterator" );
         } )
         {
+            @Override
             protected Iterator exceptionOnIterator( Throwable t )
             {
                 rethrow( new IllegalStateException() );
@@ -52,16 +53,19 @@ public class ExceptionHandlingIterableTest
     {
         Iterables.count( new ExceptionHandlingIterable( () -> new Iterator()
         {
+            @Override
             public boolean hasNext()
             {
                 return true;
             }
 
+            @Override
             public Object next()
             {
                 throw new RuntimeException( "exception on next" );
             }
 
+            @Override
             public void remove()
             {
             }
@@ -81,16 +85,19 @@ public class ExceptionHandlingIterableTest
     {
         Iterables.count( new ExceptionHandlingIterable( () -> new Iterator()
         {
+            @Override
             public boolean hasNext()
             {
                 throw new RuntimeException( "exception on next" );
             }
 
+            @Override
             public Object next()
             {
                 return null;
             }
 
+            @Override
             public void remove()
             {
             }

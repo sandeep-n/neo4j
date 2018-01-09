@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,8 +19,6 @@
  */
 package org.neo4j.kernel.impl.query;
 
-import java.util.function.Supplier;
-
 import org.neo4j.graphdb.Lock;
 import org.neo4j.graphdb.PropertyContainer;
 import org.neo4j.graphdb.TransactionTerminatedException;
@@ -32,7 +30,7 @@ import org.neo4j.kernel.api.ReadOperations;
 import org.neo4j.kernel.api.Statement;
 import org.neo4j.kernel.api.dbms.DbmsOperations;
 import org.neo4j.kernel.api.query.ExecutingQuery;
-import org.neo4j.kernel.api.security.SecurityContext;
+import org.neo4j.internal.kernel.api.security.SecurityContext;
 import org.neo4j.kernel.api.txstate.TxStateHolder;
 import org.neo4j.kernel.guard.Guard;
 import org.neo4j.kernel.impl.api.KernelStatement;
@@ -40,6 +38,8 @@ import org.neo4j.kernel.impl.core.ThreadToStatementContextBridge;
 import org.neo4j.kernel.impl.coreapi.InternalTransaction;
 import org.neo4j.kernel.impl.coreapi.PropertyContainerLocker;
 import org.neo4j.kernel.impl.query.statistic.StatisticProvider;
+
+import java.util.function.Supplier;
 
 public class Neo4jTransactionalContext implements TransactionalContext
 {
@@ -49,8 +49,8 @@ public class Neo4jTransactionalContext implements TransactionalContext
     private final ThreadToStatementContextBridge txBridge;
     private final PropertyContainerLocker locker;
 
-    private final KernelTransaction.Type transactionType;
-    private final SecurityContext securityContext;
+    public final KernelTransaction.Type transactionType;
+    public final SecurityContext securityContext;
     private final ExecutingQuery executingQuery;
 
     /**
@@ -104,6 +104,12 @@ public class Neo4jTransactionalContext implements TransactionalContext
     public DbmsOperations dbmsOperations()
     {
         return graph.getDbmsOperations();
+    }
+
+    @Override
+    public KernelTransaction kernelTransaction()
+    {
+        return txBridge.getKernelTransactionBoundToThisThread( true );
     }
 
     @Override
@@ -232,6 +238,13 @@ public class Neo4jTransactionalContext implements TransactionalContext
             isOpen = true;
         }
         return this;
+    }
+
+    public TransactionalContext beginInNewThread()
+    {
+        InternalTransaction newTx = graph.beginTransaction( transactionType, securityContext );
+        return new Neo4jTransactionalContext( graph, statementSupplier, guard, txBridge, locker, newTx,
+                statementSupplier.get(), executingQuery );
     }
 
     private void checkNotTerminated()

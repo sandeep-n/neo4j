@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,7 +23,6 @@ import org.junit.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
-import java.io.StringReader;
 import org.neo4j.csv.reader.CharReadable;
 import org.neo4j.unsafe.impl.batchimport.InputIterator;
 import org.neo4j.unsafe.impl.batchimport.input.Collector;
@@ -132,7 +131,7 @@ public class ExternalPropertiesDecoratorIT
                 printer.println( id( i ) + "," + id( i ) + "-decorated" );
             }
         }
-        return wrap( new StringReader( out.toString() ) );
+        return wrap( out.toString() );
     }
 
     private CharReadable mainData( int count )
@@ -146,6 +145,6 @@ public class ExternalPropertiesDecoratorIT
                 printer.println( id( i ) );
             }
         }
-        return wrap( new StringReader( out.toString() ) );
+        return wrap( out.toString() );
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -63,7 +63,7 @@ public class TransactionPositionLocatorTest
         when( logEntryReader.readLogEntry( channel ) ).thenReturn( start, command, commit, null );
 
         // when
-        final boolean result = locator.visit( startPosition, channel );
+        final boolean result = locator.visit( channel );
         final LogPosition position = locator.getAndCacheFoundLogPosition( metadataCache );
 
         // then
@@ -89,7 +89,7 @@ public class TransactionPositionLocatorTest
         when( logEntryReader.readLogEntry( channel ) ).thenReturn( start, command, null );
 
         // when
-        final boolean result = locator.visit( startPosition, channel );
+        final boolean result = locator.visit( channel );
 
         // then
         assertTrue( result );

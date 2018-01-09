@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,12 +21,12 @@ package org.neo4j.cypher.internal.runtime.interpreted.pipes
 
 import org.neo4j.cypher.internal.runtime.interpreted.ExecutionContext
 import org.neo4j.cypher.internal.util.v3_4.NameId
-import org.neo4j.cypher.internal.v3_4.logical.plans.LogicalPlanId
+import org.neo4j.cypher.internal.util.v3_4.attribution.Id
 import org.neo4j.values.storable.Values
 
 case class RelationshipCountFromCountStorePipe(ident: String, startLabel: Option[LazyLabel],
                                                typeNames: LazyTypes, endLabel: Option[LazyLabel])
-                                              (val id: LogicalPlanId = LogicalPlanId.DEFAULT) extends Pipe {
+                                              (val id: Id = Id.INVALID_ID) extends Pipe {
 
   protected def internalCreateResults(state: QueryState): Iterator[ExecutionContext] = {
     val maybeStartLabelId = getLabelId(startLabel, state)
@@ -41,8 +41,8 @@ case class RelationshipCountFromCountStorePipe(ident: String, startLabel: Option
         0
     }
 
-    val baseContext = state.createOrGetInitialContext()
-    Seq(baseContext.newWith1(ident, Values.longValue(count))).iterator
+    val baseContext = state.createOrGetInitialContext(executionContextFactory)
+    Seq(baseContext.set(ident, Values.longValue(count))).iterator
   }
 
   private def getLabelId(lazyLabel: Option[LazyLabel], state: QueryState): Option[Int] = lazyLabel match {

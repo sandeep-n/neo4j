@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -79,6 +79,16 @@ public class Neo4jWithSocket extends ExternalResource
         this.graphDatabaseFactory = graphDatabaseFactory;
         this.fileSystemProvider = fileSystemProvider;
         this.configure = configure;
+    }
+
+    public FileSystemAbstraction getFileSystem()
+    {
+        return this.graphDatabaseFactory.getFileSystem();
+    }
+
+    public File getWorkingDirectory()
+    {
+        return workingDirectory;
     }
 
     @Override

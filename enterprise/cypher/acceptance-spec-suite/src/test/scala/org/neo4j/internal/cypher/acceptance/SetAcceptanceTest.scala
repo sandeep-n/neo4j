@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,9 +24,9 @@ import org.neo4j.internal.cypher.acceptance.CypherComparisonSupport._
 
 class SetAcceptanceTest extends ExecutionEngineFunSuite with QueryStatisticsTestSupport with CypherComparisonSupport {
 
-  val expectedToSucceed = Configs.CommunityInterpreted - Configs.Cost2_3
-  val expectedToFail = Configs.CommunityInterpreted - Configs.Cost2_3 + TestConfiguration(Versions.Default, Planners.Default, Runtimes(Runtimes.ProcedureOrSchema))
-  val expectedToFail2 = Configs.CommunityInterpreted - Configs.Version2_3 + TestConfiguration(Versions.Default, Planners.Default, Runtimes(Runtimes.ProcedureOrSchema))
+  val expectedToSucceed = Configs.Interpreted - Configs.Cost2_3
+  val expectedToFail = Configs.Interpreted - Configs.Cost2_3 + TestConfiguration(Versions.Default, Planners.Default, Runtimes(Runtimes.ProcedureOrSchema))
+  val expectedToFail2 = Configs.Interpreted - Configs.Version2_3 + TestConfiguration(Versions.Default, Planners.Default, Runtimes(Runtimes.ProcedureOrSchema))
 
   test("optional match and set") {
     val n1 = createLabeledNode("L1")

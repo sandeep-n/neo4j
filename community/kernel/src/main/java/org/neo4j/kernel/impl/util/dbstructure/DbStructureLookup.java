@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -36,6 +36,7 @@ public interface DbStructureLookup
     Iterator<Pair<String, String[]>> knownRelationshipPropertyExistenceConstraints();
     Iterator<Pair<String, String[]>> knownNodeKeyConstraints();
 
+    long nodesAllCardinality();
     long nodesWithLabelCardinality( int labelId );
     long cardinalityByLabelsAndRelationshipType( int fromLabelId, int relTypeId, int toLabelId );
     double indexSelectivity( int labelId, int... propertyKeyIds );

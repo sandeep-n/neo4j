@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,6 +24,7 @@ import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.RuleChain;
 
 import java.io.File;
 
@@ -32,16 +33,19 @@ import org.neo4j.causalclustering.discovery.Cluster;
 import org.neo4j.causalclustering.discovery.CoreClusterMember;
 import org.neo4j.causalclustering.discovery.IpFamily;
 import org.neo4j.causalclustering.discovery.SharedDiscoveryService;
+import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.enterprise.configuration.OnlineBackupSettings;
 import org.neo4j.kernel.impl.store.format.standard.Standard;
+import org.neo4j.kernel.monitoring.Monitors;
+import org.neo4j.restore.RestoreDatabaseCommand;
 import org.neo4j.test.DbRepresentation;
+import org.neo4j.test.rule.SuppressOutput;
 import org.neo4j.test.rule.TestDirectory;
 import org.neo4j.test.rule.fs.DefaultFileSystemRule;
 
 import static java.util.Collections.emptyMap;
-import static java.util.Collections.singletonMap;
 import static org.junit.Assert.assertEquals;
 import static org.neo4j.causalclustering.BackupCoreIT.backupAddress;
 import static org.neo4j.causalclustering.discovery.Cluster.dataMatchesEventually;
@@ -54,22 +58,25 @@ public class ClusterSeedingIT
     private Cluster cluster;
     private FileSystemAbstraction fsa;
 
-    @Rule
     public TestDirectory testDir = TestDirectory.testDirectory();
-    @Rule
     public DefaultFileSystemRule fileSystemRule = new DefaultFileSystemRule();
+    public SuppressOutput suppressOutput = SuppressOutput.suppressAll();
+    @Rule
+    public RuleChain rules = RuleChain.outerRule( fileSystemRule ).around( testDir ).around( suppressOutput );
+
     private File baseBackupDir;
 
     @Before
     public void setup() throws Exception
     {
         fsa = fileSystemRule.get();
-
         backupCluster = new Cluster( testDir.directory( "cluster-for-backup" ), 3, 0,
-                new SharedDiscoveryService(), emptyMap(), emptyMap(), emptyMap(), emptyMap(), Standard.LATEST_NAME, IpFamily.IPV4, false );
+                new SharedDiscoveryService(), emptyMap(), emptyMap(), emptyMap(), emptyMap(), Standard
+                .LATEST_NAME, IpFamily.IPV4, false );
 
         cluster = new Cluster( testDir.directory( "cluster-b" ), 3, 0,
-                new SharedDiscoveryService(), emptyMap(), emptyMap(), emptyMap(), emptyMap(), Standard.LATEST_NAME, IpFamily.IPV4, false );
+                new SharedDiscoveryService(), emptyMap(), emptyMap(), emptyMap(), emptyMap(), Standard.LATEST_NAME,
+                IpFamily.IPV4, false );
 
         baseBackupDir = testDir.directory( "backups" );
     }
@@ -114,9 +121,13 @@ public class ClusterSeedingIT
         DbRepresentation before = DbRepresentation.of( backupDir, config );
 
         // when
-        fsa.copyRecursively( backupDir, cluster.getCoreMemberById( 0 ).storeDir() );
-        fsa.copyRecursively( backupDir, cluster.getCoreMemberById( 1 ).storeDir() );
-        fsa.copyRecursively( backupDir, cluster.getCoreMemberById( 2 ).storeDir() );
+        for ( CoreClusterMember coreClusterMember : cluster.coreMembers() )
+        {
+            String databaseName = coreClusterMember
+                    .getMemberConfig().get( GraphDatabaseSettings.active_database );
+            new RestoreDatabaseCommand( fsa, backupDir, coreClusterMember.getMemberConfig(), databaseName, true )
+                    .execute();
+        }
         cluster.start();
 
         // then
@@ -127,8 +138,10 @@ public class ClusterSeedingIT
     public void shouldSeedNewMemberFromEmptyIdleCluster() throws Throwable
     {
         // given
+        Monitors monitors = new Monitors();
         cluster = new Cluster( testDir.directory( "cluster-b" ), 3, 0,
-                new SharedDiscoveryService(), emptyMap(), emptyMap(), emptyMap(), emptyMap(), Standard.LATEST_NAME, IpFamily.IPV4, false );
+                new SharedDiscoveryService(), emptyMap(), emptyMap(), emptyMap(), emptyMap(), Standard.LATEST_NAME,
+                IpFamily.IPV4, false );
         cluster.start();
 
         // when: creating a backup
@@ -136,7 +149,8 @@ public class ClusterSeedingIT
 
         // and: seeding new member with said backup
         CoreClusterMember newMember = cluster.addCoreMemberWithId( 3 );
-        fsa.copyRecursively( backupDir, newMember.storeDir() );
+        String databaseName = newMember.getMemberConfig().get( GraphDatabaseSettings.active_database );
+        new RestoreDatabaseCommand( fsa, backupDir, newMember.getMemberConfig(), databaseName, true ).execute();
         newMember.start();
 
         // then
@@ -147,8 +161,10 @@ public class ClusterSeedingIT
     public void shouldSeedNewMemberFromNonEmptyIdleCluster() throws Throwable
     {
         // given
+        Monitors monitors = new Monitors();
         cluster = new Cluster( testDir.directory( "cluster-b" ), 3, 0,
-                new SharedDiscoveryService(), emptyMap(), emptyMap(), emptyMap(), emptyMap(), Standard.LATEST_NAME, IpFamily.IPV4, false );
+                new SharedDiscoveryService(), emptyMap(), emptyMap(), emptyMap(), emptyMap(), Standard.LATEST_NAME,
+                IpFamily.IPV4, false );
 
         cluster.start();
         createEmptyNodes( cluster, 100 );
@@ -158,7 +174,8 @@ public class ClusterSeedingIT
 
         // and: seeding new member with said backup
         CoreClusterMember newMember = cluster.addCoreMemberWithId( 3 );
-        fsa.copyRecursively( backupDir, newMember.storeDir() );
+        String databaseName = newMember.getMemberConfig().get( GraphDatabaseSettings.active_database );
+        new RestoreDatabaseCommand( fsa, backupDir, newMember.getMemberConfig(), databaseName, true ).execute();
         newMember.start();
 
         // then

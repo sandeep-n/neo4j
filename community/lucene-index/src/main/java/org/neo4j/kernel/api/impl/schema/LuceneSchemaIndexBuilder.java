@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -44,12 +44,14 @@ import org.neo4j.kernel.impl.api.index.sampling.IndexSamplingConfig;
 public class LuceneSchemaIndexBuilder extends AbstractLuceneIndexBuilder<LuceneSchemaIndexBuilder>
 {
     private final IndexDescriptor descriptor;
-    private IndexSamplingConfig samplingConfig = new IndexSamplingConfig( Config.defaults() );
+    private IndexSamplingConfig samplingConfig;
     private Factory<IndexWriterConfig> writerConfigFactory = IndexWriterConfigs::standard;
 
-    private LuceneSchemaIndexBuilder( IndexDescriptor descriptor )
+    private LuceneSchemaIndexBuilder( IndexDescriptor descriptor, Config config )
     {
+        super( config );
         this.descriptor = descriptor;
+        this.samplingConfig = new IndexSamplingConfig( config );
     }
 
     /**
@@ -58,9 +60,9 @@ public class LuceneSchemaIndexBuilder extends AbstractLuceneIndexBuilder<LuceneS
      * @return new LuceneSchemaIndexBuilder
      * @param descriptor The descriptor for this index
      */
-    public static LuceneSchemaIndexBuilder create( IndexDescriptor descriptor )
+    public static LuceneSchemaIndexBuilder create( IndexDescriptor descriptor, Config config )
     {
-        return new LuceneSchemaIndexBuilder( descriptor );
+        return new LuceneSchemaIndexBuilder( descriptor, config );
     }
 
     /**

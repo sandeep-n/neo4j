@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -40,6 +40,7 @@ import org.neo4j.logging.Log;
 class RunnableBoltWorker implements Runnable, BoltWorker
 {
     private static final int workQueueSize = Integer.getInteger( "org.neo4j.bolt.workQueueSize", 100 );
+    static final int workQueuePollDuration =  Integer.getInteger( "org.neo4j.bolt.workQueuePollDuration", 10 );
 
     private final BlockingQueue<Job> jobQueue = new ArrayBlockingQueue<>( workQueueSize );
     private final BoltStateMachine machine;
@@ -85,7 +86,7 @@ class RunnableBoltWorker implements Runnable, BoltWorker
         {
             while ( keepRunning )
             {
-                Job job = jobQueue.poll( 10, TimeUnit.SECONDS );
+                Job job = jobQueue.poll( workQueuePollDuration, TimeUnit.SECONDS );
                 if ( job != null )
                 {
                     execute( job );
@@ -95,6 +96,10 @@ class RunnableBoltWorker implements Runnable, BoltWorker
                     {
                         executeBatch( batch );
                     }
+                }
+                else
+                {
+                    machine.validateTransaction();
                 }
             }
         }

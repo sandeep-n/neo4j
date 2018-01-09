@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -643,6 +643,23 @@ public class AssertableLogProvider extends AbstractLogProvider<Log> implements T
                     "Expected no log statement containing '%s', but at least one found. Actual log calls were:\n%s",
                     partOfMessage, serialize( logCalls.iterator() ) ) );
         }
+    }
+
+    public void assertLogStringContains( String partOfMessage )
+    {
+        synchronized ( logCalls )
+        {
+            for ( LogCall logCall : logCalls )
+            {
+                if ( logCall.toLogLikeString().contains( partOfMessage ) )
+                {
+                    return;
+                }
+            }
+        }
+        fail( format(
+                "Expected at least one log strings containing '%s', but none found. Actual log calls were:\n%s",
+                partOfMessage, serialize( logCalls.iterator() ) ) );
     }
 
     public void assertContainsLogCallContaining( String partOfMessage )

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -42,6 +42,8 @@ import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.helpers.collection.Iterators;
 import org.neo4j.helpers.collection.Visitor;
+import org.neo4j.internal.kernel.api.InternalIndexState;
+import org.neo4j.internal.kernel.api.schema.LabelSchemaDescriptor;
 import org.neo4j.kernel.api.ReadOperations;
 import org.neo4j.kernel.api.Statement;
 import org.neo4j.kernel.api.StatementTokenNameLookup;
@@ -52,11 +54,9 @@ import org.neo4j.kernel.api.exceptions.index.IndexPopulationFailedKernelExceptio
 import org.neo4j.kernel.api.impl.schema.LuceneSchemaIndexProviderFactory;
 import org.neo4j.kernel.api.impl.schema.NativeLuceneFusionSchemaIndexProviderFactory;
 import org.neo4j.kernel.api.index.IndexEntryUpdate;
-import org.neo4j.kernel.api.index.InternalIndexState;
 import org.neo4j.kernel.api.index.SchemaIndexProvider;
 import org.neo4j.kernel.api.labelscan.LabelScanStore;
 import org.neo4j.kernel.api.labelscan.NodeLabelUpdate;
-import org.neo4j.kernel.api.schema.LabelSchemaDescriptor;
 import org.neo4j.kernel.api.schema.SchemaDescriptorFactory;
 import org.neo4j.kernel.api.schema.index.IndexDescriptorFactory;
 import org.neo4j.kernel.configuration.Config;
@@ -87,9 +87,9 @@ import org.neo4j.storageengine.api.schema.IndexReader;
 import org.neo4j.test.rule.EmbeddedDatabaseRule;
 import org.neo4j.values.storable.Values;
 
-import static org.junit.Assert.assertEquals;
-
+import static java.lang.String.format;
 import static java.util.Arrays.asList;
+import static org.junit.Assert.assertEquals;
 
 //[NodePropertyUpdate[0, prop:0 add:Sweden, labelsBefore:[], labelsAfter:[0]]]
 //[NodePropertyUpdate[1, prop:0 add:USA, labelsBefore:[], labelsAfter:[0]]]
@@ -110,12 +110,11 @@ public class MultiIndexPopulationConcurrentUpdatesIT
     public EmbeddedDatabaseRule embeddedDatabase = new EmbeddedDatabaseRule();
 
     @Parameterized.Parameters( name = "{0}" )
-    public static Collection<Object[]> parameters()
+    public static Collection<SchemaIndexProvider.Descriptor> parameters()
     {
-        return asList(
-                new Object[]{LuceneSchemaIndexProviderFactory.PROVIDER_DESCRIPTOR},
-                new Object[]{NativeLuceneFusionSchemaIndexProviderFactory.DESCRIPTOR},
-                new Object[]{InMemoryIndexProviderFactory.PROVIDER_DESCRIPTOR} );
+        return asList( LuceneSchemaIndexProviderFactory.PROVIDER_DESCRIPTOR,
+                NativeLuceneFusionSchemaIndexProviderFactory.DESCRIPTOR,
+                InMemoryIndexProviderFactory.PROVIDER_DESCRIPTOR );
     }
 
     @Parameterized.Parameter( 0 )
@@ -232,7 +231,7 @@ public class MultiIndexPopulationConcurrentUpdatesIT
             Integer carLabelId = labelsNameIdMap.get( CAR_LABEL );
             try ( IndexReader indexReader = getIndexReader( propertyId, colorLabelId ) )
             {
-                assertEquals("Should be deleted by concurrent change.", 0,
+                assertEquals( format( "Should be deleted by concurrent change. Reader is: %s, ", indexReader ), 0,
                         indexReader.countIndexedNodes( color2.getId(), Values.of( "green" ) ) );
             }
             try ( IndexReader indexReader = getIndexReader( propertyId, colorLabelId ) )
@@ -494,8 +493,7 @@ public class MultiIndexPopulationConcurrentUpdatesIT
         public PrimitiveLongResourceIterator getNodeIdIterator()
         {
             PrimitiveLongResourceIterator originalIterator = delegate.getNodeIdIterator();
-            return new DelegatingPrimitiveLongResourceIterator( originalIterator,
-                    updates );
+            return new DelegatingPrimitiveLongResourceIterator( originalIterator, updates );
         }
     }
 

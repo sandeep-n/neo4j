@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,6 +21,8 @@ package org.neo4j.kernel.api.query;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLongFieldUpdater;
 import java.util.function.LongSupplier;
@@ -61,6 +63,7 @@ public class ExecutingQuery
     @SuppressWarnings( {"unused", "FieldCanBeLocal"} )
     private final String threadExecutingTheQueryName;
     private final LongSupplier activeLockCount;
+    private final long initialActiveLocks;
     private final SystemNanoClock clock;
     private final CpuClock cpuClock;
     private final HeapAllocation heapAllocation;
@@ -102,6 +105,7 @@ public class ExecutingQuery
         this.queryParameters = queryParameters;
         this.transactionAnnotationData = transactionAnnotationData;
         this.activeLockCount = activeLockCount;
+        this.initialActiveLocks = activeLockCount.getAsLong();
         this.threadExecutingTheQueryId = threadExecutingTheQueryId;
         this.threadExecutingTheQueryName = threadExecutingTheQueryName;
         this.cpuClock = cpuClock;
@@ -158,8 +162,10 @@ public class ExecutingQuery
         long planningDoneNanos = this.planningDoneNanos;
         // guarded by barrier - like planningDoneNanos
         PlannerInfo planner = status.isPlanning() ? null : this.plannerInfo;
+        List<ActiveLock> waitingOnLocks = status.isWaitingOnLocks() ? status.waitingOnLocks() : Collections.emptyList();
+        // activeLockCount is not atomic to capture, so we capture it after the most sensitive part.
+        long totalActiveLocks = this.activeLockCount.getAsLong();
         // just needs to be captured at some point...
-        long activeLockCount = this.activeLockCount.getAsLong();
         long heapAllocatedBytes = heapAllocation.allocatedBytes( threadExecutingTheQueryId );
         PageCounterValues pageCounters = new PageCounterValues( pageCursorCounters );
 
@@ -184,7 +190,8 @@ public class ExecutingQuery
                 NANOSECONDS.toMillis( waitTimeNanos ),
                 status.name(),
                 status.toMap( currentTimeNanos ),
-                activeLockCount,
+                waitingOnLocks,
+                totalActiveLocks - initialActiveLocks,
                 heapAllocatedBytes
         );
     }
@@ -247,9 +254,24 @@ public class ExecutingQuery
         return startTimestampMillis;
     }
 
+    public long elapsedNanos()
+    {
+        return clock.nanos() - startTimeNanos;
+    }
+
     public Map<String,Object> transactionAnnotationData()
     {
         return transactionAnnotationData;
+    }
+
+    public long reportedWaitingTimeNanos()
+    {
+        return waitTimeNanos;
+    }
+
+    public long totalWaitingTimeNanos( long currentTimeNanos )
+    {
+        return waitTimeNanos + status.waitTimeNanos( currentTimeNanos );
     }
 
     ClientConnectionInfo clientConnection()

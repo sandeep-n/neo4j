@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -900,7 +901,7 @@ public final class Iterables
     public static <T, S extends Comparable> Iterable<T> sort( Iterable<T> iterable, final Function<T, S> compareFunction )
     {
         List<T> list = asList( iterable );
-        Collections.sort( list, ( o1, o2 ) -> compareFunction.apply( o1 ).compareTo( compareFunction.apply( o2 ) ) );
+        Collections.sort( list, Comparator.comparing( compareFunction::apply ) );
         return list;
     }
 

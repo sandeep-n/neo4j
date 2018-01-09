@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -26,7 +26,7 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Supplier;
+import java.util.function.LongSupplier;
 
 import org.neo4j.collection.primitive.PrimitiveLongCollections;
 import org.neo4j.kernel.impl.store.id.IdGenerator;
@@ -48,13 +48,13 @@ public class EphemeralIdGenerator implements IdGenerator
                 idTypeConfigurationProvider = new CommunityIdTypeConfigurationProvider();
 
         @Override
-        public IdGenerator open( File filename, IdType idType, Supplier<Long> highId, long maxId )
+        public IdGenerator open( File filename, IdType idType, LongSupplier highId, long maxId )
         {
             return open( filename, 0, idType, highId, maxId );
         }
 
         @Override
-        public IdGenerator open( File fileName, int grabSize, IdType idType, Supplier<Long> highId, long maxId )
+        public IdGenerator open( File fileName, int grabSize, IdType idType, LongSupplier highId, long maxId )
         {
             IdGenerator generator = generators.get( idType );
             if ( generator == null )

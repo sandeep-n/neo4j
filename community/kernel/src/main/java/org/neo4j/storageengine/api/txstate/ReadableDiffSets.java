@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,12 +25,15 @@ import java.util.Set;
 import java.util.function.Predicate;
 
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
+import org.neo4j.collection.primitive.PrimitiveLongCollections;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
+import org.neo4j.collection.primitive.PrimitiveLongResourceCollections;
+import org.neo4j.collection.primitive.PrimitiveLongResourceIterator;
 
 /**
  * {@link SuperReadableDiffSets} with added method for filtering added items.
  */
-public interface ReadableDiffSets<T> extends SuperReadableDiffSets<T,PrimitiveLongIterator>
+public interface ReadableDiffSets<T> extends SuperReadableDiffSets<T,PrimitiveLongResourceIterator, PrimitiveLongIterator>
 {
     @Override
     ReadableDiffSets<T> filterAdded( Predicate<T> addedFilter );
@@ -74,6 +77,12 @@ public interface ReadableDiffSets<T> extends SuperReadableDiffSets<T,PrimitiveLo
         }
 
         @Override
+        public Set<T> getAddedSnapshot()
+        {
+            return Collections.emptySet();
+        }
+
+        @Override
         public Set<T> getRemoved()
         {
             return Collections.emptySet();
@@ -98,9 +107,9 @@ public interface ReadableDiffSets<T> extends SuperReadableDiffSets<T,PrimitiveLo
         }
 
         @Override
-        public PrimitiveLongIterator augment( PrimitiveLongIterator source )
+        public PrimitiveLongResourceIterator augment( PrimitiveLongIterator source )
         {
-            return source;
+            return primitiveLongResourceIterator( source );
         }
 
         @Override
@@ -110,9 +119,9 @@ public interface ReadableDiffSets<T> extends SuperReadableDiffSets<T,PrimitiveLo
         }
 
         @Override
-        public PrimitiveLongIterator augmentWithRemovals( PrimitiveLongIterator source )
+        public PrimitiveLongResourceIterator augmentWithRemovals( PrimitiveLongIterator source )
         {
-            return source;
+            return primitiveLongResourceIterator( source );
         }
 
         @Override
@@ -124,6 +133,18 @@ public interface ReadableDiffSets<T> extends SuperReadableDiffSets<T,PrimitiveLo
         @Override
         public void accept( DiffSetsVisitor<T> visitor )
         {
+        }
+
+        private PrimitiveLongResourceIterator primitiveLongResourceIterator( PrimitiveLongIterator source )
+        {
+            if ( source instanceof PrimitiveLongResourceIterator )
+            {
+                return (PrimitiveLongResourceIterator) source;
+            }
+            else
+            {
+                return PrimitiveLongCollections.resourceIterator( source, null );
+            }
         }
     }
 }

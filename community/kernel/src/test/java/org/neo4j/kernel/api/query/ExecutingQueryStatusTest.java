@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -100,7 +100,7 @@ public class ExecutingQueryStatusTest
                                 null,
                                 null,
                                 null,
-                                null,
+                                ( /*activeLockCount:*/ ) -> 0,
                                 PageCursorTracer.NULL,
                                 Thread.currentThread().getId(),
                                 Thread.currentThread().getName(),

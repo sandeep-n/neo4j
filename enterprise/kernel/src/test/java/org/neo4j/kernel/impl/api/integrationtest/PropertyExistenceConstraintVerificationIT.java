@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -37,6 +37,7 @@ import org.neo4j.graphdb.Transaction;
 import org.neo4j.kernel.api.exceptions.ConstraintViolationTransactionFailureException;
 import org.neo4j.kernel.api.exceptions.schema.CreateConstraintFailureException;
 import org.neo4j.kernel.impl.api.OperationsFacade;
+import org.neo4j.kernel.impl.newapi.Operations;
 import org.neo4j.test.rule.DatabaseRule;
 import org.neo4j.test.rule.EnterpriseDatabaseRule;
 import org.neo4j.test.rule.concurrent.ThreadingRule;
@@ -91,6 +92,12 @@ public class PropertyExistenceConstraintVerificationIT
             return "nodeAddLabel"; // takes schema read lock to enforce constraints
         }
 
+        @Override
+        Class<?> getOwner()
+        {
+            return Operations.class;
+        }
+
     }
 
     public static class RelationshipPropertyExistenceExistenceConstrainVerificationIT
@@ -123,6 +130,12 @@ public class PropertyExistenceConstraintVerificationIT
             return "relationshipCreate"; // takes schema read lock to enforce constraints
         }
 
+        @Override
+        Class<?> getOwner()
+        {
+            return OperationsFacade.class;
+        }
+
     }
 
     public abstract static class AbstractPropertyExistenceConstraintVerificationIT
@@ -142,6 +155,7 @@ public class PropertyExistenceConstraintVerificationIT
         abstract long createOffender( DatabaseRule db, String key );
 
         abstract String offenderCreationMethodName();
+        abstract Class<?> getOwner();
 
         @Test
         public void shouldFailToCreateConstraintIfSomeNodeLacksTheMandatoryProperty() throws Exception
@@ -182,7 +196,7 @@ public class PropertyExistenceConstraintVerificationIT
                     createConstraint( db, KEY, PROPERTY );
 
                     nodeCreation = thread.executeAndAwait( createOffender(), null,
-                            waitingWhileIn( OperationsFacade.class, offenderCreationMethodName() ),
+                            waitingWhileIn( getOwner(), offenderCreationMethodName() ),
                             WAIT_TIMEOUT_SECONDS, SECONDS );
 
                     tx.success();

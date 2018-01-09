@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,9 +19,9 @@
  */
 package org.neo4j.values.storable;
 
-abstract class FloatingPointArray extends NumberArray
+public abstract class FloatingPointArray extends NumberArray
 {
-    abstract double doubleValue( int offset );
+    public abstract double doubleValue( int offset );
 
     @Override
     public int compareTo( IntegralArray other )

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -28,26 +28,34 @@ import org.neo4j.collection.primitive.PrimitiveIntCollection;
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.collection.primitive.PrimitiveIntSet;
 import org.neo4j.collection.primitive.PrimitiveIntStack;
+import org.neo4j.collection.primitive.PrimitiveLongCollections;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
 import org.neo4j.collection.primitive.PrimitiveLongResourceIterator;
 import org.neo4j.cursor.Cursor;
 import org.neo4j.graphdb.NotFoundException;
+import org.neo4j.internal.kernel.api.IndexQuery;
+import org.neo4j.internal.kernel.api.InternalIndexState;
+import org.neo4j.internal.kernel.api.exceptions.InvalidTransactionTypeKernelException;
+import org.neo4j.internal.kernel.api.exceptions.LabelNotFoundKernelException;
+import org.neo4j.internal.kernel.api.exceptions.PropertyKeyIdNotFoundKernelException;
+import org.neo4j.internal.kernel.api.exceptions.explicitindex.AutoIndexingKernelException;
+import org.neo4j.internal.kernel.api.exceptions.explicitindex.ExplicitIndexNotFoundKernelException;
+import org.neo4j.internal.kernel.api.exceptions.schema.ConstraintValidationException;
+import org.neo4j.internal.kernel.api.schema.LabelSchemaDescriptor;
+import org.neo4j.internal.kernel.api.schema.RelationTypeSchemaDescriptor;
+import org.neo4j.internal.kernel.api.schema.SchemaDescriptor;
+import org.neo4j.internal.kernel.api.schema.SchemaUtil;
+import org.neo4j.internal.kernel.api.schema.constraints.ConstraintDescriptor;
 import org.neo4j.kernel.api.DataWriteOperations;
 import org.neo4j.kernel.api.ExplicitIndex;
 import org.neo4j.kernel.api.ExplicitIndexHits;
 import org.neo4j.kernel.api.Statement;
 import org.neo4j.kernel.api.exceptions.EntityNotFoundException;
-import org.neo4j.kernel.api.exceptions.InvalidTransactionTypeKernelException;
-import org.neo4j.kernel.api.exceptions.LabelNotFoundKernelException;
-import org.neo4j.kernel.api.exceptions.PropertyKeyIdNotFoundKernelException;
 import org.neo4j.kernel.api.exceptions.RelationshipTypeIdNotFoundKernelException;
 import org.neo4j.kernel.api.exceptions.TransactionFailureException;
-import org.neo4j.kernel.api.exceptions.explicitindex.AutoIndexingKernelException;
-import org.neo4j.kernel.api.exceptions.explicitindex.ExplicitIndexNotFoundKernelException;
 import org.neo4j.kernel.api.exceptions.index.IndexNotApplicableKernelException;
 import org.neo4j.kernel.api.exceptions.index.IndexNotFoundKernelException;
 import org.neo4j.kernel.api.exceptions.schema.AlreadyConstrainedException;
-import org.neo4j.kernel.api.exceptions.schema.ConstraintValidationException;
 import org.neo4j.kernel.api.exceptions.schema.CreateConstraintFailureException;
 import org.neo4j.kernel.api.exceptions.schema.DropIndexFailureException;
 import org.neo4j.kernel.api.exceptions.schema.IllegalTokenNameException;
@@ -56,15 +64,8 @@ import org.neo4j.kernel.api.exceptions.schema.SchemaRuleNotFoundException;
 import org.neo4j.kernel.api.exceptions.schema.TooManyLabelsException;
 import org.neo4j.kernel.api.exceptions.schema.UniquePropertyValueValidationException;
 import org.neo4j.kernel.api.explicitindex.AutoIndexing;
-import org.neo4j.kernel.api.index.InternalIndexState;
 import org.neo4j.kernel.api.index.SchemaIndexProvider;
 import org.neo4j.kernel.api.properties.PropertyKeyIdIterator;
-import org.neo4j.kernel.api.schema.IndexQuery;
-import org.neo4j.kernel.api.schema.LabelSchemaDescriptor;
-import org.neo4j.kernel.api.schema.RelationTypeSchemaDescriptor;
-import org.neo4j.kernel.api.schema.SchemaDescriptor;
-import org.neo4j.kernel.api.schema.SchemaUtil;
-import org.neo4j.kernel.api.schema.constaints.ConstraintDescriptor;
 import org.neo4j.kernel.api.schema.constaints.ConstraintDescriptorFactory;
 import org.neo4j.kernel.api.schema.constaints.IndexBackedConstraintDescriptor;
 import org.neo4j.kernel.api.schema.constaints.NodeExistenceConstraintDescriptor;
@@ -534,17 +535,16 @@ public class StateHandlingStatementOperations implements
     }
 
     @Override
-    public PrimitiveLongIterator nodesGetForLabel( KernelStatement state, int labelId )
+    public PrimitiveLongResourceIterator nodesGetForLabel( KernelStatement state, int labelId )
     {
+        PrimitiveLongResourceIterator committed = storeLayer.nodesGetForLabel( state.getStoreStatement(), labelId );
         if ( state.hasTxStateWithChanges() )
         {
-            PrimitiveLongIterator wLabelChanges =
-                    state.txState().nodesWithLabelChanged( labelId ).augment(
-                            storeLayer.nodesGetForLabel( state.getStoreStatement(), labelId ) );
+            PrimitiveLongResourceIterator wLabelChanges = state.txState().nodesWithLabelChanged( labelId ).augment( committed );
             return state.txState().addedAndRemovedNodes().augmentWithRemovals( wLabelChanges );
         }
 
-        return storeLayer.nodesGetForLabel( state.getStoreStatement(), labelId );
+        return committed;
     }
 
     @Override
@@ -581,7 +581,7 @@ public class StateHandlingStatementOperations implements
         state.txState().indexDoDrop( descriptor );
     }
 
-    private IndexBackedConstraintDescriptor indexBackedConstraintCreate( KernelStatement state, IndexBackedConstraintDescriptor constraint )
+    private void indexBackedConstraintCreate( KernelStatement state, IndexBackedConstraintDescriptor constraint )
             throws CreateConstraintFailureException
     {
         LabelSchemaDescriptor descriptor = constraint.schema();
@@ -603,13 +603,21 @@ public class StateHandlingStatementOperations implements
                 {
                     if ( it.next().equals( constraint ) )
                     {
-                        return constraint;
+                        return;
                     }
                 }
                 long indexId = constraintIndexCreator.createUniquenessConstraintIndex( state, this, descriptor );
-                state.txState().constraintDoAdd( constraint, indexId );
+                if ( !constraintExists( state, constraint ) )
+                {
+                    // This looks weird, but since we release the label lock while awaiting population of the index
+                    // backing this constraint there can be someone else getting ahead of us, creating this exact constraint
+                    // before we do, so now getting out here under the lock we must check again and if it exists
+                    // we must at this point consider this an idempotent operation because we verified earlier
+                    // that it didn't exist and went on to create it.
+                    state.txState().constraintDoAdd( constraint, indexId );
+                }
             }
-            return constraint;
+            return;
         }
         catch ( UniquePropertyValueValidationException |
                 DropIndexFailureException |
@@ -837,7 +845,7 @@ public class StateHandlingStatementOperations implements
          * a fresh reader that isn't associated with the current transaction and hence will not be
          * automatically closed. */
         PrimitiveLongResourceIterator committed = resourceIterator( reader.query( query ), reader );
-        PrimitiveLongIterator exactMatches = reader.hasFullNumberPrecision( query )
+        PrimitiveLongResourceIterator exactMatches = reader.hasFullNumberPrecision( query )
                 ? committed : LookupFilter.exactIndexMatches( this, state, committed, query );
         PrimitiveLongIterator changesFiltered =
                 filterIndexStateChangesForSeek( state, exactMatches, index, IndexQuery.asValueTuple( query ) );
@@ -845,13 +853,13 @@ public class StateHandlingStatementOperations implements
     }
 
     @Override
-    public PrimitiveLongIterator indexQuery( KernelStatement state, IndexDescriptor index, IndexQuery... predicates )
+    public PrimitiveLongResourceIterator indexQuery( KernelStatement state, IndexDescriptor index, IndexQuery... predicates )
             throws IndexNotFoundKernelException, IndexNotApplicableKernelException
     {
         StorageStatement storeStatement = state.getStoreStatement();
         IndexReader reader = storeStatement.getIndexReader( index );
-        PrimitiveLongIterator committed = reader.query( predicates );
-        PrimitiveLongIterator exactMatches = reader.hasFullNumberPrecision( predicates )
+        PrimitiveLongResourceIterator committed = reader.query( predicates );
+        PrimitiveLongResourceIterator exactMatches = reader.hasFullNumberPrecision( predicates )
                 ? committed : LookupFilter.exactIndexMatches( this, state, committed, predicates );
 
         IndexQuery firstPredicate = predicates[0];
@@ -867,12 +875,11 @@ public class StateHandlingStatementOperations implements
             return filterIndexStateChangesForScan( state, exactMatches, index );
 
         case rangeNumeric:
-        {
             assertSinglePredicate( predicates );
             IndexQuery.NumberRangePredicate numPred = (IndexQuery.NumberRangePredicate) firstPredicate;
             return filterIndexStateChangesForRangeSeekByNumber( state, index, numPred.from(),
                     numPred.fromInclusive(), numPred.to(), numPred.toInclusive(), exactMatches );
-        }
+
         case rangeString:
         {
             assertSinglePredicate( predicates );
@@ -892,7 +899,7 @@ public class StateHandlingStatementOperations implements
         }
     }
 
-    private IndexQuery.ExactPredicate[] assertOnlyExactPredicates( IndexQuery[] predicates )
+    public static IndexQuery.ExactPredicate[] assertOnlyExactPredicates( IndexQuery[] predicates )
     {
         IndexQuery.ExactPredicate[] exactPredicates;
         if ( predicates.getClass() == IndexQuery.ExactPredicate[].class )
@@ -935,8 +942,8 @@ public class StateHandlingStatementOperations implements
         return reader.countIndexedNodes( nodeId, value );
     }
 
-    private PrimitiveLongIterator filterIndexStateChangesForScan(
-            KernelStatement state, PrimitiveLongIterator nodeIds, IndexDescriptor index )
+    private PrimitiveLongResourceIterator filterIndexStateChangesForScan(
+            KernelStatement state, PrimitiveLongResourceIterator nodeIds, IndexDescriptor index )
     {
         if ( state.hasTxStateWithChanges() )
         {
@@ -950,8 +957,8 @@ public class StateHandlingStatementOperations implements
         return nodeIds;
     }
 
-    private PrimitiveLongIterator filterIndexStateChangesForSeek(
-            KernelStatement state, PrimitiveLongIterator nodeIds, IndexDescriptor index,
+    private PrimitiveLongResourceIterator filterIndexStateChangesForSeek(
+            KernelStatement state, PrimitiveLongResourceIterator nodeIds, IndexDescriptor index,
             ValueTuple propertyValues )
     {
         if ( state.hasTxStateWithChanges() )
@@ -966,11 +973,11 @@ public class StateHandlingStatementOperations implements
         return nodeIds;
     }
 
-    private PrimitiveLongIterator filterIndexStateChangesForRangeSeekByNumber( KernelStatement state,
+    private PrimitiveLongResourceIterator filterIndexStateChangesForRangeSeekByNumber( KernelStatement state,
             IndexDescriptor index,
             Number lower, boolean includeLower,
             Number upper, boolean includeUpper,
-            PrimitiveLongIterator nodeIds )
+            PrimitiveLongResourceIterator nodeIds )
     {
         if ( state.hasTxStateWithChanges() )
         {
@@ -986,11 +993,11 @@ public class StateHandlingStatementOperations implements
 
     }
 
-    private PrimitiveLongIterator filterIndexStateChangesForRangeSeekByString( KernelStatement state,
+    private PrimitiveLongResourceIterator filterIndexStateChangesForRangeSeekByString( KernelStatement state,
             IndexDescriptor index,
             String lower, boolean includeLower,
             String upper, boolean includeUpper,
-            PrimitiveLongIterator nodeIds )
+            PrimitiveLongResourceIterator nodeIds )
     {
         if ( state.hasTxStateWithChanges() )
         {
@@ -1006,10 +1013,10 @@ public class StateHandlingStatementOperations implements
 
     }
 
-    private PrimitiveLongIterator filterIndexStateChangesForRangeSeekByPrefix( KernelStatement state,
+    private PrimitiveLongResourceIterator filterIndexStateChangesForRangeSeekByPrefix( KernelStatement state,
             IndexDescriptor index,
             String prefix,
-            PrimitiveLongIterator nodeIds )
+            PrimitiveLongResourceIterator nodeIds )
     {
         if ( state.hasTxStateWithChanges() )
         {

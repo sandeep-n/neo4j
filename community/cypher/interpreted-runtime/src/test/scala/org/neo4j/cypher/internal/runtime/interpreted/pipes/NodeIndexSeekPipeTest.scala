@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,7 +20,7 @@
 package org.neo4j.cypher.internal.runtime.interpreted.pipes
 
 import org.mockito.ArgumentMatchers
-import org.mockito.ArgumentMatchers.any
+import org.mockito.ArgumentMatchers.{any, anyInt}
 import org.mockito.Mockito._
 import org.neo4j.cypher.internal.planner.v3_4.spi.IndexDescriptor
 import org.neo4j.cypher.internal.runtime.QueryContext
@@ -30,9 +30,9 @@ import org.neo4j.cypher.internal.util.v3_4.test_helpers.{CypherFunSuite, Windows
 import org.neo4j.cypher.internal.util.v3_4.{CypherTypeException, LabelId, PropertyKeyId}
 import org.neo4j.cypher.internal.v3_4.expressions.{LabelName, LabelToken, PropertyKeyName, PropertyKeyToken}
 import org.neo4j.cypher.internal.v3_4.logical.plans.{CompositeQueryExpression, ManyQueryExpression, SingleQueryExpression}
-import org.neo4j.graphdb.Node
-import org.neo4j.kernel.impl.util.ValueUtils.fromNodeProxy
+import org.neo4j.internal.kernel.api.IndexReference
 import org.neo4j.values.storable.Values.stringValue
+import org.neo4j.values.virtual.NodeValue
 
 class NodeIndexSeekPipeTest extends CypherFunSuite with ImplicitDummyPos {
 
@@ -41,12 +41,12 @@ class NodeIndexSeekPipeTest extends CypherFunSuite with ImplicitDummyPos {
   val label = LabelToken(LabelName("LabelName") _, LabelId(11))
   val propertyKey = Seq(PropertyKeyToken(PropertyKeyName("PropertyName") _, PropertyKeyId(10)))
   val descriptor = IndexDescriptor(label.nameId.id, propertyKey.map(_.nameId.id))
-  val node = nodeProxy(1)
-  val node2 = nodeProxy(2)
+  val node = nodeValue(1)
+  val node2 = nodeValue(2)
 
-  private def nodeProxy(id: Long) = {
-    val node = mock[Node]
-    when(node.getId).thenReturn(id)
+  private def nodeValue(id: Long) = {
+    val node = mock[NodeValue]
+    when(node.id()).thenReturn(id)
     node
   }
 
@@ -61,7 +61,7 @@ class NodeIndexSeekPipeTest extends CypherFunSuite with ImplicitDummyPos {
     val result = pipe.createResults(queryState)
 
     // then
-    result.map(_("n")).toList should equal(List(fromNodeProxy(node)))
+    result.map(_("n")).toList should equal(List(node))
   }
 
   test("should handle index lookups for multiple values") {
@@ -78,7 +78,7 @@ class NodeIndexSeekPipeTest extends CypherFunSuite with ImplicitDummyPos {
     val result = pipe.createResults(queryState)
 
     // then
-    result.map(_("n")).toList should equal(List(fromNodeProxy(node), fromNodeProxy(node2)))
+    result.map(_("n")).toList should equal(List(node, node2))
   }
 
   test("should handle unique index lookups for multiple values") {
@@ -95,7 +95,7 @@ class NodeIndexSeekPipeTest extends CypherFunSuite with ImplicitDummyPos {
     val result = pipe.createResults(queryState)
 
     // then
-    result.map(_("n")).toList should equal(List(fromNodeProxy(node), fromNodeProxy(node2)))
+    result.map(_("n")).toList should equal(List(node, node2))
   }
 
   test("should handle index lookups for multiple values when some are null") {
@@ -114,7 +114,7 @@ class NodeIndexSeekPipeTest extends CypherFunSuite with ImplicitDummyPos {
     val result = pipe.createResults(queryState)
 
     // then
-    result.map(_("n")).toList should equal(List(fromNodeProxy(node)))
+    result.map(_("n")).toList should equal(List(node))
   }
 
   test("should handle unique index lookups for multiple values when some are null") {
@@ -133,7 +133,7 @@ class NodeIndexSeekPipeTest extends CypherFunSuite with ImplicitDummyPos {
     val result = pipe.createResults(queryState)
 
     // then
-    result.map(_("n")).toList should equal(List(fromNodeProxy(node)))
+    result.map(_("n")).toList should equal(List(node))
   }
 
   test("should handle index lookups for IN an empty collection") {
@@ -168,7 +168,7 @@ class NodeIndexSeekPipeTest extends CypherFunSuite with ImplicitDummyPos {
     val result = pipe.createResults(queryState)
 
     // then
-    result.map(_("n")).toList should equal(List(fromNodeProxy(node)))
+    result.map(_("n")).toList should equal(List(node))
   }
 
   test("should handle index lookups for IN a collection that returns the same nodes for multiple values") {
@@ -188,7 +188,7 @@ class NodeIndexSeekPipeTest extends CypherFunSuite with ImplicitDummyPos {
     val result = pipe.createResults(queryState)
 
     // then
-    result.map(_("n")).toList should equal(List(fromNodeProxy(node), fromNodeProxy(node)))
+    result.map(_("n")).toList should equal(List(node, node))
   }
 
   test("should handle index lookups for composite index lookups over multiple values") {
@@ -210,12 +210,14 @@ class NodeIndexSeekPipeTest extends CypherFunSuite with ImplicitDummyPos {
     val result = pipe.createResults(queryState)
 
     // then
-    result.map(_("n")).toList should equal(List(fromNodeProxy(node)))
+    result.map(_("n")).toList should equal(List(node))
   }
 
   test("should give a helpful error message") {
     // given
-    val queryState = QueryStateHelper.empty
+    val queryContext = mock[QueryContext]
+    when(queryContext.indexReference(anyInt(), anyInt())).thenReturn(mock[IndexReference])
+    val queryState = QueryStateHelper.emptyWith(query = queryContext)
 
     // when
     val pipe = NodeIndexSeekPipe("n", label, propertyKey, ManyQueryExpression(Literal("wut?")))()
@@ -233,7 +235,7 @@ class NodeIndexSeekPipeTest extends CypherFunSuite with ImplicitDummyPos {
     val result = pipe.createResults(queryState)
 
     // then
-    result.map(_("n")).toList should equal(List(fromNodeProxy(node)))
+    result.map(_("n")).toList should equal(List(node))
   }
 
   test("should use existing values from arguments when available") {
@@ -248,10 +250,10 @@ class NodeIndexSeekPipeTest extends CypherFunSuite with ImplicitDummyPos {
     val result = pipe.createResults(queryState)
 
     // then
-    result.map(_("n")).toList should equal(List(fromNodeProxy(node)))
+    result.map(_("n")).toList should equal(List(node))
   }
 
-  private def indexFor(values: (Seq[Any], Iterator[Node])*): QueryContext = {
+  private def indexFor(values: (Seq[Any], Iterator[NodeValue])*): QueryContext = {
     val query = mock[QueryContext]
     when(query.indexSeek(any(), any())).thenReturn(Iterator.empty)
 

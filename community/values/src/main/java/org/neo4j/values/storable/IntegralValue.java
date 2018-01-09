@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,6 +21,18 @@ package org.neo4j.values.storable;
 
 public abstract class IntegralValue extends NumberValue
 {
+    @Override
+    public boolean equals( long x )
+    {
+        return longValue() == x;
+    }
+
+    @Override
+    public boolean equals( double x )
+    {
+        return NumberValues.numbersEqual( x, longValue() );
+    }
+
     @Override
     public final int computeHash()
     {

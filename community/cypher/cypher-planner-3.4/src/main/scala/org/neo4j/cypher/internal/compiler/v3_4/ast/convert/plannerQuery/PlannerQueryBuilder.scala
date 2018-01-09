@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -76,8 +76,9 @@ case class PlannerQueryBuilder(private val q: PlannerQuery, semanticTable: Seman
 
     def fixArgumentIdsOnOptionalMatch(plannerQuery: PlannerQuery): PlannerQuery = {
       val optionalMatches = plannerQuery.queryGraph.optionalMatches
-      val (_, newOptionalMatches) = optionalMatches.foldMap(plannerQuery.queryGraph.coveredIds) { case (args, qg) =>
-        (args ++ qg.allCoveredIds, qg.withArgumentIds(args intersect qg.allCoveredIds))
+      val (_, newOptionalMatches) = optionalMatches.foldMap(plannerQuery.queryGraph.idsWithoutOptionalMatchesOrUpdates) {
+        case (args, qg) =>
+          (args ++ qg.allCoveredIds, qg.withArgumentIds(args intersect qg.dependencies))
       }
       plannerQuery
         .amendQueryGraph(_.withOptionalMatches(newOptionalMatches.toIndexedSeq))
@@ -85,13 +86,23 @@ case class PlannerQueryBuilder(private val q: PlannerQuery, semanticTable: Seman
     }
 
     def fixArgumentIdsOnMerge(plannerQuery: PlannerQuery): PlannerQuery = {
-      val mergeMatchGraph = plannerQuery.queryGraph.mergeQueryGraph
-      val newMergeMatchGraph = mergeMatchGraph.map {
+      val newMergeMatchGraph = plannerQuery.queryGraph.mergeQueryGraph.map {
         qg =>
-          val requiredArguments = qg.coveredIdsExceptArguments intersect qg.argumentIds
-          qg.withArgumentIds(requiredArguments)
+          val nodesAndRels = QueryGraph.coveredIdsForPatterns(qg.patternNodes, qg.patternRelationships)
+          val predicateDependencies = qg.withoutArguments().dependencies
+          val requiredArguments = nodesAndRels ++ predicateDependencies
+          val availableArguments = qg.argumentIds
+          qg.withArgumentIds(requiredArguments intersect availableArguments)
       }
-      plannerQuery.amendQueryGraph(qg => newMergeMatchGraph.map(qg.withMergeMatch).getOrElse(qg)).updateTail(fixArgumentIdsOnMerge)
+
+      val updatePQ = newMergeMatchGraph match {
+        case None =>
+          plannerQuery
+        case Some(qg) =>
+          plannerQuery.amendQueryGraph(_.withMergeMatch(qg))
+      }
+
+      updatePQ.updateTail(fixArgumentIdsOnMerge)
     }
 
     def fixQueriesWithOnlyRelationshipIndex(plannerQuery: PlannerQuery): PlannerQuery = {

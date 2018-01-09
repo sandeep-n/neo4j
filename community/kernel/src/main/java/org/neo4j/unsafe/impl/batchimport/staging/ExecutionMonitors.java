@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,8 +19,9 @@
  */
 package org.neo4j.unsafe.impl.batchimport.staging;
 
-import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.neo4j.unsafe.impl.batchimport.staging.SpectrumExecutionMonitor.DEFAULT_WIDTH;
+import java.io.InputStream;
+
+import static org.neo4j.unsafe.impl.batchimport.staging.HumanUnderstandableExecutionMonitor.NO_MONITOR;
 
 /**
  * Common {@link ExecutionMonitor} implementations.
@@ -34,7 +35,15 @@ public class ExecutionMonitors
 
     public static ExecutionMonitor defaultVisible()
     {
-        return new SpectrumExecutionMonitor( 2, SECONDS, System.out, DEFAULT_WIDTH );
+        return defaultVisible( System.in );
+    }
+
+    public static ExecutionMonitor defaultVisible( InputStream in )
+    {
+        ProgressRestoringMonitor monitor = new ProgressRestoringMonitor();
+        return new MultiExecutionMonitor(
+                new HumanUnderstandableExecutionMonitor( System.out, NO_MONITOR, monitor ),
+                new OnDemandDetailsExecutionMonitor( System.out, in, monitor ) );
     }
 
     private static final ExecutionMonitor INVISIBLE = new ExecutionMonitor()

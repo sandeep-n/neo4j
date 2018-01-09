@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,9 +21,12 @@ package org.neo4j.kernel.api;
 
 import java.util.Optional;
 
+import org.neo4j.internal.kernel.api.NodeCursor;
+import org.neo4j.internal.kernel.api.PropertyCursor;
+import org.neo4j.internal.kernel.api.Transaction;
+import org.neo4j.internal.kernel.api.security.SecurityContext;
 import org.neo4j.kernel.api.exceptions.Status;
 import org.neo4j.kernel.api.exceptions.TransactionFailureException;
-import org.neo4j.kernel.api.security.SecurityContext;
 import org.neo4j.kernel.impl.api.Kernel;
 
 /**
@@ -76,14 +79,8 @@ import org.neo4j.kernel.impl.api.Kernel;
  * }
  * </pre>
  */
-public interface KernelTransaction extends AutoCloseable
+public interface KernelTransaction extends Transaction
 {
-    enum Type
-    {
-        implicit,
-        explicit
-    }
-
     interface CloseListener
     {
         /**
@@ -93,9 +90,6 @@ public interface KernelTransaction extends AutoCloseable
         void notify( long txId );
     }
 
-    long ROLLBACK = -1;
-    long READ_ONLY = 0;
-
     /**
      * Acquires a new {@link Statement} for this transaction which allows for reading and writing data from and
      * to the underlying database. After the group of reads and writes have been performed the statement
@@ -103,19 +97,6 @@ public interface KernelTransaction extends AutoCloseable
      * @return a {@link Statement} with access to underlying database.
      */
     Statement acquireStatement();
-
-    /**
-     * Marks this transaction as successful. When this transaction later gets {@link #close() closed}
-     * its changes, if any, will be committed. If this method hasn't been called or if {@link #failure()}
-     * has been called then any changes in this transaction will be rolled back as part of {@link #close() closing}.
-     */
-    void success();
-
-    /**
-     * Marks this transaction as failed. No amount of calls to {@link #success()} will clear this flag.
-     * When {@link #close() closing} this transaction any changes will be rolled back.
-     */
-    void failure();
 
     /**
      * Closes this transaction, committing its changes if {@link #success()} has been called and neither
@@ -221,6 +202,10 @@ public interface KernelTransaction extends AutoCloseable
     long getCommitTime();
 
     Revertable overrideWith( SecurityContext context );
+
+    NodeCursor nodeCursor();
+
+    PropertyCursor propertyCursor();
 
     @FunctionalInterface
     interface Revertable extends AutoCloseable

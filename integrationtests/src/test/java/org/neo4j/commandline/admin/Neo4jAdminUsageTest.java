@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -35,7 +35,7 @@ public class Neo4jAdminUsageTest
     }
 
     @Test
-    public void verifyUsageMatchesExpectedCommands() throws Exception
+    public void verifyUsageMatchesExpectedCommands()
     {
         final StringBuilder sb = new StringBuilder();
         usageCmd.print( s -> sb.append( s ).append( "\n" ) );
@@ -58,6 +58,8 @@ public class Neo4jAdminUsageTest
                         "        Check the consistency of a database.\n" +
                         "    import\n" +
                         "        Import from a collection of CSV files or a pre-3.0 database.\n" +
+                        "    report\n" +
+                        "        Produces a zip/tar of the most common information needed for remote assessments.\n" +
                         "    store-info\n" +
                         "        Prints information about a Neo4j database store.\n" +
                         "\n" +

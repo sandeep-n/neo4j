@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -27,6 +27,7 @@ import org.neo4j.logging.Log;
 import org.neo4j.logging.LogProvider;
 import org.neo4j.server.configuration.ServerSettings;
 import org.neo4j.server.modules.ServerModule;
+import org.neo4j.server.rest.causalclustering.CausalClusteringService;
 import org.neo4j.server.web.WebServer;
 
 import static java.util.Arrays.asList;
@@ -65,7 +66,8 @@ public class DatabaseRoleInfoServerModule implements ServerModule
         return asList(
                 MasterInfoService.class.getName(),
                 CoreDatabaseAvailabilityService.class.getName(),
-                ReadReplicaDatabaseAvailabilityService.class.getName()
+                ReadReplicaDatabaseAvailabilityService.class.getName(),
+                CausalClusteringService.class.getName()
         );
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -79,7 +79,6 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.junit.rules.RuleChain.outerRule;
-
 import static org.neo4j.index.internal.gbptree.GBPTree.NO_HEADER_READER;
 import static org.neo4j.index.internal.gbptree.ThrowingRunnable.throwing;
 import static org.neo4j.io.pagecache.IOLimiter.unlimited;
@@ -465,7 +464,7 @@ public class GBPTreeTest
         try ( GBPTree<MutableLong, MutableLong> index = index( controlledPageCache ).build() )
         {
             // WHEN
-            assert throwOnNextIO.compareAndSet( false, true );
+            assertTrue( throwOnNextIO.compareAndSet( false, true ) );
             try ( Writer<MutableLong,MutableLong> ignored = index.writer() )
             {
                 fail( "Expected to throw" );
@@ -1593,7 +1592,7 @@ public class GBPTreeTest
         }
     }
 
-    private class ControlledRecoveryCleanupWorkCollector extends LifecycleAdapter
+    private static class ControlledRecoveryCleanupWorkCollector extends LifecycleAdapter
             implements RecoveryCleanupWorkCollector
     {
         Queue<CleanupJob> jobs = new LinkedList<>();

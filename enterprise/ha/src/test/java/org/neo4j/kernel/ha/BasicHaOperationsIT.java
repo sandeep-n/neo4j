@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -42,7 +42,7 @@ public class BasicHaOperationsIT
     @ClassRule
     public static LoggerRule logger = new LoggerRule( Level.OFF );
     @Rule
-    public ClusterRule clusterRule = new ClusterRule( getClass() ).withSharedSetting( HaSettings.tx_push_factor, "2" );
+    public ClusterRule clusterRule = new ClusterRule().withSharedSetting( HaSettings.tx_push_factor, "2" );
 
     @Test
     public void testBasicFailover() throws Throwable

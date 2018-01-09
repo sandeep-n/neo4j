@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,6 +19,7 @@
  */
 package org.neo4j.internal.cypher.acceptance
 
+import org.hamcrest.Matchers
 import org.neo4j.cypher.ExecutionEngineFunSuite
 import org.neo4j.cypher.ExecutionEngineHelper.createEngine
 import org.neo4j.cypher.internal.{ExecutionEngine, StringCacheMonitor}
@@ -48,7 +49,7 @@ class CypherCompilerStringCacheMonitoringAcceptanceTest extends ExecutionEngineF
       counts = counts.copy(flushes = counts.flushes + 1)
     }
 
-    override def cacheDiscard(key: String, key2: String) {
+    override def cacheDiscard(key: String, key2: String, secondsSinceReplan: Int) {
       counts = counts.copy(evicted = counts.evicted + 1)
     }
   }
@@ -109,7 +110,7 @@ class CypherCompilerStringCacheMonitoringAcceptanceTest extends ExecutionEngineF
     execute(query).toList
 
     // then
-    counter.counts should equal(CacheCounts(hits = 3, misses = 2, flushes = 1, evicted = 1))
+    counter.counts should equal(CacheCounts(hits = 3, misses = 1, flushes = 1, evicted = 1))
   }
 
   test("should log on cache evictions") {
@@ -130,7 +131,7 @@ class CypherCompilerStringCacheMonitoringAcceptanceTest extends ExecutionEngineF
 
     // then
     logProvider.assertAtLeastOnce(
-      AssertableLogProvider.inLog( classOf[ExecutionEngine] ).info( s"Discarded stale query from the query cache: $query" )
+      AssertableLogProvider.inLog(classOf[ExecutionEngine]).info(Matchers.containsString("Discarded stale query from the query cache"))
     )
   }
 }

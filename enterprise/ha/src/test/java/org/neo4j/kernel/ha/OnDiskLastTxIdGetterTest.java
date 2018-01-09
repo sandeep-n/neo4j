@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,9 +25,11 @@ import org.junit.Test;
 import java.io.File;
 import java.util.function.LongSupplier;
 
+import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.ha.transaction.OnDiskLastTxIdGetter;
 import org.neo4j.kernel.impl.store.NeoStores;
 import org.neo4j.kernel.impl.store.StoreFactory;
+import org.neo4j.kernel.impl.store.id.DefaultIdGeneratorFactory;
 import org.neo4j.kernel.impl.transaction.log.TransactionIdStore;
 import org.neo4j.logging.NullLogProvider;
 import org.neo4j.test.rule.PageCacheRule;
@@ -54,8 +56,10 @@ public class OnDiskLastTxIdGetterTest
     @Test
     public void lastTransactionIdIsBaseTxIdWhileNeoStoresAreStopped()
     {
-        final StoreFactory storeFactory = new StoreFactory( new File( "store" ), pageCacheRule.getPageCache( fs.get() ),
-                fs.get(), NullLogProvider.getInstance() );
+        final StoreFactory storeFactory = new StoreFactory(
+                new File( "store" ), Config.defaults(), new DefaultIdGeneratorFactory( fs.get() ),
+                pageCacheRule.getPageCache( fs.get() ), fs.get(),
+                NullLogProvider.getInstance() );
         final NeoStores neoStores = storeFactory.openAllNeoStores( true );
         neoStores.close();
 

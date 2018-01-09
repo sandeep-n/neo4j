@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -37,6 +37,11 @@ import org.neo4j.io.fs.FileSystemAbstraction;
  */
 public interface PageCache extends AutoCloseable
 {
+    /**
+     * The default {@link #pageSize()}.
+     */
+    int PAGE_SIZE = 8192;
+
     /**
      * Ask for a handle to a paged file, backed by this page cache.
      * <p>

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,11 +24,9 @@ import org.neo4j.internal.cypher.acceptance.CypherComparisonSupport.{ComparePlan
 
 class ShortestPathComplexQueryAcceptanceTest extends ExecutionEngineFunSuite with CypherComparisonSupport {
 
-  val expectedToSucceed = Configs.CommunityInterpreted - Configs.Cost2_3
-
   test("allShortestPaths with complex LHS should be planned with exhaustive fallback and include predicate") {
     setupModel()
-    val result = executeWith(Configs.CommunityInterpreted,
+    val result = executeWith(Configs.Interpreted,
       """
         |PROFILE MATCH (charles:Pixie { fname : 'Charles'}),(joey:Pixie { fname : 'Joey'}),(kim:Pixie { fname : 'Kim'})
         |WITH kim AS kimDeal, collect(charles) AS charlesT, collect(joey) AS joeyS
@@ -47,7 +45,7 @@ class ShortestPathComplexQueryAcceptanceTest extends ExecutionEngineFunSuite wit
 
   test("shortestPath with complex LHS should be planned with exhaustive fallback and include predicate") {
     setupModel()
-    val result = executeWith(Configs.CommunityInterpreted,
+    val result = executeWith(Configs.Interpreted,
       """
         |PROFILE MATCH (charles:Pixie { fname : 'Charles'}),(joey:Pixie { fname : 'Joey'}),(kim:Pixie { fname : 'Kim'})
         |WITH kim AS kimDeal, collect(charles) AS charlesT, collect(joey) AS joeyS

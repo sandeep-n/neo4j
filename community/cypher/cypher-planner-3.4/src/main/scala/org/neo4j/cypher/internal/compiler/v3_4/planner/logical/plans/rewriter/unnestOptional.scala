@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,9 +19,10 @@
  */
 package org.neo4j.cypher.internal.compiler.v3_4.planner.logical.plans.rewriter
 
+import org.neo4j.cypher.internal.ir.v3_4.{CardinalityEstimation, PlannerQuery}
+import org.neo4j.cypher.internal.util.v3_4.attribution.{IdGen, SameId}
 import org.neo4j.cypher.internal.util.v3_4.{Rewriter, bottomUp}
 import org.neo4j.cypher.internal.v3_4.expressions.Expression
-import org.neo4j.cypher.internal.ir.v3_4.{CardinalityEstimation, PlannerQuery}
 import org.neo4j.cypher.internal.v3_4.logical.plans._
 
 case object unnestOptional extends Rewriter {
@@ -45,16 +46,16 @@ case object unnestOptional extends Rewriter {
 
     case apply@Apply(lhs,
       Optional(
-      e@Expand(_: SingleRow, _, _, _, _, _, _), _)) =>
-        optionalExpand(e, lhs)(Seq.empty)(apply.solved)
+      e@Expand(_: Argument, _, _, _, _, _, _), _)) =>
+        optionalExpand(e.selfThis, lhs)(Seq.empty)(apply.solved)(SameId(apply.id))
 
     case apply@Apply(lhs,
       Optional(
       Selection(predicates,
-      e@Expand(_: SingleRow, _, _, _, _, _, _)), _)) =>
-        optionalExpand(e, lhs)(predicates)(apply.solved)
+      e@Expand(_: Argument, _, _, _, _, _, _)), _)) =>
+        optionalExpand(e.selfThis, lhs)(predicates)(apply.solved)(SameId(apply.id))
   })
 
-  private def optionalExpand(e: Expand, lhs: LogicalPlan): (Seq[Expression] => PlannerQuery with CardinalityEstimation => OptionalExpand) =
-    predicates => OptionalExpand(lhs, e.from, e.dir, e.types, e.to, e.relName, e.mode, predicates)
+  private def optionalExpand(e: Expand, lhs: LogicalPlan): Seq[Expression] => PlannerQuery with CardinalityEstimation => IdGen => OptionalExpand =
+    predicates => solved => idGen => OptionalExpand(lhs, e.from, e.dir, e.types, e.to, e.relName, e.mode, predicates)(solved)(idGen)
 }

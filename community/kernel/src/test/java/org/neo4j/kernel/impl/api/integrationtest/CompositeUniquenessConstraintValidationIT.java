@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -34,14 +34,14 @@ import java.util.Arrays;
 
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Transaction;
-import org.neo4j.kernel.api.KernelAPI;
+import org.neo4j.kernel.api.InwardKernel;
 import org.neo4j.kernel.api.KernelTransaction;
 import org.neo4j.kernel.api.Statement;
 import org.neo4j.internal.kernel.api.exceptions.KernelException;
 import org.neo4j.kernel.api.exceptions.TransactionFailureException;
 import org.neo4j.kernel.api.exceptions.schema.UniquePropertyValueValidationException;
 import org.neo4j.kernel.api.schema.constaints.ConstraintDescriptorFactory;
-import org.neo4j.kernel.api.security.SecurityContext;
+import org.neo4j.internal.kernel.api.security.SecurityContext;
 import org.neo4j.kernel.internal.GraphDatabaseAPI;
 import org.neo4j.test.rule.ImpermanentDatabaseRule;
 import org.neo4j.values.storable.Values;
@@ -102,14 +102,14 @@ public class CompositeUniquenessConstraintValidationIT
     private KernelTransaction transaction;
     private Statement statement;
     private GraphDatabaseAPI graphDatabaseAPI;
-    protected KernelAPI kernel;
+    protected InwardKernel kernel;
 
     @Before
     public void setup() throws Exception
     {
 
         graphDatabaseAPI = dbRule.getGraphDatabaseAPI();
-        kernel = graphDatabaseAPI.getDependencyResolver().resolveDependency( KernelAPI.class );
+        kernel = graphDatabaseAPI.getDependencyResolver().resolveDependency( InwardKernel.class );
 
         newTransaction();
         statement.schemaWriteOperations().uniquePropertyConstraintCreate( forLabel( label, propertyIds() ) );

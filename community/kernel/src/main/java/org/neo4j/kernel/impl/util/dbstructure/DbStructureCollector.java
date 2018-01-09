@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -27,8 +27,8 @@ import java.util.Set;
 
 import org.neo4j.helpers.collection.Iterators;
 import org.neo4j.helpers.collection.Pair;
-import org.neo4j.kernel.api.schema.LabelSchemaDescriptor;
-import org.neo4j.kernel.api.schema.LabelSchemaSupplier;
+import org.neo4j.internal.kernel.api.schema.LabelSchemaDescriptor;
+import org.neo4j.internal.kernel.api.schema.LabelSchemaSupplier;
 import org.neo4j.kernel.api.schema.SchemaDescriptorFactory;
 import org.neo4j.kernel.api.schema.constaints.NodeExistenceConstraintDescriptor;
 import org.neo4j.kernel.api.schema.constaints.NodeKeyConstraintDescriptor;
@@ -107,6 +107,12 @@ public class DbStructureCollector implements DbStructureVisitor
             }
 
             @Override
+            public long nodesAllCardinality()
+            {
+                return allNodesCount;
+            }
+
+            @Override
             public Iterator<Pair<String,String[]>> knownRelationshipPropertyExistenceConstraints()
             {
                 return Iterators.map( relConstraint ->
@@ -121,7 +127,7 @@ public class DbStructureCollector implements DbStructureVisitor
             @Override
             public long nodesWithLabelCardinality( int labelId )
             {
-                Long result = labelId == -1 ? allNodesCount : nodeCounts.get( labelId );
+                Long result = nodeCounts.get( labelId );
                 return result == null ? 0L : result;
             }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -54,7 +54,7 @@ import static org.neo4j.kernel.impl.ha.ClusterManager.clusterOfSize;
 public class DeletionIT
 {
     @Rule
-    public ClusterRule clusterRule = new ClusterRule( DeletionIT.class ).withCluster( clusterOfSize( 2 ) );
+    public ClusterRule clusterRule = new ClusterRule().withCluster( clusterOfSize( 2 ) );
 
     /**
      * The problem would manifest even if the transaction was performed on the Master, it would then occur when the

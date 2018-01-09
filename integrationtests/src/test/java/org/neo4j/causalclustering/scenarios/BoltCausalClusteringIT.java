@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,6 +23,7 @@ import org.junit.Rule;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.time.Clock;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -76,7 +77,7 @@ public class BoltCausalClusteringIT
 {
     private static final long DEFAULT_TIMEOUT_MS = 15_000;
     @Rule
-    public final ClusterRule clusterRule = new ClusterRule( getClass() ).withNumberOfCoreMembers( 3 );
+    public final ClusterRule clusterRule = new ClusterRule().withNumberOfCoreMembers( 3 );
     @Rule
     public final SuppressOutput suppressOutput = SuppressOutput.suppressAll();
 
@@ -404,7 +405,7 @@ public class BoltCausalClusteringIT
                 try
                 {
                     switchLeader( leader );
-                    session.run( "CREATE (p:Person {name: {name} })" ).consume();
+                    session.run( "CREATE (p:Person {name: {name} })", Values.parameters( "name", "Mark" ) ).consume();
                     fail( "Should have thrown an exception as the leader went away mid session" );
                 }
                 catch ( SessionExpiredException sep )
@@ -811,7 +812,7 @@ public class BoltCausalClusteringIT
         {
             if ( !coreClusterMember.equals( initialLeader ) )
             {
-                coreClusterMember.raft().triggerElection();
+                coreClusterMember.raft().triggerElection( Clock.systemUTC() );
                 return cluster.awaitLeader();
             }
         }

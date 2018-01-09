@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -30,7 +30,7 @@ import org.neo4j.kernel.impl.api.store.RelationshipIterator;
 /**
  * {@link SuperReadableDiffSets} with added method for filtering added relationships.
  */
-public interface ReadableRelationshipDiffSets<T> extends SuperReadableDiffSets<T,RelationshipIterator>
+public interface ReadableRelationshipDiffSets<T> extends SuperReadableDiffSets<T,RelationshipIterator, RelationshipIterator>
 {
     @Override
     ReadableRelationshipDiffSets<T> filterAdded( Predicate<T> addedFilter );
@@ -65,6 +65,12 @@ public interface ReadableRelationshipDiffSets<T> extends SuperReadableDiffSets<T
 
         @Override
         public Set<T> getAdded()
+        {
+            return Collections.emptySet();
+        }
+
+        @Override
+        public Set<T> getAddedSnapshot()
         {
             return Collections.emptySet();
         }

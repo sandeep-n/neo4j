@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,8 +19,8 @@
  */
 package org.neo4j.cypher.internal.compatibility.v3_4.runtime.slotted.pipes
 
-import org.neo4j.cypher.internal.compatibility.v3_4.runtime.PipelineInformation
-import org.neo4j.cypher.internal.compatibility.v3_4.runtime.slotted.PrimitiveExecutionContext
+import org.neo4j.cypher.internal.compatibility.v3_4.runtime.SlotConfiguration
+import org.neo4j.cypher.internal.compatibility.v3_4.runtime.slotted.SlottedExecutionContext
 import org.neo4j.cypher.internal.compatibility.v3_4.runtime.slotted.expressions.ReferenceFromSlot
 import org.neo4j.cypher.internal.runtime.interpreted.QueryStateHelper
 import org.neo4j.cypher.internal.runtime.interpreted.pipes._
@@ -34,12 +34,12 @@ import scala.collection.JavaConverters._
 class UnwindSlottedPipeTest extends CypherFunSuite {
 
   private def unwindWithInput(data: Traversable[Map[String, Any]]) = {
-    val inputPipeline = PipelineInformation
+    val inputPipeline = SlotConfiguration
       .empty
       .newReference("x", nullable = false, CTAny)
 
     val outputPipeline = inputPipeline
-      .breakPipelineAndClone()
+      .copy()
       .newReference("y", nullable = true, CTAny)
 
     val x = inputPipeline.getReferenceOffsetFor("x")
@@ -48,7 +48,7 @@ class UnwindSlottedPipeTest extends CypherFunSuite {
     val source = FakeSlottedPipe(data.toIterator, inputPipeline)
     val unwindPipe = UnwindSlottedPipe(source, ReferenceFromSlot(x), y, outputPipeline)()
     unwindPipe.createResults(QueryStateHelper.empty).map {
-      case c: PrimitiveExecutionContext =>
+      case c: SlottedExecutionContext =>
         Map("x" -> c.getRefAt(x), "y" -> c.getRefAt(y))
     }.toList
   }

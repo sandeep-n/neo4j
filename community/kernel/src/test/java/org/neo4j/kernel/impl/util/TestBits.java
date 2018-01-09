@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -61,6 +61,26 @@ public class TestBits
         byte[] asBytes = bits.asBytes();
         String other = Bits.bitsFromBytes( asBytes ).toString();
         assertEquals( first, other );
+    }
+
+    @Test
+    public void doubleAsBytesWithOffset() throws Exception
+    {
+        double[] array1 = new double[]{1.0, 2.0, 3.0, 4.0, 5.0};
+        Bits bits = Bits.bits( array1.length * 8 );
+        for ( double value : array1 )
+        {
+            bits.put( Double.doubleToRawLongBits( value ) );
+        }
+        int offset = 6;
+        byte[] asBytesOffset = bits.asBytes( offset );
+        byte[] asBytes = bits.asBytes();
+        assertEquals( asBytes.length, array1.length * 8 );
+        assertEquals( asBytesOffset.length, array1.length * 8 + offset );
+        for ( int i = 0; i < asBytes.length; i++ )
+        {
+            assertEquals( asBytesOffset[i + offset], asBytes[i] );
+        }
     }
 
     @Test

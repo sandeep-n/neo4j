@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,7 +23,6 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 
-import java.io.File;
 import java.io.IOException;
 
 import org.neo4j.graphdb.Label;
@@ -34,8 +33,8 @@ import org.neo4j.graphdb.Transaction;
 import org.neo4j.helpers.collection.Iterables;
 import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.kernel.impl.MyRelTypes;
-import org.neo4j.kernel.impl.transaction.log.LogFileInformation;
 import org.neo4j.kernel.impl.transaction.log.entry.LogEntry;
+import org.neo4j.kernel.impl.transaction.log.files.LogFiles;
 import org.neo4j.kernel.internal.GraphDatabaseAPI;
 import org.neo4j.test.LogTestUtils.CountingLogHook;
 import org.neo4j.test.rule.DatabaseRule;
@@ -95,14 +94,13 @@ public class ReadTransactionLogWritingTest
     {
         GraphDatabaseAPI db = dbr.getGraphDatabaseAPI();
         FileSystemAbstraction fs = db.getDependencyResolver().resolveDependency( FileSystemAbstraction.class );
-        File storeDir = db.getStoreDir();
+        LogFiles logFiles = db.getDependencyResolver().resolveDependency( LogFiles.class );
         try
         {
             CountingLogHook<LogEntry> logicalLogCounter = new CountingLogHook<>();
-            filterNeostoreLogicalLog( fs, storeDir.getPath(), logicalLogCounter );
+            filterNeostoreLogicalLog( logFiles, fs, logicalLogCounter );
 
-            long txLogRecordCount = db.getDependencyResolver()
-                    .resolveDependency( LogFileInformation.class ).getLastEntryId();
+            long txLogRecordCount = logFiles.getLogFileInformation().getLastEntryId();
 
             return logicalLogCounter.getCount() + txLogRecordCount;
         }

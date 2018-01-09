@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,7 +19,6 @@
  */
 package org.neo4j.kernel.api.impl.fulltext.integrations.bloom;
 
-import org.apache.commons.lang3.SystemUtils;
 import org.apache.lucene.analysis.en.EnglishAnalyzer;
 import org.apache.lucene.analysis.sv.SwedishAnalyzer;
 import org.junit.After;
@@ -28,13 +27,13 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
-import java.io.File;
 import java.util.Date;
 
 import org.neo4j.consistency.ConsistencyCheckService;
 import org.neo4j.consistency.checking.full.ConsistencyFlags;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
+import org.neo4j.graphdb.QueryExecutionException;
 import org.neo4j.graphdb.Relationship;
 import org.neo4j.graphdb.RelationshipType;
 import org.neo4j.graphdb.Result;
@@ -57,8 +56,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-import static org.junit.Assume.assumeFalse;
 import static org.neo4j.kernel.api.impl.fulltext.integrations.bloom.BloomFulltextConfig.bloom_enabled;
 
 public class BloomIT
@@ -89,8 +86,8 @@ public class BloomIT
     public void before() throws Exception
     {
         GraphDatabaseFactory factory = new GraphDatabaseFactory();
-        builder = factory.newEmbeddedDatabaseBuilder( testDirectory.graphDbDir() );
-        builder.setConfig( bloom_enabled, "true" );
+        builder = factory.newEmbeddedDatabaseBuilder( testDirectory.graphDbDir() )
+                         .setConfig( bloom_enabled, "true" );
     }
 
     @After
@@ -606,56 +603,20 @@ public class BloomIT
     }
 
     @Test
-    public void failureToStartUpMustNotPreventShutDown() throws Exception
+    public void databaseShouldBeAbleToStartWithBloomPresentButDisabled() throws Exception
     {
-        // Ignore this test on Windows because the test relies on file permissions to trigger failure modes in
-        // the code. Unfortunately, file permissions are an incredible pain to work with on Windows.
-        assumeFalse( SystemUtils.IS_OS_WINDOWS );
-
-        // Create the store directory and all its files, and add a bit of data to it
-        GraphDatabaseService db = getDb();
-        db.execute( String.format( SET_NODE_KEYS, "\"prop\"" ) );
-
-        try ( Transaction tx = db.beginTx() )
-        {
-            db.createNode().setProperty( "prop", "bla bla bla" );
-            tx.success();
-        }
-        db.shutdown();
-
-        File dir = testDirectory.graphDbDir();
-        assertTrue( dir.setReadable( false ) );
-        try
-        {
-            // Making the directory not readable ought to cause problems for the database as it tries to start up
-            getDb().shutdown();
-            fail( "Should not have started up and shut down cleanly on an unreadable store directory" );
-        }
-        catch ( Exception e )
-        {
-            // Good
-        }
-        catch ( Throwable th )
-        {
-            makeReadable( dir, th );
-            throw th;
-        }
-        makeReadable( dir, null );
+        builder.setConfig( bloom_enabled, "false" );
+        db = getDb();
+        //all good.
     }
 
-    private void makeReadable( File dir, Throwable th )
+    @Test
+    public void shouldThrowSomewhatHelpfulMessageIfCalledWhenDisabled() throws Exception
     {
-        if ( !dir.setReadable( true ) )
-        {
-            AssertionError error = new AssertionError( "Failed to make " + dir + " writable again!" );
-            if ( th != null )
-            {
-                th.addSuppressed( error );
-            }
-            else
-            {
-                throw error;
-            }
-        }
+        builder.setConfig( bloom_enabled, "false" );
+        db = getDb();
+        expectedException.expect( QueryExecutionException.class );
+        expectedException.expectMessage( "enabled" );
+        db.execute( AWAIT_POPULATION );
     }
 }

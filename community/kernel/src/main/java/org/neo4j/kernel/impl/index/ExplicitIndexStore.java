@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -32,15 +32,15 @@ import org.neo4j.graphdb.PropertyContainer;
 import org.neo4j.graphdb.Relationship;
 import org.neo4j.graphdb.TransactionFailureException;
 import org.neo4j.helpers.collection.MapUtil;
-import org.neo4j.kernel.api.KernelAPI;
+import org.neo4j.internal.kernel.api.exceptions.explicitindex.ExplicitIndexNotFoundKernelException;
+import org.neo4j.kernel.api.InwardKernel;
 import org.neo4j.kernel.api.KernelTransaction;
 import org.neo4j.kernel.api.Statement;
-import org.neo4j.kernel.api.exceptions.explicitindex.ExplicitIndexNotFoundKernelException;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.spi.explicitindex.IndexImplementation;
 
 import static org.neo4j.graphdb.index.IndexManager.PROVIDER;
-import static org.neo4j.kernel.api.security.SecurityContext.AUTH_DISABLED;
+import static org.neo4j.internal.kernel.api.security.SecurityContext.AUTH_DISABLED;
 
 /**
  * Uses an {@link IndexConfigStore} and puts logic around providers and configuration comparison.
@@ -50,9 +50,9 @@ public class ExplicitIndexStore
     private final IndexConfigStore indexStore;
     private final Config config;
     private final Function<String,IndexImplementation> indexProviders;
-    private final Supplier<KernelAPI> kernel;
+    private final Supplier<InwardKernel> kernel;
 
-    public ExplicitIndexStore( @Nonnull Config config, IndexConfigStore indexStore, Supplier<KernelAPI> kernel,
+    public ExplicitIndexStore( @Nonnull Config config, IndexConfigStore indexStore, Supplier<InwardKernel> kernel,
             Function<String,IndexImplementation> indexProviders )
     {
         this.config = config;

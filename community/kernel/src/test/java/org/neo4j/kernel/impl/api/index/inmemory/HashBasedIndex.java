@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -28,15 +28,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.neo4j.collection.primitive.PrimitiveLongCollections;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
+import org.neo4j.collection.primitive.PrimitiveLongResourceIterator;
 import org.neo4j.helpers.collection.Iterables;
-import org.neo4j.kernel.api.schema.IndexQuery;
+import org.neo4j.internal.kernel.api.IndexQuery;
+import org.neo4j.kernel.api.schema.index.IndexDescriptor;
 import org.neo4j.storageengine.api.schema.IndexSampler;
 import org.neo4j.values.storable.Value;
 
+import static org.neo4j.collection.primitive.PrimitiveLongCollections.emptyIterator;
+import static org.neo4j.collection.primitive.PrimitiveLongCollections.resourceIterator;
 import static org.neo4j.collection.primitive.PrimitiveLongCollections.toPrimitiveIterator;
-import static org.neo4j.kernel.api.schema.IndexQuery.IndexQueryType.exact;
+import static org.neo4j.internal.kernel.api.IndexQuery.IndexQueryType.exact;
 import static org.neo4j.kernel.impl.api.PropertyValueComparison.COMPARE_VALUES;
 import static org.neo4j.kernel.impl.api.PropertyValueComparison.SuperType.NUMBER;
 import static org.neo4j.kernel.impl.api.PropertyValueComparison.SuperType.STRING;
@@ -44,6 +47,11 @@ import static org.neo4j.kernel.impl.api.PropertyValueComparison.SuperType.STRING
 class HashBasedIndex extends InMemoryIndexImplementation
 {
     private Map<List<Object>,Set<Long>> data;
+
+    HashBasedIndex( IndexDescriptor descriptor )
+    {
+        super( descriptor );
+    }
 
     public Map<List<Object>,Set<Long>> data()
     {
@@ -73,13 +81,13 @@ class HashBasedIndex extends InMemoryIndexImplementation
     }
 
     @Override
-    synchronized PrimitiveLongIterator doIndexSeek( Object... propertyValues )
+    synchronized PrimitiveLongResourceIterator doIndexSeek( Object... propertyValues )
     {
         Set<Long> nodes = data().get( Arrays.asList( propertyValues ) );
-        return nodes == null ? PrimitiveLongCollections.emptyIterator() : toPrimitiveIterator( nodes.iterator() );
+        return asResource( nodes == null ? emptyIterator() : toPrimitiveIterator( nodes.iterator() ) );
     }
 
-    private synchronized PrimitiveLongIterator rangeSeekByNumberInclusive( Number lower, Number upper )
+    private synchronized PrimitiveLongResourceIterator rangeSeekByNumberInclusive( Number lower, Number upper )
     {
         Set<Long> nodeIds = new HashSet<>();
         for ( Map.Entry<List<Object>,Set<Long>> entry : data.entrySet() )
@@ -96,10 +104,10 @@ class HashBasedIndex extends InMemoryIndexImplementation
                 }
             }
         }
-        return toPrimitiveIterator( nodeIds.iterator() );
+        return asResource( toPrimitiveIterator( nodeIds.iterator() ) );
     }
 
-    private synchronized PrimitiveLongIterator rangeSeekByString( String lower, boolean includeLower, String upper,
+    private synchronized PrimitiveLongResourceIterator rangeSeekByString( String lower, boolean includeLower, String upper,
             boolean includeUpper )
     {
         Set<Long> nodeIds = new HashSet<>();
@@ -137,38 +145,34 @@ class HashBasedIndex extends InMemoryIndexImplementation
                 }
             }
         }
-        return toPrimitiveIterator( nodeIds.iterator() );
+        return asResource( toPrimitiveIterator( nodeIds.iterator() ) );
     }
 
-    private synchronized PrimitiveLongIterator rangeSeekByPrefix( String prefix )
+    private synchronized PrimitiveLongResourceIterator rangeSeekByPrefix( String prefix )
     {
         return stringSearch( ( String entry ) -> entry.startsWith( prefix ) );
     }
 
-    private synchronized PrimitiveLongIterator containsString( String exactTerm )
+    private synchronized PrimitiveLongResourceIterator containsString( String exactTerm )
     {
         return stringSearch( ( String entry ) -> entry.contains( exactTerm ) );
     }
 
-    private PrimitiveLongIterator endsWith( String suffix )
+    private PrimitiveLongResourceIterator endsWith( String suffix )
     {
         return stringSearch( ( String entry ) -> entry.endsWith( suffix ) );
     }
 
-    private synchronized PrimitiveLongIterator scan()
+    private synchronized PrimitiveLongResourceIterator scan()
     {
         Iterable<Long> all = Iterables.flattenIterable( data.values() );
-        return toPrimitiveIterator( all.iterator() );
+        return asResource( toPrimitiveIterator( all.iterator() ) );
     }
 
     @Override
     synchronized boolean doAdd( long nodeId, boolean applyIdempotently, Object... propertyValue )
     {
-        Set<Long> nodes = data().get( Arrays.asList( propertyValue ) );
-        if ( nodes == null )
-        {
-            data().put( Arrays.asList( propertyValue ), nodes = new HashSet<>() );
-        }
+        Set<Long> nodes = data().computeIfAbsent( Arrays.asList( propertyValue ), k -> new HashSet<>() );
         // In this implementation we don't care about idempotency.
         return nodes.add( nodeId );
     }
@@ -226,7 +230,7 @@ class HashBasedIndex extends InMemoryIndexImplementation
     @Override
     synchronized InMemoryIndexImplementation snapshot()
     {
-        HashBasedIndex snapshot = new HashBasedIndex();
+        HashBasedIndex snapshot = new HashBasedIndex( descriptor );
         snapshot.initialize();
         for ( Map.Entry<List<Object>,Set<Long>> entry : data().entrySet() )
         {
@@ -249,7 +253,7 @@ class HashBasedIndex extends InMemoryIndexImplementation
     }
 
     @Override
-    public PrimitiveLongIterator query( IndexQuery... predicates )
+    public PrimitiveLongResourceIterator query( IndexQuery... predicates )
     {
         if ( predicates.length > 1 )
         {
@@ -300,7 +304,7 @@ class HashBasedIndex extends InMemoryIndexImplementation
         boolean test( String s );
     }
 
-    private PrimitiveLongIterator stringSearch( StringFilter filter )
+    private PrimitiveLongResourceIterator stringSearch( StringFilter filter )
     {
         Set<Long> nodeIds = new HashSet<>();
         for ( Map.Entry<List<Object>,Set<Long>> entry : data.entrySet() )
@@ -314,7 +318,12 @@ class HashBasedIndex extends InMemoryIndexImplementation
                 }
             }
         }
-        return toPrimitiveIterator( nodeIds.iterator() );
+        return asResource( toPrimitiveIterator( nodeIds.iterator() ) );
+    }
+
+    private PrimitiveLongResourceIterator asResource( PrimitiveLongIterator iterator )
+    {
+        return resourceIterator( iterator, null );
     }
 
     @Override

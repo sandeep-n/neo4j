@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -34,8 +34,10 @@ object LogicalPlan2PlanDescription extends ((LogicalPlan, PlannerName) => Intern
     val readOnly = input.solved.readOnly
     new LogicalPlan2PlanDescription(readOnly).create(input)
       .addArgument(Version("CYPHER 3.4"))
+      .addArgument(RuntimeVersion("3.4"))
       .addArgument(Planner(plannerName.toTextOutput))
       .addArgument(PlannerImpl(plannerName.name))
+      .addArgument(PlannerVersion(plannerName.version))
   }
 }
 
@@ -45,7 +47,7 @@ case class LogicalPlan2PlanDescription(readOnly: Boolean)
   override protected def build(plan: LogicalPlan): InternalPlanDescription = {
     assert(plan.isLeaf)
 
-    val id = plan.assignedId
+    val id = plan.id
     val variables = plan.availableSymbols.map(_.name)
 
     val result: InternalPlanDescription = plan match {
@@ -69,11 +71,11 @@ case class LogicalPlan2PlanDescription(readOnly: Boolean)
       case ProduceResult(_, _) =>
         PlanDescriptionImpl(id, "ProduceResults", NoChildren, Seq(), variables)
 
-      case _: SingleRow if variables.size > 0 =>
+      case _: plans.Argument if variables.nonEmpty =>
         PlanDescriptionImpl(id, "Argument", NoChildren, Seq.empty, variables)
 
-      case _: SingleRow =>
-        SingleRowPlanDescription(id, Seq.empty, variables)
+      case _: plans.Argument =>
+        ArgumentPlanDescription(id, Seq.empty, variables)
 
       case DirectedRelationshipByIdSeek(_, relIds, _, _, _) =>
         val entityByIdRhs = EntityByIdRhs(relIds)
@@ -119,9 +121,9 @@ case class LogicalPlan2PlanDescription(readOnly: Boolean)
     assert(plan.lhs.nonEmpty)
     assert(plan.rhs.isEmpty)
 
-    val id = plan.assignedId
+    val id = plan.id
     val variables = plan.availableSymbols.map(_.name)
-    val children = if (source.isInstanceOf[SingleRowPlanDescription]) NoChildren else SingleChild(source)
+    val children = if (source.isInstanceOf[ArgumentPlanDescription]) NoChildren else SingleChild(source)
 
     val result: InternalPlanDescription = plan match {
       case Aggregation(_, groupingExpressions, aggregationExpressions) if aggregationExpressions.isEmpty =>
@@ -156,17 +158,17 @@ case class LogicalPlan2PlanDescription(readOnly: Boolean)
         PlanDescriptionImpl(id, "DropResult", children, Seq.empty, variables)
 
       case NodeCountFromCountStore(IdName(id), labelName, arguments) =>
-        PlanDescriptionImpl(id = plan.assignedId, "NodeCountFromCountStore", NoChildren,
+        PlanDescriptionImpl(id = plan.id, "NodeCountFromCountStore", NoChildren,
                             Seq(CountNodesExpression(id, labelName.map(l => l.map(_.name)))), variables)
 
       case RelationshipCountFromCountStore(IdName(id), start, types, end, arguments) =>
-        PlanDescriptionImpl(id = plan.assignedId, "RelationshipCountFromCountStore", NoChildren,
+        PlanDescriptionImpl(id = plan.id, "RelationshipCountFromCountStore", NoChildren,
                             Seq(
                               CountRelationshipsExpression(id, start.map(_.name), types.map(_.name), end.map(_.name))),
                             variables)
 
       case NodeUniqueIndexSeek(IdName(id), label, propKeys, value, arguments) =>
-        PlanDescriptionImpl(id = plan.assignedId, "NodeUniqueIndexSeek", NoChildren,
+        PlanDescriptionImpl(id = plan.id, "NodeUniqueIndexSeek", NoChildren,
                             Seq(Index(label.name, propKeys.map(_.name))), variables)
 
       case _: ErrorPlan =>
@@ -213,7 +215,7 @@ case class LogicalPlan2PlanDescription(readOnly: Boolean)
         PlanDescriptionImpl(id, "ShortestPath", children, Seq(Expressions(args.toMap)), variables)
 
       case Limit(_, count, _) =>
-        PlanDescriptionImpl(id, "LetAntiSemiApply", children, Seq(Expression(count)), variables)
+        PlanDescriptionImpl(id, "Limit", children, Seq(Expression(count)), variables)
 
       case _: LoadCSV =>
         PlanDescriptionImpl(id, "LoadCSV", children, Seq.empty, variables)
@@ -297,7 +299,7 @@ case class LogicalPlan2PlanDescription(readOnly: Boolean)
     assert(plan.lhs.nonEmpty)
     assert(plan.rhs.nonEmpty)
 
-    val id = plan.assignedId
+    val id = plan.id
     val variables = plan.availableSymbols.map(_.name)
     val children = TwoChildren(lhs, rhs)
 
@@ -329,11 +331,11 @@ case class LogicalPlan2PlanDescription(readOnly: Boolean)
       case LetSelectOrSemiApply(_, _, _, predicate) =>
         PlanDescriptionImpl(id, "LetSelectOrSemiApply", children, Seq(Expression(predicate)), variables)
 
-      case row: SingleRow =>
-        SingleRowPlanDescription(id = plan.assignedId, Seq.empty, row.argumentIds.map(_.name))
+      case row: plans.Argument =>
+        ArgumentPlanDescription(id = plan.id, Seq.empty, row.argumentIds.map(_.name))
 
       case LetSelectOrAntiSemiApply(_, _, _, predicate) =>
-        PlanDescriptionImpl(id, "LetSelectOrSemiApply", children, Seq(Expression(predicate)), variables)
+        PlanDescriptionImpl(id, "LetSelectOrAntiSemiApply", children, Seq(Expression(predicate)), variables)
 
       case _: LetSemiApply =>
         PlanDescriptionImpl(id, "LetSemiApply", children, Seq.empty, variables)
@@ -351,7 +353,7 @@ case class LogicalPlan2PlanDescription(readOnly: Boolean)
         PlanDescriptionImpl(id, "SelectOrAntiSemiApply", children, Seq(Expression(predicate)), variables)
 
       case SelectOrSemiApply(_, _, predicate) =>
-        PlanDescriptionImpl(id, "SelectOrAntiSemiApply", children, Seq(Expression(predicate)), variables)
+        PlanDescriptionImpl(id, "SelectOrSemiApply", children, Seq(Expression(predicate)), variables)
 
       case _: SemiApply =>
         PlanDescriptionImpl(id, "SemiApply", children, Seq.empty, variables)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -295,8 +295,9 @@ public class IndexConfigStore extends LifecycleAdapter
         StoreChannel channel = null;
         try
         {
+
             channel = fileSystem.open( file, OpenMode.READ_WRITE );
-            channel.write( ByteBuffer.wrap( MAGICK ) );
+            channel.writeAll( ByteBuffer.wrap( MAGICK ) );
             IoPrimitiveUtils.writeInt( channel, buffer( 4 ), VERSION );
             writeMap( channel, nodeConfig );
             writeMap( channel, relConfig );

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -29,7 +29,9 @@ import org.apache.lucene.search.TotalHitCountCollector;
 import java.io.IOException;
 import java.util.Arrays;
 
+import org.neo4j.collection.primitive.PrimitiveLongCollections;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
+import org.neo4j.collection.primitive.PrimitiveLongResourceIterator;
 import org.neo4j.helpers.TaskControl;
 import org.neo4j.helpers.TaskCoordinator;
 import org.neo4j.kernel.api.exceptions.index.IndexNotApplicableKernelException;
@@ -38,16 +40,17 @@ import org.neo4j.kernel.api.impl.index.partition.PartitionSearcher;
 import org.neo4j.kernel.api.impl.schema.LuceneDocumentStructure;
 import org.neo4j.kernel.api.impl.schema.sampler.NonUniqueLuceneIndexSampler;
 import org.neo4j.kernel.api.impl.schema.sampler.UniqueLuceneIndexSampler;
-import org.neo4j.kernel.api.schema.IndexQuery;
-import org.neo4j.kernel.api.schema.IndexQuery.IndexQueryType;
+import org.neo4j.internal.kernel.api.IndexQuery;
+import org.neo4j.internal.kernel.api.IndexQuery.IndexQueryType;
 import org.neo4j.kernel.api.schema.index.IndexDescriptor;
 import org.neo4j.kernel.impl.api.index.sampling.IndexSamplingConfig;
+import org.neo4j.storageengine.api.schema.AbstractIndexReader;
 import org.neo4j.storageengine.api.schema.IndexReader;
 import org.neo4j.storageengine.api.schema.IndexSampler;
 import org.neo4j.values.storable.Value;
 
 import static org.neo4j.kernel.api.impl.schema.LuceneDocumentStructure.NODE_ID_KEY;
-import static org.neo4j.kernel.api.schema.IndexQuery.IndexQueryType.exact;
+import static org.neo4j.internal.kernel.api.IndexQuery.IndexQueryType.exact;
 import static org.neo4j.kernel.api.schema.index.IndexDescriptor.Type.UNIQUE;
 
 /**
@@ -55,7 +58,7 @@ import static org.neo4j.kernel.api.schema.index.IndexDescriptor.Type.UNIQUE;
  *
  * @see PartitionedIndexReader
  */
-public class SimpleIndexReader implements IndexReader
+public class SimpleIndexReader extends AbstractIndexReader
 {
     private final PartitionSearcher partitionSearcher;
     private final IndexDescriptor descriptor;
@@ -67,6 +70,7 @@ public class SimpleIndexReader implements IndexReader
             IndexSamplingConfig samplingConfig,
             TaskCoordinator taskCoordinator )
     {
+        super( descriptor );
         this.partitionSearcher = partitionSearcher;
         this.descriptor = descriptor;
         this.samplingConfig = samplingConfig;
@@ -88,7 +92,7 @@ public class SimpleIndexReader implements IndexReader
     }
 
     @Override
-    public PrimitiveLongIterator query( IndexQuery... predicates ) throws IndexNotApplicableKernelException
+    public PrimitiveLongResourceIterator query( IndexQuery... predicates ) throws IndexNotApplicableKernelException
     {
         IndexQuery predicate = predicates[0];
         switch ( predicate.type() )
@@ -119,7 +123,7 @@ public class SimpleIndexReader implements IndexReader
         case rangeString:
             assertNotComposite( predicates );
             IndexQuery.StringRangePredicate sp = (IndexQuery.StringRangePredicate) predicate;
-            return rangeSeekByString( sp.from(), sp.fromInclusive(), sp.to(), sp.toInclusive() );
+           return rangeSeekByString( sp.from(), sp.fromInclusive(), sp.to(), sp.toInclusive() );
         case stringPrefix:
             assertNotComposite( predicates );
             IndexQuery.StringPrefixPredicate spp = (IndexQuery.StringPrefixPredicate) predicate;
@@ -149,38 +153,38 @@ public class SimpleIndexReader implements IndexReader
         assert predicates.length == 1 : "composite indexes not yet supported for this operation";
     }
 
-    private PrimitiveLongIterator seek( Value... values )
+    private PrimitiveLongResourceIterator seek( Value... values )
     {
         return query( LuceneDocumentStructure.newSeekQuery( values ) );
     }
 
-    private PrimitiveLongIterator rangeSeekByNumberInclusive( Number lower, Number upper )
+    private PrimitiveLongResourceIterator rangeSeekByNumberInclusive( Number lower, Number upper )
     {
         return query( LuceneDocumentStructure.newInclusiveNumericRangeSeekQuery( lower, upper ) );
     }
 
-    private PrimitiveLongIterator rangeSeekByString( String lower, boolean includeLower,
+    private PrimitiveLongResourceIterator rangeSeekByString( String lower, boolean includeLower,
             String upper, boolean includeUpper )
     {
         return query( LuceneDocumentStructure.newRangeSeekByStringQuery( lower, includeLower, upper, includeUpper ) );
     }
 
-    private PrimitiveLongIterator rangeSeekByPrefix( String prefix )
+    private PrimitiveLongResourceIterator rangeSeekByPrefix( String prefix )
     {
         return query( LuceneDocumentStructure.newRangeSeekByPrefixQuery( prefix ) );
     }
 
-    private PrimitiveLongIterator scan()
+    private PrimitiveLongResourceIterator scan()
     {
         return query( LuceneDocumentStructure.newScanQuery() );
     }
 
-    private PrimitiveLongIterator containsString( String exactTerm )
+    private PrimitiveLongResourceIterator containsString( String exactTerm )
     {
         return query( LuceneDocumentStructure.newWildCardStringQuery( exactTerm ) );
     }
 
-    private PrimitiveLongIterator endsWith( String suffix )
+    private PrimitiveLongResourceIterator endsWith( String suffix )
     {
         return query( LuceneDocumentStructure.newSuffixStringQuery( suffix ) );
     }
@@ -219,7 +223,7 @@ public class SimpleIndexReader implements IndexReader
         }
     }
 
-    protected PrimitiveLongIterator query( Query query )
+    protected PrimitiveLongResourceIterator query( Query query )
     {
         try
         {

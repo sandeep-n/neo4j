@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,42 +19,52 @@
  */
 package org.neo4j.cypher.internal.compatibility.v3_4.runtime.slotted.pipes
 
-import org.neo4j.cypher.internal.compatibility.v3_4.runtime.PipelineInformation
-import org.neo4j.cypher.internal.compatibility.v3_4.runtime.slotted.PrimitiveExecutionContext
-import org.neo4j.cypher.internal.planner.v3_4.spi.IndexDescriptor
+import org.neo4j.cypher.internal.compatibility.v3_4.runtime.SlotConfiguration
+import org.neo4j.cypher.internal.compatibility.v3_4.runtime.slotted.SlottedExecutionContext
+import org.neo4j.cypher.internal.runtime.QueryContext
+import org.neo4j.cypher.internal.runtime.interpreted.ExecutionContext
 import org.neo4j.cypher.internal.runtime.interpreted.commands.expressions.Expression
 import org.neo4j.cypher.internal.runtime.interpreted.commands.indexQuery
 import org.neo4j.cypher.internal.runtime.interpreted.pipes._
-import org.neo4j.cypher.internal.runtime.interpreted.ExecutionContext
+import org.neo4j.cypher.internal.util.v3_4.attribution.Id
 import org.neo4j.cypher.internal.v3_4.expressions.{LabelToken, PropertyKeyToken}
-import org.neo4j.cypher.internal.v3_4.logical.plans.{LogicalPlanId, QueryExpression}
+import org.neo4j.cypher.internal.v3_4.logical.plans.QueryExpression
+import org.neo4j.internal.kernel.api.{CapableIndexReference, IndexReference}
 
 case class NodeIndexSeekSlottedPipe(ident: String,
                                     label: LabelToken,
                                     propertyKeys: Seq[PropertyKeyToken],
                                     valueExpr: QueryExpression[Expression],
                                     indexMode: IndexSeekMode = IndexSeek,
-                                    pipelineInformation: PipelineInformation)
-                                   (val id: LogicalPlanId = LogicalPlanId.DEFAULT) extends Pipe {
+                                    slots: SlotConfiguration,
+                                    argumentSize: SlotConfiguration.Size)
+                                   (val id: Id = Id.INVALID_ID) extends Pipe {
 
-  private val offset = pipelineInformation.getLongOffsetFor(ident)
+  private val offset = slots.getLongOffsetFor(ident)
 
   private val propertyIds: Array[Int] = propertyKeys.map(_.nameId.id).toArray
 
-  private val descriptor = IndexDescriptor(label.nameId.id, propertyIds)
+  private var reference: IndexReference = CapableIndexReference.NO_INDEX
 
-  private val indexFactory = indexMode.indexFactory(descriptor)
+  private def reference(context: QueryContext): IndexReference = {
+    if (reference == CapableIndexReference.NO_INDEX) {
+      reference = context.indexReference(label.nameId.id, propertyIds:_*)
+    }
+    reference
+  }
+
+  private def indexFactory(context: QueryContext) = indexMode.indexFactory(reference(context))
 
   valueExpr.expressions.foreach(_.registerOwningPipe(this))
 
   protected def internalCreateResults(state: QueryState): Iterator[ExecutionContext] = {
-    val index = indexFactory(state)
-    val baseContext = state.initialContext.getOrElse(PrimitiveExecutionContext.empty)
+    val index = indexFactory(state.query)(state)
+    val baseContext = state.createOrGetInitialContext(executionContextFactory)
     val resultNodes = indexQuery(valueExpr, baseContext, state, index, label.name, propertyKeys.map(_.name))
     resultNodes.map { node =>
-      val context = PrimitiveExecutionContext(pipelineInformation)
-      state.copyArgumentStateTo(context, pipelineInformation.initialNumberOfLongs, pipelineInformation.initialNumberOfReferences)
-      context.setLongAt(offset, node.getId)
+      val context = SlottedExecutionContext(slots)
+      state.copyArgumentStateTo(context, argumentSize.nLongs, argumentSize.nReferences)
+      context.setLongAt(offset, node.id)
       context
     }
   }

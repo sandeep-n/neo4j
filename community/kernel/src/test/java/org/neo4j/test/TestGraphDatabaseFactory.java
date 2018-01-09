@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -46,6 +46,7 @@ import org.neo4j.kernel.impl.factory.GraphDatabaseFacadeFactory;
 import org.neo4j.kernel.impl.factory.PlatformModule;
 import org.neo4j.kernel.impl.logging.LogService;
 import org.neo4j.kernel.impl.logging.SimpleLogService;
+import org.neo4j.kernel.internal.locker.StoreLocker;
 import org.neo4j.kernel.monitoring.Monitors;
 import org.neo4j.logging.LogProvider;
 import org.neo4j.logging.NullLogProvider;
@@ -259,6 +260,7 @@ public class TestGraphDatabaseFactory extends GraphDatabaseFactory
         protected PlatformModule createPlatform( File storeDir, Config config, Dependencies dependencies,
                 GraphDatabaseFacade graphDatabaseFacade )
         {
+            config.augment( GraphDatabaseSettings.database_path, storeDir.getAbsolutePath() );
             if ( impermanent )
             {
                 config.augment( ephemeral, TRUE );
@@ -330,6 +332,12 @@ public class TestGraphDatabaseFactory extends GraphDatabaseFactory
             protected FileSystemAbstraction createNewFileSystem()
             {
                 return new EphemeralFileSystemAbstraction();
+            }
+
+            @Override
+            protected StoreLocker createStoreLocker()
+            {
+                return new StoreLocker( fileSystem, storeDir );
             }
         }
     }

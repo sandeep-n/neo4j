@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,25 +21,25 @@ package org.neo4j.cypher.internal.compiler.v3_4.planner.logical.idp
 
 object IDPSolverStep {
   def empty[S, P, C] = new IDPSolverStep[S, P, C] {
-    override def apply(registry: IdRegistry[S], goal: Goal, cache: IDPCache[P])(implicit context: C): Iterator[P] =
+    override def apply(registry: IdRegistry[S], goal: Goal, cache: IDPCache[P], context: C): Iterator[P] =
       Iterator.empty
   }
 }
 
 trait SolverStep[S, P, C] {
-  def apply(registry: IdRegistry[S], goal: Goal, cache: IDPCache[P])(implicit context: C):  Iterator[P]
+  def apply(registry: IdRegistry[S], goal: Goal, cache: IDPCache[P], context: C):  Iterator[P]
 }
 
 trait IDPSolverStep[S, P, C] extends SolverStep[S, P, C] {
   self =>
 
   def map(f: P => P) = new IDPSolverStep[S, P, C] {
-    override def apply(registry: IdRegistry[S], goal: Goal, cache: IDPCache[P])(implicit context: C): Iterator[P] =
-      self(registry, goal, cache).map(f)
+    override def apply(registry: IdRegistry[S], goal: Goal, cache: IDPCache[P], context: C): Iterator[P] =
+      self(registry, goal, cache, context).map(f)
   }
 
   def ++(next: IDPSolverStep[S, P, C]) = new IDPSolverStep[S, P, C] {
-    override def apply(registry: IdRegistry[S], goal: Goal, cache: IDPCache[P])(implicit context: C): Iterator[P] =
-      self(registry, goal, cache) ++ next(registry, goal, cache)
+    override def apply(registry: IdRegistry[S], goal: Goal, cache: IDPCache[P], context: C): Iterator[P] =
+      self(registry, goal, cache, context) ++ next(registry, goal, cache, context)
   }
 }

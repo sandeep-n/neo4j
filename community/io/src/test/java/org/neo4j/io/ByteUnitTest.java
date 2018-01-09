@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,6 +22,7 @@ package org.neo4j.io;
 import org.junit.Test;
 
 import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 
 public class ByteUnitTest
@@ -148,5 +149,116 @@ public class ByteUnitTest
         assertThat( ByteUnit.tebiBytes( 1 ), is( 1099511627776L ) );
         assertThat( ByteUnit.pebiBytes( 1 ), is( 1125899906842624L ) );
         assertThat( ByteUnit.exbiBytes( 1 ), is( 1152921504606846976L ) );
+
+        assertThat( ByteUnit.parse( "1" ), is( 1L ) );
+        assertThat( ByteUnit.parse( "1 KiB" ), is( 1024L ) );
+        assertThat( ByteUnit.parse( "1KiB" ), is( 1024L ) );
+        assertThat( ByteUnit.parse( " 1    Ki B" ), is( 1024L ) );
+        assertThat( ByteUnit.parse( "1 KB" ), is( 1024L ) );
+        assertThat( ByteUnit.parse( "1KB" ), is( 1024L ) );
+        assertThat( ByteUnit.parse( " 1    KB " ), is( 1024L ) );
+        assertThat( ByteUnit.parse( "1 kB" ), is( 1024L ) );
+        assertThat( ByteUnit.parse( "1kB" ), is( 1024L ) );
+        assertThat( ByteUnit.parse( " 1    kB " ), is( 1024L ) );
+        assertThat( ByteUnit.parse( "1 kb" ), is( 1024L ) );
+        assertThat( ByteUnit.parse( "1kb" ), is( 1024L ) );
+        assertThat( ByteUnit.parse( " 1    kb " ), is( 1024L ) );
+        assertThat( ByteUnit.parse( "1 k" ), is( 1024L ) );
+        assertThat( ByteUnit.parse( "1k" ), is( 1024L ) );
+        assertThat( ByteUnit.parse( " 1    k"  ), is( 1024L ) );
+        assertThat( ByteUnit.parse( "1 MiB" ), is( 1048576L ) );
+        assertThat( ByteUnit.parse( "1MiB" ), is( 1048576L ) );
+        assertThat( ByteUnit.parse( " 1    Mi B" ), is( 1048576L ) );
+        assertThat( ByteUnit.parse( "1 MB" ), is( 1048576L ) );
+        assertThat( ByteUnit.parse( "1MB" ), is( 1048576L ) );
+        assertThat( ByteUnit.parse( " 1    MB " ), is( 1048576L ) );
+        assertThat( ByteUnit.parse( "1 mB" ), is( 1048576L ) );
+        assertThat( ByteUnit.parse( "1mB" ), is( 1048576L ) );
+        assertThat( ByteUnit.parse( " 1    mB " ), is( 1048576L ) );
+        assertThat( ByteUnit.parse( "1 mb" ), is( 1048576L ) );
+        assertThat( ByteUnit.parse( "1mb" ), is( 1048576L ) );
+        assertThat( ByteUnit.parse( " 1    mb " ), is( 1048576L ) );
+        assertThat( ByteUnit.parse( "1 m" ), is( 1048576L ) );
+        assertThat( ByteUnit.parse( "1m" ), is( 1048576L ) );
+        assertThat( ByteUnit.parse( " 1    m"  ), is( 1048576L ) );
+        assertThat( ByteUnit.parse( "1 GiB" ), is( 1073741824L ) );
+        assertThat( ByteUnit.parse( "1GiB" ), is( 1073741824L ) );
+        assertThat( ByteUnit.parse( " 1    Gi B" ), is( 1073741824L ) );
+        assertThat( ByteUnit.parse( "1 GB" ), is( 1073741824L ) );
+        assertThat( ByteUnit.parse( "1GB" ), is( 1073741824L ) );
+        assertThat( ByteUnit.parse( " 1    GB " ), is( 1073741824L ) );
+        assertThat( ByteUnit.parse( "1 gB" ), is( 1073741824L ) );
+        assertThat( ByteUnit.parse( "1gB" ), is( 1073741824L ) );
+        assertThat( ByteUnit.parse( " 1    gB " ), is( 1073741824L ) );
+        assertThat( ByteUnit.parse( "1 gb" ), is( 1073741824L ) );
+        assertThat( ByteUnit.parse( "1gb" ), is( 1073741824L ) );
+        assertThat( ByteUnit.parse( " 1    gb " ), is( 1073741824L ) );
+        assertThat( ByteUnit.parse( "1 g" ), is( 1073741824L ) );
+        assertThat( ByteUnit.parse( "1g" ), is( 1073741824L ) );
+        assertThat( ByteUnit.parse( " 1    g"  ), is( 1073741824L ) );
+        assertThat( ByteUnit.parse( "1 TiB" ), is( 1099511627776L ) );
+        assertThat( ByteUnit.parse( "1TiB" ), is( 1099511627776L ) );
+        assertThat( ByteUnit.parse( " 1    Ti B" ), is( 1099511627776L ) );
+        assertThat( ByteUnit.parse( "1 TB" ), is( 1099511627776L ) );
+        assertThat( ByteUnit.parse( "1TB" ), is( 1099511627776L ) );
+        assertThat( ByteUnit.parse( " 1    TB " ), is( 1099511627776L ) );
+        assertThat( ByteUnit.parse( "1 PiB" ), is( 1125899906842624L ) );
+        assertThat( ByteUnit.parse( "1PiB" ), is( 1125899906842624L ) );
+        assertThat( ByteUnit.parse( " 1    Pi B" ), is( 1125899906842624L ) );
+        assertThat( ByteUnit.parse( "1 PB" ), is( 1125899906842624L ) );
+        assertThat( ByteUnit.parse( "1PB" ), is( 1125899906842624L ) );
+        assertThat( ByteUnit.parse( " 1    PB " ), is( 1125899906842624L ) );
+        assertThat( ByteUnit.parse( "1 EiB" ), is( 1152921504606846976L ) );
+        assertThat( ByteUnit.parse( "1EiB" ), is( 1152921504606846976L ) );
+        assertThat( ByteUnit.parse( " 1    Ei B" ), is( 1152921504606846976L ) );
+        assertThat( ByteUnit.parse( "1 EB" ), is( 1152921504606846976L ) );
+        assertThat( ByteUnit.parse( "1EB" ), is( 1152921504606846976L ) );
+        assertThat( ByteUnit.parse( " 1    EB " ), is( 1152921504606846976L ) );
+    }
+
+    @Test
+    public void bytesToString()
+    {
+        assertEquals( "1B", ByteUnit.bytesToString( 1 ) );
+        assertEquals( "10B", ByteUnit.bytesToString( 10 ) );
+        assertEquals( "1000B", ByteUnit.bytesToString( 1000 ) );
+        assertEquals( "1.001KiB", ByteUnit.bytesToString( 1025 ) );
+        assertEquals( "10.01KiB", ByteUnit.bytesToString( 10250 ) );
+        assertEquals( "100.1KiB", ByteUnit.bytesToString( 102500 ) );
+        assertEquals( "1001KiB", ByteUnit.bytesToString( 1025000 ) );
+        assertEquals( "9.775MiB", ByteUnit.bytesToString( 10250000 ) );
+        assertEquals( "97.75MiB", ByteUnit.bytesToString( 102500000 ) );
+        assertEquals( "977.5MiB", ByteUnit.bytesToString( 1025000000 ) );
+        assertEquals( "9.546GiB", ByteUnit.bytesToString( 10250000000L) );
+    }
+
+    @Test( expected = IllegalArgumentException.class )
+    public void mustThrowWhenParsingInvalidUnit() throws Exception
+    {
+        ByteUnit.parse( "1 XB" );
+    }
+
+    @Test( expected = IllegalArgumentException.class )
+    public void mustThrowWhenParsingUnitInterjectedWithNumber() throws Exception
+    {
+        ByteUnit.parse( "1K2i3B" );
+    }
+
+    @Test( expected = IllegalArgumentException.class )
+    public void mustThrowWhenParsingNonNumbericTest() throws Exception
+    {
+        ByteUnit.parse( "abc" );
+    }
+
+    @Test( expected = IllegalArgumentException.class )
+    public void mustThrowWhenParsingOnlyUnit() throws Exception
+    {
+        ByteUnit.parse( "MiB" );
+    }
+
+    @Test( expected = IllegalArgumentException.class )
+    public void mustThrowWhenParsingUnitBeforeValue() throws Exception
+    {
+        ByteUnit.parse( "MiB 1" );
     }
 }

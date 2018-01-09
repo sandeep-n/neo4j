@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -153,4 +153,12 @@ public class MetricsSettings implements LoadableConfig
 
     @Description( "The reporting interval for Graphite. That is, how often to send updated metrics to Graphite." )
     public static Setting<Duration> graphiteInterval = setting( "metrics.graphite.interval", DURATION, "3s" );
+
+    // Prometheus settings
+    @Description( "Set to `true` to enable the Prometheus endpoint" )
+    public static Setting<Boolean> prometheusEnabled = setting( "metrics.prometheus.enabled", BOOLEAN, FALSE );
+
+    @Description( "The hostname and port to use as Prometheus endpoint" )
+    public static Setting<HostnamePort> prometheusEndpoint =
+            setting( "metrics.prometheus.endpoint", HOSTNAME_PORT, "localhost:2004" );
 }

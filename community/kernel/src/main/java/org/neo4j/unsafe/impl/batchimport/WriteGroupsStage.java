@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,6 +22,7 @@ package org.neo4j.unsafe.impl.batchimport;
 import org.neo4j.kernel.impl.store.RecordStore;
 import org.neo4j.kernel.impl.store.record.RelationshipGroupRecord;
 import org.neo4j.unsafe.impl.batchimport.staging.Stage;
+import org.neo4j.unsafe.impl.batchimport.store.StorePrepareIdSequence;
 
 import static org.neo4j.unsafe.impl.batchimport.RelationshipGroupCache.GROUP_ENTRY_SIZE;
 
@@ -39,12 +40,14 @@ import static org.neo4j.unsafe.impl.batchimport.RelationshipGroupCache.GROUP_ENT
  */
 public class WriteGroupsStage extends Stage
 {
+    public static final String NAME = "Write";
+
     public WriteGroupsStage( Configuration config, RelationshipGroupCache cache,
             RecordStore<RelationshipGroupRecord> store )
     {
-        super( "Write", config );
+        super( NAME, null, config, 0 );
         add( new ReadGroupsFromCacheStep( control(), config, cache.iterator(), GROUP_ENTRY_SIZE ) );
         add( new EncodeGroupsStep( control(), config, store ) );
-        add( new UpdateRecordsStep<>( control(), config, store ) );
+        add( new UpdateRecordsStep<>( control(), config, store, new StorePrepareIdSequence() ) );
     }
 }

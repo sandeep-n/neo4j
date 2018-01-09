@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,6 +21,7 @@ package org.neo4j.internal.cypher.acceptance
 
 import java.io.{File, PrintWriter}
 import java.net.{URL, URLConnection, URLStreamHandler, URLStreamHandlerFactory}
+import java.nio.file.Files
 import java.util.Collections.emptyMap
 
 import org.neo4j.cypher._
@@ -41,8 +42,8 @@ class LoadCsvAcceptanceTest
   extends ExecutionEngineFunSuite with BeforeAndAfterAll
   with QueryStatisticsTestSupport with CreateTempFileTestSupport with CypherComparisonSupport{
 
-  val expectedToSucceed = Configs.CommunityInterpreted - Configs.Cost2_3
-  val expectedToFail = Configs.CommunityInterpreted - Configs.Cost2_3 + TestConfiguration(Versions.Default, Planners.Default,
+  val expectedToSucceed = Configs.Interpreted - Configs.Cost2_3
+  val expectedToFail = Configs.Interpreted - Configs.Cost2_3 + TestConfiguration(Versions.Default, Planners.Default,
     Runtimes(Runtimes.Default, Runtimes.ProcedureOrSchema, Runtimes.CompiledSource, Runtimes.CompiledBytecode))
 
   def csvUrls(f: PrintWriter => Unit) = Seq(
@@ -72,7 +73,7 @@ class LoadCsvAcceptanceTest
 
     // when & then
     for (url <- urls) {
-      val result = executeWith(Configs.CommunityInterpreted - Configs.Version2_3,
+      val result = executeWith(Configs.Interpreted - Configs.Version2_3,
         s"""LOAD CSV WITH HEADERS FROM '$url' AS row
             | MATCH (user:User{userID: row.USERID}) USING INDEX user:User(userID)
             | MATCH (order:Order{orderID: row.OrderId})
@@ -121,6 +122,21 @@ class LoadCsvAcceptanceTest
       val result = executeWith(expectedToSucceed, s"LOAD CSV FROM '$url' AS line CREATE (a {name: line[0]}) RETURN a.name")
       assertStats(result, nodesCreated = 3, propertiesWritten = 3)
     }
+  }
+
+  test("make sure to release all possible locks/references on input files") {
+    val path = Files.createTempFile("file",".csv")
+
+    Files.write(path,"foo".getBytes)
+    assert(Files.exists(path))
+
+    val filePathForQuery = path.normalize().toUri
+    val result = execute(s"LOAD CSV FROM '$filePathForQuery' AS line CREATE (a {name: line[0]}) RETURN a.name")
+    assertStats(result, nodesCreated = 1, propertiesWritten = 1)
+
+    result.close()
+
+    assert(Files.deleteIfExists(path))
   }
 
   test("import three numbers") {
@@ -202,7 +218,7 @@ class LoadCsvAcceptanceTest
         writer.println("5,'Emerald',")
     })
     for (url <- urls) {
-      val result = executeWith(expectedToSucceed, s"LOAD CSV WITH HEADERS FROM '$url' AS line WITH line WHERE line.x IS NOT NULL RETURN line.name")
+      val result = executeWith(expectedToSucceed + Configs.SlottedInterpreted, s"LOAD CSV WITH HEADERS FROM '$url' AS line WITH line WHERE line.x IS NOT NULL RETURN line.name")
       assert(result.toList === List(
         Map("line.name" -> "'Aardvark'"),
         Map("line.name" -> "'Cash'"),

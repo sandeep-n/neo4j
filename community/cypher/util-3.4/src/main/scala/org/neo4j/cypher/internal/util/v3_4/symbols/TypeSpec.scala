@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -68,7 +68,7 @@ object TypeSpec {
  *
  * @param ranges A set of TypeRanges, the intersection of which constitutes the entire set of types matched by this specification
  */
-class TypeSpec private (private val ranges: Seq[TypeRange]) extends Equals {
+class TypeSpec(val ranges: Seq[TypeRange]) extends Equals {
   def contains(that: CypherType): Boolean = contains(that, ranges)
   private def contains(that: CypherType, rs: Seq[TypeRange]): Boolean = rs.exists(_ contains that)
 

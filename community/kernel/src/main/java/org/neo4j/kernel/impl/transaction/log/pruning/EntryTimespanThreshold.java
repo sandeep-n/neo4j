@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -33,7 +33,7 @@ public final class EntryTimespanThreshold implements Threshold
 
     private long lowerLimit;
 
-    public EntryTimespanThreshold( Clock clock, TimeUnit timeUnit, long timeToKeep )
+    EntryTimespanThreshold( Clock clock, TimeUnit timeUnit, long timeToKeep )
     {
         this.clock = clock;
         this.timeToKeepInMillis = timeUnit.toMillis( timeToKeep );

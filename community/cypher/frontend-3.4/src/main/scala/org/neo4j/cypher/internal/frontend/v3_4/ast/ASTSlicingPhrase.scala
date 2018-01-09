@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -26,7 +26,7 @@ import org.neo4j.cypher.internal.v3_4.expressions._
 trait ASTSlicingPhrase extends SemanticCheckable with SemanticAnalysisTooling {
   self: ASTNode =>
   def name: String
-  def dependencies: Set[Variable] = expression.dependencies
+  def dependencies: Set[LogicalVariable] = expression.dependencies
   def expression: Expression
 
   def semanticCheck: SemanticCheck =

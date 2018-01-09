@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -40,7 +40,6 @@ import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.graphdb.index.Index;
 import org.neo4j.graphdb.index.RelationshipIndex;
 import org.neo4j.index.lucene.ValueContext;
-import org.neo4j.io.fs.FileUtils;
 import org.neo4j.kernel.configuration.Settings;
 import org.neo4j.kernel.impl.storemigration.UpgradeNotAllowedByConfigurationException;
 import org.neo4j.test.TestGraphDatabaseFactory;
@@ -58,18 +57,13 @@ import static org.neo4j.index.impl.lucene.explicit.LuceneIndexImplementation.FUL
 public class ExplicitIndexesUpgradeIT
 {
     @Rule
-    public TestDirectory testDir = TestDirectory.testDirectory();
+    public final TestDirectory testDir = TestDirectory.testDirectory();
 
     @Rule
-    public ExpectedException expectedException = ExpectedException.none();
+    public final ExpectedException expectedException = ExpectedException.none();
 
     @Rule
-    public SuppressOutput suppressOutput = SuppressOutput.suppressAll();
-
-    public void setUp() throws IOException
-    {
-        FileUtils.deleteRecursively( testDir.graphDbDir() );
-    }
+    public final SuppressOutput suppressOutput = SuppressOutput.suppressAll();
 
     @Test
     public void successfulMigrationWithoutExplicitIndexes() throws Exception

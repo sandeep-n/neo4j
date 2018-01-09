@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -41,7 +41,7 @@ class ExpressionSelectivityCalculatorTest extends CypherFunSuite with AstConstru
     implicit val selections = Selections(Set(Predicate(Set(IdName("n")), HasLabels(varFor("n"), Seq(LabelName("Page")_))_)))
 
     val stats = mock[GraphStatistics]
-    when(stats.nodesWithLabelCardinality(None)).thenReturn(1000.0)
+    when(stats.nodesAllCardinality()).thenReturn(1000.0)
     when(stats.indexSelectivity(index)).thenReturn(Some(Selectivity.of(0.1d).get))
 
     val calculator = ExpressionSelectivityCalculator(stats, IndependenceCombiner)
@@ -58,7 +58,7 @@ class ExpressionSelectivityCalculatorTest extends CypherFunSuite with AstConstru
     implicit val selections = Selections(Set(Predicate(Set(IdName("n")), HasLabels(varFor("n"), Seq(LabelName("Page")_))_)))
 
     val stats = mock[GraphStatistics]
-    when(stats.nodesWithLabelCardinality(None)).thenReturn(2000.0)
+    when(stats.nodesAllCardinality()).thenReturn(2000.0)
     when(stats.nodesWithLabelCardinality(Some(index.label))).thenReturn(1000.0)
     val calculator = ExpressionSelectivityCalculator(stats, IndependenceCombiner)
 
@@ -81,7 +81,7 @@ class ExpressionSelectivityCalculatorTest extends CypherFunSuite with AstConstru
     implicit val selections = Selections(Set(n_is_Person, n_gt_3_and_lt_4))
 
     val stats = mock[GraphStatistics]
-    when(stats.nodesWithLabelCardinality(None)).thenReturn(2000.0)
+    when(stats.nodesAllCardinality()).thenReturn(2000.0)
     when(stats.nodesWithLabelCardinality(Some(index.label))).thenReturn(1000.0)
     val calculator = ExpressionSelectivityCalculator(stats, IndependenceCombiner)
 
@@ -147,7 +147,7 @@ class ExpressionSelectivityCalculatorTest extends CypherFunSuite with AstConstru
 
   test("should default to single cardinality for HasLabels with previously unknown label") {
     val stats = mock[GraphStatistics]
-    when(stats.nodesWithLabelCardinality(None)).thenReturn(Cardinality(10))
+    when(stats.nodesAllCardinality()).thenReturn(Cardinality(10))
     val calculator = ExpressionSelectivityCalculator(stats, IndependenceCombiner)
     implicit val semanticTable = SemanticTable()
     implicit val selections = mock[Selections]

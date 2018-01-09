@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,15 +21,15 @@ package org.neo4j.cypher.internal.compiler.v3_4.planner.logical.plans.rewriter
 
 import org.neo4j.cypher.internal.compiler.v3_4.planner.LogicalPlanningTestSupport
 import org.neo4j.cypher.internal.frontend.v3_4.ast.AstConstructionTestSupport
-import org.neo4j.cypher.internal.util.v3_4.test_helpers.CypherFunSuite
 import org.neo4j.cypher.internal.ir.v3_4.IdName
-import org.neo4j.cypher.internal.v3_4.logical.plans.{Selection, SingleRow}
+import org.neo4j.cypher.internal.util.v3_4.test_helpers.CypherFunSuite
+import org.neo4j.cypher.internal.v3_4.logical.plans.{Argument, Selection}
 
 class FuseSelectionsTest extends CypherFunSuite with LogicalPlanningTestSupport with AstConstructionTestSupport {
   test("merges two selections into one") {
     val p1 = propEquality("a", "foo", 12)
     val p2 = propEquality("a", "bar", 33)
-    val lhs = SingleRow(Set(IdName("a")))(solved)()
+    val lhs = Argument(Set(IdName("a")))(solved)
 
     Selection(Seq(p1),
       Selection(Seq(p2), lhs)(solved))(solved).
@@ -42,7 +42,7 @@ class FuseSelectionsTest extends CypherFunSuite with LogicalPlanningTestSupport 
     val p1 = propEquality("a", "foo", 12)
     val p2 = propEquality("a", "bar", 33)
     val p3 = propEquality("a", "baz", 42)
-    val lhs = SingleRow(Set(IdName("a")))(solved)()
+    val lhs = Argument(Set(IdName("a")))(solved)
 
     Selection(Seq(p1),
       Selection(Seq(p2),

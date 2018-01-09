@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -107,7 +107,7 @@ class ProcedureExecutionResult(context: QueryContext,
           case CTString => transform(res(pos), stringValue)
           case CTBoolean => transform(res(pos), booleanValue)
           case CTPoint => transform(res(pos), (p: Point) => asPointValue(p))
-          case CTGeometry => transform(res(pos), (g: Geometry) => asPointValue(g))
+          case CTGeometry => transform(res(pos), (g: Geometry) => asGeometryValue(g))
           case CTMap => transform(res(pos), asMapValue)
           case ListType(_) => transform(res(pos), asListValue)
           case CTAny => transform(res(pos), ValueUtils.of)

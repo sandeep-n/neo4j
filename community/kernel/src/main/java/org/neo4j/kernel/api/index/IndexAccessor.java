@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -67,6 +67,16 @@ public interface IndexAccessor extends Closeable
     void force() throws IOException;
 
     /**
+     * Refreshes this index, so that {@link #newReader() readers} created after completion of this call
+     * will see the latest updates. This happens automatically on closing {@link #newUpdater(IndexUpdateMode)}
+     * w/ {@link IndexUpdateMode#ONLINE}, but not guaranteed for {@link IndexUpdateMode#RECOVERY}.
+     * Therefore this call is complementary for updates that has taken place with {@link IndexUpdateMode#RECOVERY}.
+     *
+     * @throws IOException if there was a problem refreshing the index.
+     */
+    void refresh() throws IOException;
+
+    /**
      * Closes this index accessor. There will not be any interactions after this call.
      * After completion of this call there cannot be any essential state that hasn't been forced to disk.
      *
@@ -116,6 +126,11 @@ public interface IndexAccessor extends Closeable
 
         @Override
         public void force()
+        {
+        }
+
+        @Override
+        public void refresh()
         {
         }
 
@@ -192,6 +207,12 @@ public interface IndexAccessor extends Closeable
         public void force() throws IOException
         {
             delegate.force();
+        }
+
+        @Override
+        public void refresh() throws IOException
+        {
+            delegate.refresh();
         }
 
         @Override

@@ -1,5 +1,5 @@
 Neo4j
-Copyright © 2002-2017 Network Engine for Objects in Lund AB (referred to
+Copyright © 2002-2018 Network Engine for Objects in Lund AB (referred to
 in this notice as "Neo Technology")
    [http://neotechnology.com]
 
@@ -46,7 +46,9 @@ Apache Software License, Version 2.0
   Commons Logging
   ConcurrentLinkedHashMap
   Data Mapper for Jackson
+  FindBugs-jsr305
   Graphite Integration for Metrics
+  Guava: Google Core Libraries for Java
   hazelcast-all
   Jackson
   JAX-RS provider for JSON content type
@@ -58,6 +60,8 @@ Apache Software License, Version 2.0
   Jetty :: Utilities
   Jetty :: Webapp Application Support
   Jetty :: XML utilities
+  jPowerShell
+  jProcesses
   Lucene codecs
   Lucene Common Analyzers
   Lucene Core
@@ -69,6 +73,11 @@ Apache Software License, Version 2.0
   opencsv
   parboiled-core
   parboiled-scala
+  Prometheus Java Simpleclient
+  Prometheus Java Simpleclient Common
+  Prometheus Java Simpleclient Dropwizard
+  Prometheus Java Simpleclient Httpserver
+  WMI4Java
 
 BSD - Scala License
   Scala Library
@@ -78,6 +87,7 @@ BSD License
   ASM Core
   ASM Tree
   ASM Util
+  JLine
   Scala Compiler
 
 Bouncy Castle License
@@ -97,10 +107,12 @@ GNU General Public License, version 2 with the Classpath Exception
   Java Servlet API
 
 MIT License
+  scallop
   SLF4J API Module
   SLF4J NOP Binding
 
 Mozilla Public License, Version 2.0
+  kiama
   Mozilla Rhino
 
 Dependencies with multiple licenses

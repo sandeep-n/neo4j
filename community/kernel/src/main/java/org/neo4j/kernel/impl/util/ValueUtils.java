@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,7 +20,6 @@
 package org.neo4j.kernel.impl.util;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -29,28 +28,28 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+import org.neo4j.graphdb.Entity;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Path;
 import org.neo4j.graphdb.PropertyContainer;
 import org.neo4j.graphdb.Relationship;
 import org.neo4j.graphdb.spatial.Geometry;
 import org.neo4j.graphdb.spatial.Point;
-import org.neo4j.helpers.collection.Iterables;
 import org.neo4j.values.AnyValue;
+import org.neo4j.values.storable.CoordinateReferenceSystem;
 import org.neo4j.values.storable.NumberValue;
+import org.neo4j.values.storable.PointValue;
 import org.neo4j.values.storable.TextValue;
+import org.neo4j.values.storable.Value;
 import org.neo4j.values.storable.Values;
-import org.neo4j.values.virtual.CoordinateReferenceSystem;
 import org.neo4j.values.virtual.EdgeValue;
 import org.neo4j.values.virtual.ListValue;
 import org.neo4j.values.virtual.MapValue;
 import org.neo4j.values.virtual.NodeValue;
 import org.neo4j.values.virtual.PathValue;
-import org.neo4j.values.virtual.PointValue;
 import org.neo4j.values.virtual.VirtualValues;
 
 import static java.util.stream.StreamSupport.stream;
-import static org.neo4j.values.virtual.VirtualValues.list;
 import static org.neo4j.values.virtual.VirtualValues.map;
 
 public final class ValueUtils
@@ -69,31 +68,46 @@ public final class ValueUtils
     @SuppressWarnings( "unchecked" )
     public static AnyValue of( Object object )
     {
-        try
+        Value value = Values.unsafeOf( object, true );
+        if ( value != null )
         {
-            return Values.of( object );
+            return value;
         }
-        catch ( IllegalArgumentException e )
+        else
         {
-            if ( object instanceof Node )
+            if ( object instanceof Entity )
             {
-                return fromNodeProxy( (Node) object );
+                if ( object instanceof Node )
+                {
+                    return fromNodeProxy( (Node) object );
+                }
+                else if ( object instanceof Relationship )
+                {
+                    return fromRelationshipProxy( (Relationship) object );
+                }
+                else
+                {
+                    throw new IllegalArgumentException( "Unknown entity + " + object.getClass().getName() );
+                }
             }
-            else if ( object instanceof Relationship )
+            else if ( object instanceof Iterable<?> )
             {
-                return fromRelationshipProxy( (Relationship) object );
-            }
-            else if ( object instanceof Path )
-            {
-                return asPathValue( (Path) object );
+                if ( object instanceof Path )
+                {
+                    return asPathValue( (Path) object );
+                }
+                else if ( object instanceof List<?> )
+                {
+                    return asListValue( (List<?>) object );
+                }
+                else
+                {
+                    return asListValue( (Iterable<?>) object );
+                }
             }
             else if ( object instanceof Map<?,?> )
             {
                 return asMapValue( (Map<String,Object>) object );
-            }
-            else if ( object instanceof Iterable<?> )
-            {
-                return asListValue( (Iterable<?>) object );
             }
             else if ( object instanceof Iterator<?> )
             {
@@ -105,18 +119,6 @@ public final class ValueUtils
                 }
                 return asListValue( objects );
             }
-            else if ( object instanceof Stream<?> )
-            {
-                return asListValue( ((Stream<Object>) object).collect( Collectors.toList() ) );
-            }
-            else if ( object instanceof Point )
-            {
-                return asPointValue( (Point) object );
-            }
-            else if ( object instanceof Geometry )
-            {
-                return asPointValue( (Geometry) object );
-            }
             else if ( object instanceof Object[] )
             {
                 Object[] array = (Object[]) object;
@@ -126,6 +128,21 @@ public final class ValueUtils
                     anyValues[i] = of( array[i] );
                 }
                 return VirtualValues.list( anyValues );
+            }
+            else if ( object instanceof Stream<?> )
+            {
+                return asListValue( ((Stream<Object>) object).collect( Collectors.toList() ) );
+            }
+            else if ( object instanceof Geometry )
+            {
+                if ( object instanceof Point )
+                {
+                    return asPointValue( (Point) object );
+                }
+                else
+                {
+                    return asGeometryValue( (Geometry) object );
+                }
             }
             else
             {
@@ -140,7 +157,7 @@ public final class ValueUtils
         return toPoint( point );
     }
 
-    public static PointValue asPointValue( Geometry geometry )
+    public static PointValue asGeometryValue( Geometry geometry )
     {
         if ( !geometry.getGeometryType().equals( "Point" ) )
         {
@@ -152,13 +169,23 @@ public final class ValueUtils
     private static PointValue toPoint( Geometry geometry )
     {
         List<Double> coordinate = geometry.getCoordinates().get( 0 ).getCoordinate();
-        if ( geometry.getCRS().getCode() == CoordinateReferenceSystem.Cartesian.code )
+        double[] primitiveCoordinate = new double[coordinate.size()];
+        for ( int i = 0; i < coordinate.size(); i++ )
         {
-            return VirtualValues.pointCartesian( coordinate.get( 0 ), coordinate.get( 1 ) );
+            primitiveCoordinate[i] = coordinate.get( i );
         }
-        else if ( geometry.getCRS().getCode() == CoordinateReferenceSystem.WGS84.code )
+
+        // TODO:
+        // From a (public class) CRS we can not get the name of the CRSTable.
+        // I do not know how to a sensible mapping here.
+        // Maybe we have to deprecate the public types after all and rewrite them
+        if ( geometry.getCRS().getCode() == CoordinateReferenceSystem.Cartesian.getCode() )
         {
-            return VirtualValues.pointGeographic( coordinate.get( 0 ), coordinate.get( 1 ) );
+            return Values.pointValue( CoordinateReferenceSystem.Cartesian, primitiveCoordinate );
+        }
+        else if ( geometry.getCRS().getCode() == CoordinateReferenceSystem.WGS84.getCode() )
+        {
+            return Values.pointValue( CoordinateReferenceSystem.WGS84, primitiveCoordinate );
         }
         else
         {
@@ -166,11 +193,24 @@ public final class ValueUtils
         }
     }
 
+    public static ListValue asListValue( List<?> collection )
+    {
+        ArrayList<AnyValue> values = new ArrayList<>( collection.size() );
+        for ( Object o : collection )
+        {
+            values.add( of( o ) );
+        }
+        return VirtualValues.fromList( values );
+    }
+
     public static ListValue asListValue( Iterable<?> collection )
     {
-        AnyValue[] anyValues =
-                Iterables.stream( collection ).map( ValueUtils::of ).toArray( AnyValue[]::new );
-        return list( anyValues );
+        ArrayList<AnyValue> values = new ArrayList<>();
+        for ( Object o : collection )
+        {
+            values.add( of( o ) );
+        }
+        return VirtualValues.fromList( values );
     }
 
     public static AnyValue asNodeOrEdgeValue( PropertyContainer container )
@@ -229,17 +269,17 @@ public final class ValueUtils
             double y = ((NumberValue) map.get( "y" )).doubleValue();
             if ( !map.containsKey( "crs" ) )
             {
-                return VirtualValues.pointCartesian( x, y );
+                return Values.pointValue( CoordinateReferenceSystem.Cartesian, x, y );
             }
 
             TextValue crs = (TextValue) map.get( "crs" );
-            if ( crs.stringValue().equals( CoordinateReferenceSystem.Cartesian.type() ) )
+            if ( crs.stringValue().equals( CoordinateReferenceSystem.Cartesian.getName() ) )
             {
-                return VirtualValues.pointCartesian( x, y );
+                return Values.pointValue( CoordinateReferenceSystem.Cartesian, x, y );
             }
-            else if ( crs.stringValue().equals( CoordinateReferenceSystem.WGS84.type() ) )
+            else if ( crs.stringValue().equals( CoordinateReferenceSystem.WGS84.getName() ) )
             {
-                return VirtualValues.pointGeographic( x, y );
+                return Values.pointValue( CoordinateReferenceSystem.WGS84, x, y );
             }
             else
             {
@@ -252,13 +292,13 @@ public final class ValueUtils
             double longitude = ((NumberValue) map.get( "longitude" )).doubleValue();
             if ( !map.containsKey( "crs" ) )
             {
-                return VirtualValues.pointGeographic( longitude, latitude );
+                return Values.pointValue( CoordinateReferenceSystem.WGS84, longitude, latitude );
             }
 
             TextValue crs = (TextValue) map.get( "crs" );
-            if ( crs.stringValue().equals( CoordinateReferenceSystem.WGS84.type() ) )
+            if ( crs.stringValue().equals( CoordinateReferenceSystem.WGS84.getName() ) )
             {
-                return VirtualValues.pointGeographic( longitude, latitude );
+                return Values.pointValue( CoordinateReferenceSystem.WGS84, longitude, latitude );
             }
             else
             {

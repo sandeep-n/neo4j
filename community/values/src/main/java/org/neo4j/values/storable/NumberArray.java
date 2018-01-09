@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -18,6 +18,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.neo4j.values.storable;
+
+import org.neo4j.graphdb.spatial.Geometry;
 
 abstract class NumberArray extends ArrayValue
 {
@@ -39,6 +41,12 @@ abstract class NumberArray extends ArrayValue
 
     @Override
     public boolean equals( String[] x )
+    {
+        return false;
+    }
+
+    @Override
+    public boolean equals( Geometry[] x )
     {
         return false;
     }

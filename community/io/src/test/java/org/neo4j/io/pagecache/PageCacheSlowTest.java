@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -112,7 +112,7 @@ public abstract class PageCacheSlowTest<T extends PageCache> extends PageCacheTe
                                           int pf_flags ) throws IOException;
     }
 
-    @RepeatRule.Repeat( times = 250 )
+    @RepeatRule.Repeat( times = 50 )
     @Test( timeout = SEMI_LONG_TIMEOUT_MILLIS )
     public void mustNotLoseUpdates() throws Exception
     {
@@ -147,7 +147,7 @@ public abstract class PageCacheSlowTest<T extends PageCache> extends PageCacheTe
 //        LinearTracers linearTracers = LinearHistoryTracerFactory.pageCacheTracer();
 //        getPageCache( fs, cachePages, pageSize, linearTracers.getPageCacheTracer(),
 //                linearTracers.getCursorTracerSupplier() );
-        getPageCache( fs, cachePages, pageSize, PageCacheTracer.NULL, PageCursorTracerSupplier.NULL );
+        getPageCache( fs, cachePages, PageCacheTracer.NULL, PageCursorTracerSupplier.NULL );
         final PagedFile pagedFile = pageCache.map( file( "a" ), pageSize );
 
         ensureAllPagesExists( filePages, pagedFile );
@@ -157,6 +157,7 @@ public abstract class PageCacheSlowTest<T extends PageCache> extends PageCacheTe
         {
             UpdateWorker worker = new UpdateWorker( i, filePages, shouldStop, pagedFile )
             {
+                @Override
                 protected void performReadOrUpdate(
                         ThreadLocalRandom rng, boolean updateCounter, int pf_flags ) throws IOException
                 {
@@ -297,7 +298,7 @@ public abstract class PageCacheSlowTest<T extends PageCache> extends PageCacheTe
         final int maxCursorsPerThread = cachePages / (1 + threadCount);
         assertThat( maxCursorsPerThread * threadCount, lessThan( cachePages ) );
 
-        getPageCache( fs, cachePages, pageSize, PageCacheTracer.NULL, PageCursorTracerSupplier.NULL );
+        getPageCache( fs, cachePages, PageCacheTracer.NULL, PageCursorTracerSupplier.NULL );
         final PagedFile pagedFile = pageCache.map( file( "a" ), pageSize );
 
         ensureAllPagesExists( filePages, pagedFile );
@@ -386,7 +387,7 @@ public abstract class PageCacheSlowTest<T extends PageCache> extends PageCacheTe
         File file = file( "a" );
         generateFileWithRecords( file, recordsPerFilePage * 2, recordSize );
 
-        getPageCache( fs, maxPages, pageCachePageSize, PageCacheTracer.NULL, PageCursorTracerSupplier.NULL );
+        getPageCache( fs, maxPages, PageCacheTracer.NULL, PageCursorTracerSupplier.NULL );
 
         final PagedFile pf = pageCache.map( file, filePageSize );
         final CountDownLatch hasLockLatch = new CountDownLatch( 1 );
@@ -482,7 +483,7 @@ public abstract class PageCacheSlowTest<T extends PageCache> extends PageCacheTe
         }
     }
 
-    @RepeatRule.Repeat( times = 100 )
+    @RepeatRule.Repeat( times = 20 )
     @Test( timeout = LONG_TIMEOUT_MILLIS )
     public void pageCacheMustRemainInternallyConsistentWhenGettingRandomFailures() throws Exception
     {
@@ -498,7 +499,7 @@ public abstract class PageCacheSlowTest<T extends PageCache> extends PageCacheTe
         // Because our test failures are non-deterministic, we use this tracer to capture a full history of the
         // events leading up to any given failure.
         LinearTracers linearTracers = LinearHistoryTracerFactory.pageCacheTracer();
-        getPageCache( fs, maxPages, pageCachePageSize, linearTracers.getPageCacheTracer(),
+        getPageCache( fs, maxPages, linearTracers.getPageCacheTracer(),
                 linearTracers.getCursorTracerSupplier() );
 
         PagedFile pfA = pageCache.map( existingFile( "a" ), filePageSize );

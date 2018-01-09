@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,19 +21,19 @@ package org.neo4j.cypher.internal.spi.v3_4.codegen
 
 import java.util
 
-import org.neo4j.collection.primitive.{PrimitiveLongIntMap, PrimitiveLongIterator}
+import org.neo4j.collection.primitive.{PrimitiveLongIntMap, PrimitiveLongIterator, PrimitiveLongResourceIterator}
 import org.neo4j.cypher.internal.codegen.CompiledConversionUtils.CompositeKey
 import org.neo4j.cypher.internal.codegen._
 import org.neo4j.cypher.internal.compatibility.v3_4.runtime.compiled.codegen.QueryExecutionEvent
 import org.neo4j.cypher.internal.compiler.v3_4.spi.{NodeIdWrapper, RelationshipIdWrapper}
 import org.neo4j.cypher.internal.javacompat.ResultRecord
+import org.neo4j.cypher.internal.util.v3_4.attribution.Id
 import org.neo4j.cypher.internal.v3_4.codegen.QueryExecutionTracer
-import org.neo4j.cypher.internal.v3_4.logical.plans.LogicalPlanId
 import org.neo4j.cypher.result.QueryResult.{QueryResultVisitor, Record}
 import org.neo4j.graphdb.Direction
 import org.neo4j.helpers.collection.MapUtil
+import org.neo4j.internal.kernel.api.IndexQuery
 import org.neo4j.kernel.api.ReadOperations
-import org.neo4j.kernel.api.schema.IndexQuery
 import org.neo4j.kernel.api.schema.index.IndexDescriptor
 import org.neo4j.kernel.impl.api.store.RelationshipIterator
 import org.neo4j.kernel.impl.api.{RelationshipDataExtractor, RelationshipVisitor}
@@ -88,13 +88,13 @@ object Methods {
   val nodeExists = method[ReadOperations, Boolean]("nodeExists", typeRef[Long])
   val nodesGetAll = method[ReadOperations, PrimitiveLongIterator]("nodesGetAll")
   val nodeGetProperty = method[ReadOperations, Value]("nodeGetProperty", typeRef[Long], typeRef[Int])
-  val indexQuery = method[ReadOperations, PrimitiveLongIterator]("indexQuery", typeRef[IndexDescriptor], typeRef[Array[IndexQuery]])
+  val indexQuery = method[ReadOperations, PrimitiveLongResourceIterator]("indexQuery", typeRef[IndexDescriptor], typeRef[Array[IndexQuery]])
   val indexQueryExact = method[IndexQuery, IndexQuery.ExactPredicate]("exact", typeRef[Int], typeRef[Object])
   val nodeGetUniqueFromIndexLookup = method[ReadOperations, Long]("nodeGetFromUniqueIndexSeek", typeRef[IndexDescriptor], typeRef[Array[IndexQuery.ExactPredicate]])
   val countsForNode = method[ReadOperations, Long]("countsForNode", typeRef[Int])
   val countsForRel = method[ReadOperations, Long]("countsForRelationship", typeRef[Int], typeRef[Int], typeRef[Int])
   val relationshipGetProperty = method[ReadOperations, Value]("relationshipGetProperty", typeRef[Long], typeRef[Int])
-  val nodesGetForLabel = method[ReadOperations, PrimitiveLongIterator]("nodesGetForLabel", typeRef[Int])
+  val nodesGetForLabel = method[ReadOperations, PrimitiveLongResourceIterator]("nodesGetForLabel", typeRef[Int])
   val nodeHasLabel = method[ReadOperations, Boolean]("nodeHasLabel", typeRef[Long], typeRef[Int])
   val nextLong = method[PrimitiveLongIterator, Long]("next")
   val fetchNextRelationship = method[RelationshipIterator, Long]("next")
@@ -105,7 +105,7 @@ object Methods {
   val relId = method[RelationshipIdWrapper, Long]("id")
   val set = method[ResultRecord, Unit]("set", typeRef[Int], typeRef[AnyValue])
   val visit = method[QueryResultVisitor[_], Boolean]("visit", typeRef[Record])
-  val executeOperator = method[QueryExecutionTracer, QueryExecutionEvent]("executeOperator", typeRef[LogicalPlanId])
+  val executeOperator = method[QueryExecutionTracer, QueryExecutionEvent]("executeOperator", typeRef[Id])
   val dbHit = method[QueryExecutionEvent, Unit]("dbHit")
   val row = method[QueryExecutionEvent, Unit]("row")
   val unboxInteger = method[java.lang.Integer, Int]("intValue")

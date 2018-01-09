@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -28,6 +28,15 @@ public abstract class NumberValue extends ScalarValue
     abstract int compareTo( IntegralValue other );
 
     abstract int compareTo( FloatingPointValue other );
+
+    @Override
+    public abstract Number asObjectCopy();
+
+    @Override
+    public Number asObject()
+    {
+        return asObjectCopy();
+    }
 
     @Override
     public boolean equals( boolean x )

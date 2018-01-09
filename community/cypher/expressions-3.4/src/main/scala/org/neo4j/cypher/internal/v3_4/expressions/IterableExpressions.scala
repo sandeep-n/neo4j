@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,7 +20,7 @@ import org.neo4j.cypher.internal.util.v3_4.InputPosition
 
 trait FilteringExpression extends Expression {
   def name: String
-  def variable: Variable
+  def variable: LogicalVariable
   def expression: Expression
   def innerPredicate: Option[Expression]
 
@@ -74,18 +74,18 @@ object ListComprehension {
     ListComprehension(ExtractScope(variable, innerPredicate, extractExpression)(position), expression)(position)
 }
 
-case class PatternComprehension(namedPath: Option[Variable], pattern: RelationshipsPattern,
+case class PatternComprehension(namedPath: Option[LogicalVariable], pattern: RelationshipsPattern,
                                 predicate: Option[Expression], projection: Expression,
-                                outerScope: Set[Variable] = Set.empty)
+                                outerScope: Set[LogicalVariable] = Set.empty)
                                (val position: InputPosition)
   extends ScopeExpression {
 
   self =>
 
-  def withOuterScope(outerScope: Set[Variable]) =
+  def withOuterScope(outerScope: Set[LogicalVariable]) =
     copy(outerScope = outerScope)(position)
 
-  override val introducedVariables: Set[Variable] = {
+  override val introducedVariables: Set[LogicalVariable] = {
     val introducedInternally = namedPath.toSet ++ pattern.element.allVariables
     val introducedExternally = introducedInternally -- outerScope
     introducedExternally
@@ -95,7 +95,7 @@ case class PatternComprehension(namedPath: Option[Variable], pattern: Relationsh
 sealed trait IterablePredicateExpression extends FilteringExpression {
 
   def scope: FilterScope
-  def variable: Variable = scope.variable
+  def variable: LogicalVariable = scope.variable
   def innerPredicate: Option[Expression] = scope.innerPredicate
 
   override def asCanonicalStringVal: String = {
@@ -109,7 +109,7 @@ case class AllIterablePredicate(scope: FilterScope, expression: Expression)(val 
 }
 
 object AllIterablePredicate {
-  def apply(variable: Variable, expression: Expression, innerPredicate: Option[Expression])(position: InputPosition): AllIterablePredicate =
+  def apply(variable: LogicalVariable, expression: Expression, innerPredicate: Option[Expression])(position: InputPosition): AllIterablePredicate =
     AllIterablePredicate(FilterScope(variable, innerPredicate)(position), expression)(position)
 }
 
@@ -118,7 +118,7 @@ case class AnyIterablePredicate(scope: FilterScope, expression: Expression)(val 
 }
 
 object AnyIterablePredicate {
-  def apply(variable: Variable, expression: Expression, innerPredicate: Option[Expression])(position: InputPosition): AnyIterablePredicate =
+  def apply(variable: LogicalVariable, expression: Expression, innerPredicate: Option[Expression])(position: InputPosition): AnyIterablePredicate =
     AnyIterablePredicate(FilterScope(variable, innerPredicate)(position), expression)(position)
 }
 
@@ -127,7 +127,7 @@ case class NoneIterablePredicate(scope: FilterScope, expression: Expression)(val
 }
 
 object NoneIterablePredicate {
-  def apply(variable: Variable, expression: Expression, innerPredicate: Option[Expression])(position: InputPosition): NoneIterablePredicate =
+  def apply(variable: LogicalVariable, expression: Expression, innerPredicate: Option[Expression])(position: InputPosition): NoneIterablePredicate =
     NoneIterablePredicate(FilterScope(variable, innerPredicate)(position), expression)(position)
 }
 
@@ -136,7 +136,7 @@ case class SingleIterablePredicate(scope: FilterScope, expression: Expression)(v
 }
 
 object SingleIterablePredicate {
-  def apply(variable: Variable, expression: Expression, innerPredicate: Option[Expression])(position: InputPosition): SingleIterablePredicate =
+  def apply(variable: LogicalVariable, expression: Expression, innerPredicate: Option[Expression])(position: InputPosition): SingleIterablePredicate =
     SingleIterablePredicate(FilterScope(variable, innerPredicate)(position), expression)(position)
 }
 

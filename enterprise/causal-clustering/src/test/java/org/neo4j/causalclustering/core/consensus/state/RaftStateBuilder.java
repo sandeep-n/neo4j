@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,12 +25,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
+import org.neo4j.causalclustering.core.consensus.log.cache.ConsecutiveInFlightCache;
 import org.neo4j.causalclustering.core.state.storage.InMemoryStateStorage;
 import org.neo4j.causalclustering.core.state.storage.StateStorage;
 import org.neo4j.causalclustering.core.consensus.RaftMessages;
 import org.neo4j.causalclustering.core.consensus.log.InMemoryRaftLog;
 import org.neo4j.causalclustering.core.consensus.log.RaftLog;
-import org.neo4j.causalclustering.core.consensus.log.segmented.InFlightMap;
 import org.neo4j.causalclustering.core.consensus.membership.RaftMembership;
 import org.neo4j.causalclustering.core.consensus.outcome.RaftLogCommand;
 import org.neo4j.causalclustering.core.consensus.outcome.Outcome;
@@ -58,10 +58,13 @@ public class RaftStateBuilder
     public long leaderCommit = -1;
     private MemberId votedFor;
     private RaftLog entryLog = new InMemoryRaftLog();
+    private boolean supportPreVoting;
     private Set<MemberId> votesForMe = emptySet();
+    private Set<MemberId> preVotesForMe = emptySet();
     private long lastLogIndexBeforeWeBecameLeader = -1;
     public long commitIndex = -1;
     private FollowerStates<MemberId> followerStates = new FollowerStates<>();
+    private boolean isPreElection;
 
     public RaftStateBuilder myself( MemberId myself )
     {
@@ -117,6 +120,12 @@ public class RaftStateBuilder
         return this;
     }
 
+    public RaftStateBuilder supportsPreVoting( boolean supportPreVoting )
+    {
+        this.supportPreVoting = supportPreVoting;
+        return this;
+    }
+
     public RaftStateBuilder lastLogIndexBeforeWeBecameLeader( long lastLogIndexBeforeWeBecameLeader )
     {
         this.lastLogIndexBeforeWeBecameLeader = lastLogIndexBeforeWeBecameLeader;
@@ -129,6 +138,12 @@ public class RaftStateBuilder
         return this;
     }
 
+    public RaftStateBuilder setPreElection( boolean isPreElection )
+    {
+        this.isPreElection = isPreElection;
+        return this;
+    }
+
     public RaftState build() throws IOException
     {
         StateStorage<TermState> termStore = new InMemoryStateStorage<>( new TermState() );
@@ -136,14 +151,14 @@ public class RaftStateBuilder
         StubMembership membership = new StubMembership( votingMembers, replicationMembers );
 
         RaftState state = new RaftState( myself, termStore, membership, entryLog,
-                voteStore, new InFlightMap<>(), NullLogProvider.getInstance() );
+                voteStore, new ConsecutiveInFlightCache(), NullLogProvider.getInstance(), supportPreVoting );
 
         Collection<RaftMessages.Directed> noMessages = Collections.emptyList();
         List<RaftLogCommand> noLogCommands = Collections.emptyList();
 
-        state.update( new Outcome( null, term, leader, leaderCommit, votedFor, votesForMe,
+        state.update( new Outcome( null, term, leader, leaderCommit, votedFor, votesForMe, preVotesForMe,
                 lastLogIndexBeforeWeBecameLeader, followerStates, false, noLogCommands,
-                noMessages, emptySet(), commitIndex, emptySet() ) );
+                noMessages, emptySet(), commitIndex, emptySet(), isPreElection ) );
 
         return state;
     }

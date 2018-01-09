@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -29,6 +29,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.DoubleStream;
@@ -40,6 +41,7 @@ import org.neo4j.cypher.internal.compiler.v3_4.spi.RelationshipIdWrapper;
 import org.neo4j.cypher.internal.util.v3_4.CypherTypeException;
 import org.neo4j.cypher.internal.util.v3_4.IncomparableValuesException;
 import org.neo4j.kernel.impl.core.NodeManager;
+import org.neo4j.kernel.impl.util.ValueUtils;
 import org.neo4j.values.AnyValue;
 
 import static java.lang.String.format;
@@ -184,6 +186,10 @@ public abstract class CompiledConversionUtils
         }
     }
 
+    /**
+     * Checks equality according to OpenCypher
+     * @return true if equal, false if not equal and null if incomparable
+     */
     public static Boolean equals( Object lhs, Object rhs )
     {
         if ( lhs == null || rhs == null )
@@ -191,16 +197,24 @@ public abstract class CompiledConversionUtils
             return null;
         }
 
-        if ( (lhs instanceof NodeIdWrapper && !(rhs instanceof NodeIdWrapper)) ||
-             (rhs instanceof NodeIdWrapper && !(lhs instanceof NodeIdWrapper)) ||
-             (lhs instanceof RelationshipIdWrapper && !(rhs instanceof RelationshipIdWrapper)) ||
-             (rhs instanceof RelationshipIdWrapper && !(lhs instanceof RelationshipIdWrapper)) )
+        boolean lhsNodeIdWrapper = lhs instanceof NodeIdWrapper;
+        if ( lhsNodeIdWrapper || rhs instanceof NodeIdWrapper || lhs instanceof RelationshipIdWrapper ||
+             rhs instanceof RelationshipIdWrapper )
         {
-
-            throw new IncomparableValuesException( lhs.getClass().getSimpleName(), rhs.getClass().getSimpleName() );
+            if ( (lhsNodeIdWrapper && !(rhs instanceof NodeIdWrapper)) ||
+                 (rhs instanceof NodeIdWrapper && !lhsNodeIdWrapper) ||
+                 (lhs instanceof RelationshipIdWrapper && !(rhs instanceof RelationshipIdWrapper)) ||
+                 (rhs instanceof RelationshipIdWrapper && !(lhs instanceof RelationshipIdWrapper)) )
+            {
+                throw new IncomparableValuesException( lhs.getClass().getSimpleName(), rhs.getClass().getSimpleName() );
+            }
+            return lhs.equals( rhs );
         }
 
-        return CompiledEquivalenceUtils.equals( lhs, rhs );
+        AnyValue lhsValue = lhs instanceof AnyValue ? (AnyValue) lhs : ValueUtils.of( lhs );
+        AnyValue rhsValue = rhs instanceof AnyValue ? (AnyValue) rhs : ValueUtils.of( rhs );
+
+        return lhsValue.ternaryEquals( rhsValue );
     }
 
     public static Boolean or( Object lhs, Object rhs )
@@ -316,6 +330,10 @@ public abstract class CompiledConversionUtils
                 System.arraycopy( anyValue, 0, copy, 0, length );
                 return copy;
             }
+            else if ( anyValue instanceof String[] )
+            {
+                return anyValue;
+            }
             else
             {
                 Object[] copy = new Object[length];
@@ -357,6 +375,10 @@ public abstract class CompiledConversionUtils
         else if ( iterable == null )
         {
             return Collections.emptyIterator();
+        }
+        else if ( iterable.getClass().isArray() )
+        {
+            return new ArrayIterator( iterable );
         }
         else
         {
@@ -714,6 +736,36 @@ public abstract class CompiledConversionUtils
         catch ( ClassCastException e )
         {
             throw new CypherTypeException( "Type mismatch: expected a map but was " + object, e );
+        }
+    }
+
+    static class ArrayIterator implements Iterator
+    {
+        private int position;
+        private final int len;
+        private final Object array;
+
+        private ArrayIterator( Object array )
+        {
+            this.position = 0;
+            this.len = Array.getLength( array );
+            this.array = array;
+        }
+
+        @Override
+        public boolean hasNext()
+        {
+            return position < len;
+        }
+
+        @Override
+        public Object next()
+        {
+            if ( position >= len )
+            {
+                throw new NoSuchElementException();
+            }
+            return Array.get( array, position++ );
         }
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,29 +22,7 @@ package org.neo4j.internal.kernel.api;
 /**
  * Token creation and lookup.
  */
-public interface Token
+public interface Token extends TokenWrite, TokenRead
 {
-    class SomeException extends Exception
-    {
-    }
 
-    /**
-     * Returns a label id for a label name. If the label doesn't exist prior to
-     * this call it gets created.
-     */
-    int labelGetOrCreateForName( String labelName ) throws SomeException;
-
-    /**
-     * Returns a property key id for a property key. If the key doesn't exist prior to
-     * this call it gets created.
-     */
-    int propertyKeyGetOrCreateForName( String propertyKeyName ) throws SomeException;
-
-    int relationshipTypeGetOrCreateForName( String relationshipTypeName ) throws SomeException;
-
-    void labelCreateForName( String labelName, int id ) throws SomeException;
-
-    void propertyKeyCreateForName( String propertyKeyName, int id ) throws SomeException;
-
-    void relationshipTypeCreateForName( String relationshipTypeName, int id ) throws SomeException;
 }

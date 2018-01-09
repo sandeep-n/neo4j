@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,6 +19,8 @@
  */
 package org.neo4j.unsafe.impl.batchimport.input.csv;
 
+import java.io.IOException;
+import org.neo4j.collection.RawIterator;
 import org.neo4j.csv.reader.CharReadable;
 import org.neo4j.csv.reader.CharSeeker;
 import org.neo4j.unsafe.impl.batchimport.input.InputEntity;
@@ -29,7 +31,7 @@ import org.neo4j.unsafe.impl.batchimport.input.InputEntity;
  */
 public interface Data<ENTITY extends InputEntity>
 {
-    CharReadable stream();
+    RawIterator<CharReadable,IOException> stream();
 
     Decorator<ENTITY> decorator();
 }

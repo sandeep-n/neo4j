@@ -1,4 +1,4 @@
-# Copyright (c) 2002-2015 "Neo Technology,"
+# Copyright (c) 2002-2018 "Neo Technology,"
 # Network Engine for Objects in Lund AB [http://neotechnology.com]
 #
 # This file is part of Neo4j.
@@ -93,7 +93,7 @@ Function Get-Neo4jPrunsrv
     # Build the PRUNSRV command line
     switch ($PsCmdlet.ParameterSetName) {
       "ServerInstallInvoke"   {
-        $PrunArgs += @("//IS//$($Name)")
+        $PrunArgs += @("`"//IS//$($Name)`"")
 
         $JvmOptions = @()
 
@@ -114,38 +114,39 @@ Function Get-Neo4jPrunsrv
         Write-Verbose "Reading JVM settings from console java invocation"
         $JvmOptions = [array](Merge-Neo4jJavaSettings -Source $JvmOptions -Add ($JavaCMD.args | Where-Object { $_ -match '(^-D|^-X)' }))
 
-        $PrunArgs += @('--StartMode=jvm',
-          '--StartMethod=start',
+        $PrunArgs += @("`"--StartMode=jvm`"",
+          "`"--StartMethod=start`"",
           "`"--StartPath=$($Neo4jServer.Home)`"",
           "`"--StartParams=--config-dir=$($Neo4jServer.ConfDir)`"",
           "`"++StartParams=--home-dir=$($Neo4jServer.Home)`"",
-          '--StopMode=jvm',
-          '--StopMethod=stop',
+          "`"--StopMode=jvm`"",
+          "`"--StopMethod=stop`"",
           "`"--StopPath=$($Neo4jServer.Home)`"",
           "`"--Description=Neo4j Graph Database - $($Neo4jServer.Home)`"",
           "`"--DisplayName=Neo4j Graph Database - $Name`"",
           "`"--Jvm=$($JvmDLL)`"",
-          "--LogPath=$($Neo4jServer.LogDir)",
-          "--StdOutput=$(Join-Path -Path $Neo4jServer.LogDir -ChildPath 'neo4j.log')",
-          "--StdError=$(Join-Path -Path $Neo4jServer.LogDir -ChildPath 'service-error.log')",
-          '--LogPrefix=neo4j-service',
-          '--Classpath=lib/*;plugins/*',
+          "`"--LogPath=$($Neo4jServer.LogDir)`"",
+          "`"--StdOutput=$(Join-Path -Path $Neo4jServer.LogDir -ChildPath 'neo4j.log')`"",
+          "`"--StdError=$(Join-Path -Path $Neo4jServer.LogDir -ChildPath 'service-error.log')`"",
+          "`"--LogPrefix=neo4j-service`"",
+          "`"--Classpath=lib/*;plugins/*`"",
           "`"--JvmOptions=$($JvmOptions -join ';')`"",
-          '--Startup=auto'
+          "`"--Startup=auto`""
         )
 
         # Check if Java invocation includes Java memory sizing
-        $JvmMs = ''
-        $JvmMx = ''
         $JavaCMD.args | ForEach-Object -Process {
           if ($Matches -ne $null) { $Matches.Clear() }
           if ($_ -match '^-Xms([\d]+)m$') {
-            $PrunArgs += "--JvmMs $($matches[1])"
+            $PrunArgs += "`"--JvmMs`""
+            $PrunArgs += "`"$($matches[1])`""
             Write-Verbose "Use JVM Start Memory of $($matches[1]) MB"
           }
           if ($Matches -ne $null) { $Matches.Clear() }
           if ($_ -match '^-Xmx([\d]+)m$') {
-            $PrunArgs += "--JvmMx $($matches[1])"
+            $PrunArgs += "`"--JvmMx`""
+            $PrunArgs += "`"$($matches[1])`""
+
             Write-Verbose "Use JVM Max Memory of $($matches[1]) MB"
           }
         }
@@ -154,11 +155,11 @@ Function Get-Neo4jPrunsrv
         if ($Neo4jServer.ServerType -eq 'Community') { $serverMainClass = 'org.neo4j.server.CommunityEntryPoint' }
         if ($Neo4jServer.DatabaseMode.ToUpper() -eq 'ARBITER') { $serverMainClass = 'org.neo4j.server.enterprise.ArbiterEntryPoint' }
         if ($serverMainClass -eq '') { Write-Error "Unable to determine the Server Main Class from the server information"; return $null }
-        $PrunArgs += @("--StopClass=$($serverMainClass)",
-                       "--StartClass=$($serverMainClass)")
+        $PrunArgs += @("`"--StopClass=$($serverMainClass)`"",
+                       "`"--StartClass=$($serverMainClass)`"")
       }
-      "ServerUninstallInvoke" { $PrunArgs += @("//DS//$($Name)") }
-      "ConsoleInvoke"         { $PrunArgs += @("//TS//$($Name)") }
+      "ServerUninstallInvoke" { $PrunArgs += @("`"//DS//$($Name)`"") }
+      "ConsoleInvoke"         { $PrunArgs += @("`"//TS//$($Name)`"") }
       default {
         throw "Unknown ParameterSerName $($PsCmdlet.ParameterSetName)"
         return $null

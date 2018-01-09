@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,23 +23,24 @@ import java.net.URL
 
 import org.neo4j.collection.primitive.PrimitiveLongIterator
 import org.neo4j.cypher.internal.planner.v3_4.spi.{IdempotentResult, IndexDescriptor}
-import org.neo4j.cypher.internal.runtime.interpreted.pipes.matching.PatternNode
 import org.neo4j.cypher.internal.runtime._
 import org.neo4j.cypher.internal.v3_4.expressions.SemanticDirection
 import org.neo4j.cypher.internal.v3_4.logical.plans.QualifiedName
-import org.neo4j.graphdb.{Node, Path, PropertyContainer, Relationship}
+import org.neo4j.graphdb.{Node, Path, PropertyContainer}
+import org.neo4j.internal.kernel.api.IndexReference
 import org.neo4j.kernel.impl.api.store.RelationshipIterator
+import org.neo4j.kernel.impl.core.NodeManager
 import org.neo4j.values.AnyValue
-import org.neo4j.values.virtual.{EdgeValue, NodeValue}
+import org.neo4j.values.virtual.{EdgeValue, ListValue, NodeValue}
 
 trait QueryContextAdaptation {
   self: QueryContext =>
 
-  override type EntityAccessor = this.type
+  override def createNewQueryContext(): QueryContext = ???
 
-  override def indexScanByContains(index: IndexDescriptor, value: String): scala.Iterator[Node] = ???
+  override def indexScanByContains(index: IndexReference, value: String): scala.Iterator[NodeValue] = ???
 
-  override def indexScanByEndsWith(index: IndexDescriptor, value: String): Iterator[Node] = ???
+  override def indexScanByEndsWith(index: IndexReference, value: String): Iterator[NodeValue] = ???
 
   override def createNodePropertyExistenceConstraint(labelId: Int, propertyKeyId: Int): Boolean = ???
 
@@ -79,21 +80,25 @@ trait QueryContextAdaptation {
 
   override def nodeGetDegree(node: Long, dir: SemanticDirection, relTypeId: Int): Int = ???
 
-  override def entityAccessor: EntityAccessor = ???
+  override def entityAccessor: NodeManager = ???
+
+  override def resources: CloseableResource = ???
 
   override def getOrCreatePropertyKeyId(propertyKey: String): Int = ???
 
   override def isLabelSetOnNode(label: Int, node: Long): Boolean = ???
 
-  override def indexSeek(index: IndexDescriptor, value: Seq[Any]): scala.Iterator[Node] = ???
+  override def indexReference(label: Int, properties: Int*): IndexReference = ???
 
-  override def getRelationshipsForIds(node: Long, dir: SemanticDirection, types: Option[Array[Int]]): scala.Iterator[Relationship] = ???
+  override def indexSeek(index: IndexReference, value: Seq[Any]): scala.Iterator[NodeValue] = ???
+
+  override def getRelationshipsForIds(node: Long, dir: SemanticDirection, types: Option[Array[Int]]): scala.Iterator[EdgeValue] = ???
 
   override def getRelationshipsForIdsPrimitive(node: Long, dir: SemanticDirection, types: Option[Array[Int]]): RelationshipIterator = ???
 
-  override def getRelationshipFor(relationshipId: Long, typeId: Int, startNodeId: Long, endNodeId: Long): Relationship = ???
+  override def getRelationshipFor(relationshipId: Long, typeId: Int, startNodeId: Long, endNodeId: Long): EdgeValue = ???
 
-  override def getLabelsForNode(node: Long): scala.Iterator[Int] = ???
+  override def getLabelsForNode(node: Long): ListValue = ???
 
   override def dropUniqueConstraint(descriptor: IndexDescriptor): Unit = ???
 
@@ -106,17 +111,15 @@ trait QueryContextAdaptation {
 
   override def allShortestPath(left: Long, right: Long, depth: Int, expander: Expander, pathPredicate: KernelPredicate[Path], filters: Seq[KernelPredicate[PropertyContainer]]): scala.Iterator[Path] = ???
 
-  override def nodeOps: Operations[Node] = ???
+  override def nodeOps: Operations[NodeValue] = ???
 
   override def lockRelationships(relIds: Long*): Unit = ???
 
   override def getOrCreateLabelId(labelName: String): Int = ???
 
-  override def indexScan(index: IndexDescriptor): scala.Iterator[Node] = ???
+  override def indexScan(index: IndexReference): scala.Iterator[NodeValue] = ???
 
-  override def indexScanPrimitive(index: IndexDescriptor): PrimitiveLongIterator = ???
-
-  override def getPropertiesForNode(node: Long): scala.Iterator[Int] = ???
+  override def indexScanPrimitive(index: IndexReference): PrimitiveLongIterator = ???
 
   override def getImportURL(url: URL): Either[String, URL] = ???
 
@@ -124,7 +127,7 @@ trait QueryContextAdaptation {
 
   override def nodeIsDense(node: Long): Boolean = ???
 
-  override def indexSeekByRange(index: IndexDescriptor, value: Any): scala.Iterator[Node] = ???
+  override def indexSeekByRange(index: IndexReference, value: Any): scala.Iterator[NodeValue] = ???
 
   override def setLabelsOnNode(node: Long, labelIds: scala.Iterator[Int]): Int = ???
 
@@ -134,13 +137,13 @@ trait QueryContextAdaptation {
 
   override def lockNodes(nodeIds: Long*): Unit = ???
 
-  override def relationshipOps: Operations[Relationship] = ???
+  override def relationshipOps: Operations[EdgeValue] = ???
 
-  override def getNodesByLabel(id: Int): scala.Iterator[Node] = ???
+  override def getNodesByLabel(id: Int): scala.Iterator[NodeValue] = ???
 
   override def getNodesByLabelPrimitive(id: Int): PrimitiveLongIterator = ???
 
-  override def lockingUniqueIndexSeek(index: IndexDescriptor, values: Seq[Any]): Option[Node] = ???
+  override def lockingUniqueIndexSeek(index: IndexReference, values: Seq[Any]): Option[NodeValue] = ???
 
   override def callReadOnlyProcedure(name: QualifiedName, args: Seq[Any], allowed: Array[String]): scala.Iterator[Array[AnyRef]] = ???
 
@@ -159,9 +162,7 @@ trait QueryContextAdaptation {
 
   override def removeLabelsFromNode(node: Long, labelIds: scala.Iterator[Int]): Int = ???
 
-  override def createRelationship(start: Node, end: Node, relType: String): Relationship = ???
-
-  override def createRelationship(start: Long, end: Long, relType: Int): Relationship = ???
+  override def createRelationship(start: Long, end: Long, relType: Int): EdgeValue = ???
 
   override def nodeCountByCountStore(labelId: Int): Long = ???
 

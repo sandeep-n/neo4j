@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,9 +20,14 @@
 package org.neo4j.internal.kernel.api;
 
 /**
- * This class is really a renamed org.neo4j.kernel.api.schema.IndexDescriptor. Maybe it will compose an
- * IndexDescriptor with an offset for faster index lookup.
+ * Reference to a specific index. This reference is valid until the schema of the database changes (that is a
+ * create/drop of an index or constraint occurs).
  */
-public class IndexReference
+public interface IndexReference
 {
+    boolean isUnique();
+
+    int label();
+
+    int[] properties();
 }

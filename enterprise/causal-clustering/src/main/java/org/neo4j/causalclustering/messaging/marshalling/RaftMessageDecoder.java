@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,6 +24,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;
 
 import java.io.IOException;
+import java.time.Clock;
 import java.util.List;
 
 import org.neo4j.causalclustering.core.consensus.RaftMessages;
@@ -41,16 +42,20 @@ import static org.neo4j.causalclustering.core.consensus.RaftMessages.Type.HEARTB
 import static org.neo4j.causalclustering.core.consensus.RaftMessages.Type.HEARTBEAT_RESPONSE;
 import static org.neo4j.causalclustering.core.consensus.RaftMessages.Type.LOG_COMPACTION_INFO;
 import static org.neo4j.causalclustering.core.consensus.RaftMessages.Type.NEW_ENTRY_REQUEST;
+import static org.neo4j.causalclustering.core.consensus.RaftMessages.Type.PRE_VOTE_REQUEST;
+import static org.neo4j.causalclustering.core.consensus.RaftMessages.Type.PRE_VOTE_RESPONSE;
 import static org.neo4j.causalclustering.core.consensus.RaftMessages.Type.VOTE_REQUEST;
 import static org.neo4j.causalclustering.core.consensus.RaftMessages.Type.VOTE_RESPONSE;
 
 public class RaftMessageDecoder extends ByteToMessageDecoder
 {
     private final ChannelMarshal<ReplicatedContent> marshal;
+    private final Clock clock;
 
-    public RaftMessageDecoder( ChannelMarshal<ReplicatedContent> marshal )
+    public RaftMessageDecoder( ChannelMarshal<ReplicatedContent> marshal, Clock clock )
     {
         this.marshal = marshal;
+        this.clock = clock;
     }
 
     @Override
@@ -82,6 +87,23 @@ public class RaftMessageDecoder extends ByteToMessageDecoder
             boolean voteGranted = channel.get() == 1;
 
             result = new RaftMessages.Vote.Response( from, term, voteGranted );
+        }
+        else if ( messageType.equals( PRE_VOTE_REQUEST ) )
+        {
+            MemberId candidate = retrieveMember( channel );
+
+            long term = channel.getLong();
+            long lastLogIndex = channel.getLong();
+            long lastLogTerm = channel.getLong();
+
+            result = new RaftMessages.PreVote.Request( from, term, candidate, lastLogIndex, lastLogTerm );
+        }
+        else if ( messageType.equals( PRE_VOTE_RESPONSE ) )
+        {
+            long term = channel.getLong();
+            boolean voteGranted = channel.get() == 1;
+
+            result = new RaftMessages.PreVote.Response( from, term, voteGranted );
         }
         else if ( messageType.equals( APPEND_ENTRIES_REQUEST ) )
         {
@@ -143,7 +165,7 @@ public class RaftMessageDecoder extends ByteToMessageDecoder
             throw new IllegalArgumentException( "Unknown message type" );
         }
 
-        list.add( new RaftMessages.ClusterIdAwareMessage( clusterId, result ) );
+        list.add( RaftMessages.ReceivedInstantClusterIdAwareMessage.of( clock.instant(), clusterId, result ) );
     }
 
     private MemberId retrieveMember( ReadableChannel buffer ) throws IOException, EndOfStreamException

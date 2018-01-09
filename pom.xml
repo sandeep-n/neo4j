@@ -10,11 +10,18 @@
   <name>Neo4j</name>
   <description>Neo4j Graph Database</description>
   <inceptionYear>2002</inceptionYear>
+  <url>http://neo4j.com/</url>
 
   <organization>
     <name>The Neo4j Graph Database Project</name>
     <url>https://neo4j.com/</url>
   </organization>
+
+  <scm>
+    <connection>scm:git:git://github.com/neo4j/neo4j.git</connection>
+    <developerConnection>scm:git:git@github.com:neo4j/neo4j.git</developerConnection>
+    <url>https://github.com/neo4j/neo4j</url>
+  </scm>
 
   <licenses>
     <license>
@@ -58,8 +65,8 @@
     <maven.compiler.source>1.8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
     <licensing.prepend.text>notice-agpl-prefix.txt</licensing.prepend.text>
-    <lucene.version>5.5.0</lucene.version>
-    <bouncycastle.version>1.53</bouncycastle.version>
+    <lucene.version>5.5.5</lucene.version>
+    <bouncycastle.version>1.59</bouncycastle.version>
     <generate-config-docs-phase>prepare-package</generate-config-docs-phase>
     <test.runner.jvm.settings.additional/>
     <test.runner.jvm.settings>-Xmx2G -XX:+UseG1GC -XX:-OmitStackTraceInFastThrow -XX:+HeapDumpOnOutOfMemoryError
@@ -78,9 +85,10 @@
     <licensesVersion>7</licensesVersion>
     <license-text.header>AGPL-3-header.txt</license-text.header>
 
-    <scala.version>2.11.11</scala.version>
+    <scala.version>2.11.12</scala.version>
     <scala.binary.version>2.11</scala.binary.version>
-    <asm.version>5.2</asm.version>
+    <asm.version>6.0</asm.version>
+    <scala.java9.arg/>
   </properties>
 
   <modules>
@@ -137,7 +145,7 @@
     <pluginManagement>
       <plugins>
 
-        <!-- Here we define our public API, it should be kept in sync with clirr settings below -->
+        <!-- Here we define our public API, it should be kept in sync with revapi settings below -->
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-javadoc-plugin</artifactId>
@@ -162,11 +170,6 @@
             <quiet>true</quiet>
             <sourcepath>${project.build.sourceDirectory}</sourcepath>
             <reportOutputDirectory>${project.build.directory}/apidocs</reportOutputDirectory>
-
-            <!-- Include the following packages... (yes, has to be one line) -->
-            <subpackages>org.neo4j.backup:org.neo4j.graphalgo:org.neo4j.cypher.export:org.neo4j.cypher.javacompat:org.neo4j.graphdb:org.neo4j.helpers:org.neo4j.helpers.collection:org.neo4j.index:org.neo4j.jmx:org.neo4j.management:org.neo4j.server.helpers:org.neo4j.server.plugins:org.neo4j.server.rest.repr:org.neo4j.server.rest.web:org.neo4j.unsafe.batchinsert:org.neo4j.logging:org.neo4j.procedure</subpackages>
-            <!-- ...unless the package contains -->
-            <excludePackageNames>*.impl.*:*.internal.*:org.neo4j.helpers.progress:org.neo4j.logging.async:org.neo4j.server.rest.repr.formats:org.neo4j.server.rest.repr.util</excludePackageNames>
 
             <!-- Defines grouping for overview -->
             <groups>
@@ -220,70 +223,101 @@
                 <packages>org.neo4j.index:org.neo4j.index.*</packages>
               </group>
             </groups>
+
+            <!-- Include the following packages... (yes, has to be one line) -->
+            <subpackages>org.neo4j.backup:org.neo4j.graphalgo:org.neo4j.cypher.export:org.neo4j.cypher.javacompat:org.neo4j.graphdb:org.neo4j.helpers:org.neo4j.helpers.collection:org.neo4j.index:org.neo4j.jmx:org.neo4j.management:org.neo4j.server.helpers:org.neo4j.server.plugins:org.neo4j.server.rest.repr:org.neo4j.server.rest.web:org.neo4j.unsafe.batchinsert:org.neo4j.logging:org.neo4j.procedure</subpackages>
+            <!-- ...unless the package contains -->
+            <excludePackageNames>*.impl.*:*.internal.*:org.neo4j.helpers.progress:org.neo4j.logging.async:org.neo4j.server.rest.repr.formats:org.neo4j.server.rest.repr.util</excludePackageNames>
           </configuration>
         </plugin>
 
         <!-- Define what packages to treat as public API, it should be kept in sync with javadoc settings above -->
         <plugin>
-          <groupId>org.codehaus.mojo</groupId>
-          <artifactId>clirr-maven-plugin</artifactId>
-          <version>2.8</version>
+          <groupId>org.revapi</groupId>
+          <artifactId>revapi-maven-plugin</artifactId>
+          <version>0.9.5</version>
           <configuration>
-            <failOnError>true</failOnError>
-            <logResults>true</logResults>
-
-            <!-- Public packages, note that /* and /** is not the same thing -->
-            <includes>
-              <include>org/neo4j/backup/OnlineBackupExtensionFactory.Dependencies</include>
-              <include>org/neo4j/backup/OnlineBackupKernelExtension.BackupProvider</include>
-              <include>org/neo4j/backup/TheBackupInterface</include>
-              <include>org/neo4j/backup/BackupExtensionService</include>
-              <include>org/neo4j/backup/BackupTool</include>
-              <include>org/neo4j/backup/OnlineBackup</include>
-              <include>org/neo4j/backup/OnlineBackupExtensionFactory</include>
-              <include>org/neo4j/backup/OnlineBackupKernelExtension</include>
-              <include>org/neo4j/backup/OnlineBackupSettings</include>
-              <include>org/neo4j/backup/StoreCopyResponsePacker</include>
-              <include>org/neo4j/backup/IncrementalBackupNotPossibleException</include>
-
-              <include>org/neo4j/graphalgo/*</include>
-              <include>org/neo4j/cypher/export/*</include>
-              <include>org/neo4j/cypher/javacompat/*</include>
-              <include>org/neo4j/graphdb/*</include>
-              <include>org/neo4j/helpers/*</include>
-              <include>org/neo4j/helpers/collection/*</include>
-              <include>org/neo4j/index/lucene/*</include>
-              <include>org/neo4j/index/lucene/unsafe/batchinsert/*</include>
-              <include>org/neo4j/jmx/*</include>
-              <include>org/neo4j/management/*</include>
-              <include>org/neo4j/server/helpers/*</include>
-              <include>org/neo4j/server/plugins/*</include>
-              <include>org/neo4j/server/rest.repr/*</include>
-              <include>org/neo4j/server/rest.web/*</include>
-              <include>org/neo4j/unsafe/batchinsert/*</include>
-              <include>org/neo4j/logging/slf4j/*</include>
-              <include>org/neo4j/procedure/*</include>
-            </includes>
-
-            <!-- Ignored changes -->
-            <ignored>
-              <difference>
-                <className>**</className>
-                <method>**</method>
-                <differenceType>7012</differenceType> <!-- Field was made final. -->
-              </difference>
-              <difference>
-                <className>**</className>
-                <field>**</field>
-                <differenceType>6006</differenceType> <!-- Method added to interface -->
-              </difference>
-            </ignored>
+            <versionFormat>^\d+\.\d+\.\d+$</versionFormat>
+            <analysisConfiguration>
+              <revapi.java>
+                <reportUsesFor>all-differences</reportUsesFor>
+                <missing-classes>
+                  <behavior>report</behavior>
+                  <ignoreMissingAnnotations>false</ignoreMissingAnnotations>
+                </missing-classes>
+                <filter>
+                  <classes>
+                    <regex>true</regex>
+                    <include>
+                      <item>org\.neo4j\.helpers\.collection\.BoundedIterable</item>
+                    </include>
+                  </classes>
+                  <packages>
+                    <regex>true</regex>
+                    <include>
+                      <item>org\.neo4j\.graphalgo(\\..+)?</item>
+                      <item>org\.neo4j\.cypher\.export(\\..+)?</item>
+                      <item>org\.neo4j\.cypher\.javacompat(\\..+)?</item>
+                      <item>org\.neo4j\.graphdb(\\..+)?</item>
+                      <item>org\.neo4j\.helpers(\\..+)?</item>
+                      <item>org\.neo4j\.index(\\..+)?</item>
+                      <item>org\.neo4j\.jmx(\\..+)?</item>
+                      <item>org\.neo4j\.management(\\..+)?</item>
+                      <item>org\.neo4j\.server\.helpers(\\..+)?</item>
+                      <item>org\.neo4j\.server\.plugins(\\..+)?</item>
+                      <item>org\.neo4j\.server\.rest\.repr(\\..+)?</item>
+                      <item>org\.neo4j\.server\.rest\.web(\\..+)?</item>
+                      <item>org\.neo4j\.unsafe\.batchinsert(\\..+)?</item>
+                      <item>org\.neo4j\.logging(\\..+)?</item>
+                      <item>org\.neo4j\.procedure(\\..+)?</item>
+                    </include>
+                    <exclude>
+                      <item>.*\.impl\..*</item>
+                      <item>.*\.internal\..*</item>
+                      <item>org\.neo4j\.helpers\.progress</item>
+                      <item>org\.neo4j\.logging\.async</item>
+                      <item>org\.neo4j\.server\.rest\.repr\.formats</item>
+                      <item>org\.neo4j\.server\.rest\.repr\.util</item>
+                    </exclude>
+                  </packages>
+                </filter>
+              </revapi.java>
+              <revapi.ignore>
+                <item>
+                  <!-- Ignore for now since some are already published, should be removed in 4.0 -->
+                  <code>java.class.nonPublicPartOfAPI</code>
+                </item>
+              </revapi.ignore>
+              <revapi.semver.ignore>
+                <enabled>true</enabled>
+                <versionIncreaseAllows>
+                  <major>breaking</major>
+                  <minor>nonBreaking</minor>
+                  <patch>equivalent</patch>
+                </versionIncreaseAllows>
+                <passThroughDifferences>
+                  <!-- Let revapi.ignore handle this -->
+                  <item>java.class.nonPublicPartOfAPI</item>
+                </passThroughDifferences>
+              </revapi.semver.ignore>
+            </analysisConfiguration>
           </configuration>
-
+          <dependencies>
+            <dependency>
+              <groupId>org.revapi</groupId>
+              <artifactId>revapi-java</artifactId>
+              <version>0.14.4</version>
+            </dependency>
+            <dependency>
+              <groupId>org.revapi</groupId>
+              <artifactId>revapi-basic-features</artifactId>
+              <version>0.6.3</version>
+            </dependency>
+          </dependencies>
           <executions>
             <execution>
               <goals>
-                <goal>check-no-fork</goal>
+                <goal>check</goal>
               </goals>
             </execution>
           </executions>
@@ -447,6 +481,8 @@
               <arg>-Xmax-classfile-name</arg>
               <arg>100</arg>
               <arg>-Xlint</arg>
+              <arg>-target:jvm-${maven.compiler.target}</arg>
+              <arg>${scala.java9.arg}</arg>
             </args>
             <jvmArgs>
               <jvmArg>-Xms64m</jvmArg>
@@ -478,7 +514,11 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-compiler-plugin</artifactId>
-          <version>3.3</version>
+          <configuration>
+            <showDeprecation>true</showDeprecation>
+            <showWarnings>true</showWarnings>
+          </configuration>
+          <version>3.7.0</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -518,12 +558,12 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-shade-plugin</artifactId>
-          <version>2.4.3</version>
+          <version>3.1.0</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-assembly-plugin</artifactId>
-          <version>2.5.5</version>
+          <version>3.1.0</version>
           <configuration>
             <tarLongFileMode>gnu</tarLongFileMode>
           </configuration>
@@ -577,12 +617,6 @@
             </goals>
           </execution>
         </executions>
-      </plugin>
-
-      <!-- Validate that the public API is unchanged -->
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>clirr-maven-plugin</artifactId>
       </plugin>
 
       <!-- Creates source jar if source exits -->
@@ -774,6 +808,18 @@
       </activation>
       <properties>
         <git.commit>${env.GIT_COMMIT}</git.commit>
+      </properties>
+    </profile>
+
+    <profile>
+      <id>java9</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+        <jdk>9</jdk>
+      </activation>
+      <properties>
+        <maven.javadoc.skip>true</maven.javadoc.skip>
+        <scala.java9.arg>-nobootcp</scala.java9.arg>
       </properties>
     </profile>
   </profiles>
@@ -1007,7 +1053,7 @@
       <dependency>
         <groupId>io.netty</groupId>
         <artifactId>netty-all</artifactId>
-        <version>4.1.15.Final</version>
+        <version>4.1.17.Final</version>
       </dependency>
 
       <dependency>
@@ -1128,12 +1174,23 @@
         <artifactId>metrics-graphite</artifactId>
         <version>3.1.2</version>
       </dependency>
+      <dependency>
+        <groupId>org.jprocesses</groupId>
+        <artifactId>jProcesses</artifactId>
+        <version>1.6.4</version>
+      </dependency>
 
       <dependency>
         <groupId>com.google.code.findbugs</groupId>
         <artifactId>annotations</artifactId>
         <version>${findbugs.version}</version>
         <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.google.testing.compile</groupId>
+        <artifactId>compile-testing</artifactId>
+        <version>0.13</version>
+        <scope>test</scope>
       </dependency>
     </dependencies>
   </dependencyManagement>

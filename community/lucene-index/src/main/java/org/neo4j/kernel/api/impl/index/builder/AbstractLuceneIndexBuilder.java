@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,6 +20,7 @@
 package org.neo4j.kernel.api.impl.index.builder;
 
 import java.io.File;
+import java.util.Objects;
 
 import org.neo4j.graphdb.config.Setting;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
@@ -37,8 +38,13 @@ import org.neo4j.kernel.impl.factory.OperationalMode;
 public abstract class AbstractLuceneIndexBuilder<T extends AbstractLuceneIndexBuilder<T>>
 {
     protected LuceneIndexStorageBuilder storageBuilder = LuceneIndexStorageBuilder.create();
-    private Config config = Config.defaults();
+    private final Config config;
     private OperationalMode operationalMode = OperationalMode.single;
+
+    public AbstractLuceneIndexBuilder( Config config )
+    {
+        this.config = Objects.requireNonNull( config );
+    }
 
     /**
      * Specify index storage
@@ -85,17 +91,6 @@ public abstract class AbstractLuceneIndexBuilder<T extends AbstractLuceneIndexBu
     public T withIndexRootFolder( File indexRootFolder )
     {
         storageBuilder.withIndexFolder( indexRootFolder );
-        return (T) this;
-    }
-
-    /**
-     * Specify db config
-     * @param config configuration
-     * @return index builder
-     */
-    public T withConfig( Config config )
-    {
-        this.config = config;
         return (T) this;
     }
 

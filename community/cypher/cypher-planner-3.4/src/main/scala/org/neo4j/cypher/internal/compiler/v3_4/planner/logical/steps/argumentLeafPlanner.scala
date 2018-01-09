@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,11 +24,11 @@ import org.neo4j.cypher.internal.ir.v3_4.QueryGraph
 import org.neo4j.cypher.internal.v3_4.logical.plans.LogicalPlan
 
 object argumentLeafPlanner extends LeafPlanner {
-  def apply(qg: QueryGraph)(implicit context: LogicalPlanningContext): Seq[LogicalPlan] = {
+  def apply(qg: QueryGraph, context: LogicalPlanningContext): Seq[LogicalPlan] = {
     val ids = qg.patternNodes ++ qg.patternRelationships.map(_.name)
     if ((qg.argumentIds intersect ids).isEmpty)
       Seq.empty
     else
-      Seq(context.logicalPlanProducer.planQuerySingleRow(qg))
+      Seq(context.logicalPlanProducer.planQueryArgument(qg, context))
   }
 }

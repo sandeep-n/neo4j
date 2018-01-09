@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -26,7 +26,7 @@ import org.neo4j.cypher.internal.frontend.v3_4.helpers.StringHelper.RichString
 import org.neo4j.cypher.internal.runtime.CreateTempFileTestSupport
 import org.neo4j.cypher.internal.runtime.planDescription.InternalPlanDescription.Arguments.{PageCacheHits, PageCacheMisses, PlannerImpl}
 import org.neo4j.graphdb.Node
-import org.neo4j.kernel.api.KernelTransaction
+import org.neo4j.internal.kernel.api.Transaction.Type
 import org.neo4j.kernel.impl.transaction.log.TransactionIdStore
 
 class PeriodicCommitAcceptanceTest extends ExecutionEngineFunSuite
@@ -190,7 +190,7 @@ class PeriodicCommitAcceptanceTest extends ExecutionEngineFunSuite
       val url = createTempCSVFile(3)
       graph.inTx( {
         execute(s"USING PERIODIC COMMIT LOAD CSV FROM '$url' AS line CREATE ()")
-      }, KernelTransaction.Type.explicit)
+      }, Type.explicit)
     }
   }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,11 +19,11 @@
  */
 package org.neo4j.values.storable;
 
+import java.util.Comparator;
+
 /**
  * A tuple of n values.
  */
-import java.util.Comparator;
-
 public class ValueTuple
 {
     public static ValueTuple of( Value... values )

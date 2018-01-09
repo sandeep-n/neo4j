@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -54,12 +54,26 @@ public class PageCacheByteArray extends PageCacheNumberArray<ByteArray> implemen
     @Override
     public void swap( long fromIndex, long toIndex )
     {
-        byte[] a = defaultValue.clone();
-        byte[] b = defaultValue.clone();
-        get( fromIndex, a );
-        get( toIndex, b );
-        set( fromIndex, b );
-        set( toIndex, a );
+        long fromPageId = pageId( fromIndex );
+        int fromOffset = offset( fromIndex );
+        long toPageId = pageId( toIndex );
+        int toOffset = offset( toIndex );
+        try ( PageCursor fromCursor = pagedFile.io( fromPageId, PF_SHARED_WRITE_LOCK );
+              PageCursor toCursor = pagedFile.io( toPageId, PF_SHARED_WRITE_LOCK ) )
+        {
+            fromCursor.next();
+            toCursor.next();
+            for ( int i = 0; i < entrySize; i++, fromOffset++, toOffset++ )
+            {
+                byte intermediary = fromCursor.getByte( fromOffset );
+                fromCursor.putByte( fromOffset, toCursor.getByte( toOffset ) );
+                toCursor.putByte( toOffset, intermediary );
+            }
+        }
+        catch ( IOException e )
+        {
+            throw new UncheckedIOException( e );
+        }
     }
 
     @Override

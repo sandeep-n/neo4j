@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -149,14 +149,16 @@ public class PropertyRecordTest
         addBlock( record, 5, 6 );
         addBlock( record, 7, 8 );
 
+        boolean validationErrorDetected = false;
         try
         {
             addBlock( record, 9, 10 );
-            fail( "Exception expected " );
         }
-        catch ( Throwable ignored )
+        catch ( AssertionError ignored )
         {
+            validationErrorDetected = true;
         }
+        assertTrue( "Assertion failure expected", validationErrorDetected );
     }
 
     private void assertIteratorRemoveThrowsIllegalState( Iterator<PropertyBlock> iterator )
@@ -174,7 +176,7 @@ public class PropertyRecordTest
     private static void addBlock( PropertyRecord record, int key, int value )
     {
         PropertyBlock block = new PropertyBlock();
-        PropertyStore.encodeValue( block, key, Values.of( value ), null, null );
+        PropertyStore.encodeValue( block, key, Values.of( value ), null, null, true );
         for ( long valueBlock : block.getValueBlocks() )
         {
             record.addLoadedBlock( valueBlock );

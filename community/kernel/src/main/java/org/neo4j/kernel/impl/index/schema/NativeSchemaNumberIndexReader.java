@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,40 +19,53 @@
  */
 package org.neo4j.kernel.impl.index.schema;
 
+import org.apache.commons.lang3.ArrayUtils;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
-import org.neo4j.collection.primitive.PrimitiveLongCollections;
-import org.neo4j.collection.primitive.PrimitiveLongIterator;
+import org.neo4j.collection.primitive.PrimitiveLongResourceIterator;
 import org.neo4j.cursor.RawCursor;
+import org.neo4j.helpers.ArrayUtil;
 import org.neo4j.index.internal.gbptree.GBPTree;
 import org.neo4j.index.internal.gbptree.Hit;
 import org.neo4j.index.internal.gbptree.Layout;
+import org.neo4j.internal.kernel.api.IndexOrder;
+import org.neo4j.internal.kernel.api.IndexQuery;
+import org.neo4j.internal.kernel.api.IndexQuery.ExactPredicate;
+import org.neo4j.internal.kernel.api.IndexQuery.NumberRangePredicate;
 import org.neo4j.io.IOUtils;
 import org.neo4j.kernel.api.exceptions.index.IndexNotApplicableKernelException;
-import org.neo4j.kernel.api.schema.IndexQuery;
-import org.neo4j.kernel.api.schema.IndexQuery.ExactPredicate;
-import org.neo4j.kernel.api.schema.IndexQuery.NumberRangePredicate;
-import org.neo4j.kernel.configuration.Config;
+import org.neo4j.kernel.api.schema.index.IndexDescriptor;
 import org.neo4j.kernel.impl.api.index.sampling.IndexSamplingConfig;
+import org.neo4j.storageengine.api.schema.IndexProgressor;
 import org.neo4j.storageengine.api.schema.IndexReader;
 import org.neo4j.storageengine.api.schema.IndexSampler;
 import org.neo4j.values.storable.Value;
 import org.neo4j.values.storable.ValueGroup;
+
+import static java.lang.String.format;
 
 class NativeSchemaNumberIndexReader<KEY extends SchemaNumberKey, VALUE extends SchemaNumberValue>
         implements IndexReader
 {
     private final GBPTree<KEY,VALUE> tree;
     private final Layout<KEY,VALUE> layout;
+    private final IndexSamplingConfig samplingConfig;
     private final Set<RawCursor<Hit<KEY,VALUE>,IOException>> openSeekers;
+    private final IndexDescriptor descriptor;
 
-    NativeSchemaNumberIndexReader( GBPTree<KEY,VALUE> tree, Layout<KEY,VALUE> layout )
+    NativeSchemaNumberIndexReader( GBPTree<KEY,VALUE> tree, Layout<KEY,VALUE> layout,
+            IndexSamplingConfig samplingConfig,
+            IndexDescriptor descriptor )
     {
         this.tree = tree;
         this.layout = layout;
+        this.samplingConfig = samplingConfig;
+        this.descriptor = descriptor;
         this.openSeekers = new HashSet<>();
     }
 
@@ -72,9 +85,8 @@ class NativeSchemaNumberIndexReader<KEY extends SchemaNumberKey, VALUE extends S
         // non-unique sampler which scans the index and counts (potentially duplicates, of which there will
         // be none in a unique index).
 
-        IndexSamplingConfig indexSamplingConfig = new IndexSamplingConfig( Config.defaults() );
         FullScanNonUniqueIndexSampler<KEY,VALUE> sampler =
-                new FullScanNonUniqueIndexSampler<>( tree, layout, indexSamplingConfig );
+                new FullScanNonUniqueIndexSampler<>( tree, layout, samplingConfig );
         return sampler::result;
     }
 
@@ -104,15 +116,20 @@ class NativeSchemaNumberIndexReader<KEY extends SchemaNumberKey, VALUE extends S
     }
 
     @Override
-    public PrimitiveLongIterator query( IndexQuery... predicates ) throws IndexNotApplicableKernelException
+    public PrimitiveLongResourceIterator query( IndexQuery... predicates ) throws IndexNotApplicableKernelException
     {
+        NodeValueIterator nodeValueIterator = new NodeValueIterator();
+        query( nodeValueIterator, IndexOrder.NONE, predicates );
+        return nodeValueIterator;
+    }
+
+    @Override
+    public void query( IndexProgressor.NodeValueClient cursor, IndexOrder indexOrder, IndexQuery... predicates )
+    {
+        validateQuery( indexOrder, predicates );
+
         KEY treeKeyFrom = layout.newKey();
         KEY treeKeyTo = layout.newKey();
-
-        if ( predicates.length != 1 )
-        {
-            throw new UnsupportedOperationException();
-        }
 
         IndexQuery predicate = predicates[0];
         switch ( predicate.type() )
@@ -120,20 +137,43 @@ class NativeSchemaNumberIndexReader<KEY extends SchemaNumberKey, VALUE extends S
         case exists:
             treeKeyFrom.initAsLowest();
             treeKeyTo.initAsHighest();
-            return startSeekForInitializedRange( treeKeyFrom, treeKeyTo );
+            startSeekForInitializedRange( cursor, treeKeyFrom, treeKeyTo, predicates );
+            break;
         case exact:
             ExactPredicate exactPredicate = (ExactPredicate) predicate;
             treeKeyFrom.from( Long.MIN_VALUE, exactPredicate.value() );
             treeKeyTo.from( Long.MAX_VALUE, exactPredicate.value() );
-            return startSeekForInitializedRange( treeKeyFrom, treeKeyTo );
+            startSeekForInitializedRange( cursor, treeKeyFrom, treeKeyTo, predicates );
+            break;
         case rangeNumeric:
-            // todo: NumberRangePredicate should return NumberValue instead of Number
             NumberRangePredicate rangePredicate = (NumberRangePredicate) predicate;
             initFromForRange( rangePredicate, treeKeyFrom );
             initToForRange( rangePredicate, treeKeyTo );
-            return startSeekForInitializedRange( treeKeyFrom, treeKeyTo );
+            startSeekForInitializedRange( cursor, treeKeyFrom, treeKeyTo, predicates );
+            break;
         default:
             throw new IllegalArgumentException( "IndexQuery of type " + predicate.type() + " is not supported." );
+        }
+    }
+
+    private void validateQuery( IndexOrder indexOrder, IndexQuery[] predicates )
+    {
+        if ( predicates.length != 1 )
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        if ( indexOrder != IndexOrder.NONE )
+        {
+            ValueGroup valueGroup = predicates[0].valueGroup();
+            IndexOrder[] capability = NativeSchemaNumberIndexProvider.CAPABILITY.orderCapability( valueGroup );
+            if ( !ArrayUtil.contains( capability, indexOrder ) )
+            {
+                capability = ArrayUtils.add( capability, IndexOrder.NONE );
+                throw new UnsupportedOperationException(
+                        format( "Tried to query index with unsupported order %s. Supported orders for query %s are %s.",
+                                indexOrder, Arrays.toString( predicates ), Arrays.toString( capability ) ) );
+            }
         }
     }
 
@@ -171,17 +211,20 @@ class NativeSchemaNumberIndexReader<KEY extends SchemaNumberKey, VALUE extends S
         return true;
     }
 
-    private PrimitiveLongIterator startSeekForInitializedRange( KEY treeKeyFrom, KEY treeKeyTo )
+    private void startSeekForInitializedRange( IndexProgressor.NodeValueClient client, KEY treeKeyFrom, KEY treeKeyTo,
+            IndexQuery[] query )
     {
         if ( layout.compare( treeKeyFrom, treeKeyTo ) > 0 )
         {
-            return PrimitiveLongCollections.emptyIterator();
+            client.initialize( descriptor, IndexProgressor.EMPTY, query );
+            return;
         }
         try
         {
             RawCursor<Hit<KEY,VALUE>,IOException> seeker = tree.seek( treeKeyFrom, treeKeyTo );
             openSeekers.add( seeker );
-            return new NumberHitIterator<>( seeker, openSeekers );
+            IndexProgressor hitProgressor = new NumberHitIndexProgressor<>( seeker, client, openSeekers );
+            client.initialize( descriptor, hitProgressor, query );
         }
         catch ( IOException e )
         {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -54,12 +54,13 @@ public class LogPositionTest
                         new LogPosition( Long.MAX_VALUE, Long.MAX_VALUE - 1 )} );
     }
 
-    @SuppressWarnings( "EqualsWithItself" )
+    @SuppressWarnings( {"EqualsWithItself", "SelfComparison"} )
     @Test
     public void logPositionComparison() throws Exception
     {
         assertEquals( 1, logPositionA.compareTo( logPositionB ) );
         assertEquals( -1, logPositionB.compareTo( logPositionA ) );
+
         assertEquals( 0, logPositionA.compareTo( logPositionA ) );
         assertEquals( 0, logPositionB.compareTo( logPositionB ) );
     }

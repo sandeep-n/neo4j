@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -549,7 +549,7 @@ public class TestPropertyBlocks extends AbstractNeo4jTestCase
         rel.setProperty( "theDoubleThatGrows", Math.PI );
         rel.setProperty( "theInteger", -444345 );
 
-        rel.setProperty( "theDoubleThatGrows", new long[] { 1 << 63, 1 << 63, 1 << 63 } );
+        rel.setProperty( "theDoubleThatGrows", new long[] { 1L << 63, 1L << 63, 1L << 63 } );
 
         rel.setProperty( "theDoubleThatGrows", Math.E );
 
@@ -611,7 +611,7 @@ public class TestPropertyBlocks extends AbstractNeo4jTestCase
         newTransaction();
         assertEquals( recordsInUseAtStart + 1, propertyRecordsInUse() );
         assertEquals( valueRecordsInUseAtStart + 1, dynamicArrayRecordsInUse() );
-        rel.setProperty( "filler", new long[] { 1 << 63, 1 << 63, 1 << 63 } );
+        rel.setProperty( "filler", new long[] { 1L << 63, 1L << 63, 1L << 63 } );
         newTransaction();
         assertEquals( recordsInUseAtStart + 2, propertyRecordsInUse() );
     }

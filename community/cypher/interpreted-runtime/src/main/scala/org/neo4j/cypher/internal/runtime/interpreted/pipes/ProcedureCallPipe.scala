@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,7 +23,7 @@ import org.neo4j.cypher.internal.runtime.ProcedureCallMode
 import org.neo4j.cypher.internal.runtime.interpreted.ExecutionContext
 import org.neo4j.cypher.internal.runtime.interpreted.commands.expressions.Expression
 import org.neo4j.cypher.internal.runtime.interpreted.ValueConversion
-import org.neo4j.cypher.internal.v3_4.logical.plans.LogicalPlanId
+import org.neo4j.cypher.internal.util.v3_4.attribution.Id
 import org.neo4j.cypher.internal.v3_4.logical.plans.ProcedureSignature
 import org.neo4j.cypher.internal.util.v3_4.symbols.CypherType
 import org.neo4j.values.AnyValue
@@ -45,7 +45,7 @@ case class ProcedureCallPipe(source: Pipe,
                              rowProcessing: ProcedureCallRowProcessing,
                              resultSymbols: Seq[(String, CypherType)],
                              resultIndices: Seq[(Int, String)])
-                            (val id: LogicalPlanId = LogicalPlanId.DEFAULT)
+                            (val id: Id = Id.INVALID_ID)
 
   extends PipeWithSource(source) {
 
@@ -72,7 +72,7 @@ case class ProcedureCallPipe(source: Pipe,
           builder += v -> javaValue
         }
         val rowEntries = builder.result()
-        val output = input.newWith(rowEntries)
+        val output = executionContextFactory.copyWith(input, rowEntries)
         builder.clear()
         output
       }

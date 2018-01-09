@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -29,6 +29,8 @@ import java.io.File;
 import java.io.PrintStream;
 import java.nio.file.Path;
 
+import org.neo4j.backup.impl.BackupProtocolService;
+import org.neo4j.backup.impl.ConsistencyCheck;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.helpers.HostnamePort;
@@ -40,6 +42,7 @@ import org.neo4j.kernel.configuration.Settings;
 import org.neo4j.kernel.impl.enterprise.configuration.OnlineBackupSettings;
 import org.neo4j.kernel.impl.store.MetaDataStore;
 import org.neo4j.kernel.impl.store.format.standard.StandardV2_3;
+import org.neo4j.kernel.impl.store.format.standard.StandardV3_4;
 import org.neo4j.ports.allocation.PortAuthority;
 import org.neo4j.test.TestGraphDatabaseFactory;
 import org.neo4j.test.rule.EmbeddedDatabaseRule;
@@ -93,8 +96,9 @@ public class BackupToolIT
             expected.expectMessage( "Failed to perform backup because existing backup is from a different version." );
 
             // Perform backup
-            backupTool.executeBackup( new HostnamePort( "localhost", backupPort ), backupDir.toFile(),
-                    ConsistencyCheck.NONE, Config.defaults(), 20L * 60L * 1000L, false );
+            backupTool.executeBackup( new HostnamePort( "localhost", backupPort ), backupDir,
+                    ConsistencyCheck.NONE, Config.defaults( GraphDatabaseSettings.record_format, StandardV3_4.NAME ),
+                    20L * 60L * 1000L, false );
         }
         finally
         {
@@ -108,6 +112,7 @@ public class BackupToolIT
                 .setConfig( OnlineBackupSettings.online_backup_enabled, Settings.TRUE )
                 .setConfig( OnlineBackupSettings.online_backup_server, "127.0.0.1:" + backupPort )
                 .setConfig( GraphDatabaseSettings.keep_logical_logs, Settings.TRUE )
+                .setConfig( GraphDatabaseSettings.record_format, StandardV2_3.NAME )
                 .newGraphDatabase();
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -26,15 +26,15 @@ import scala.annotation.tailrec
 case object projectNamedPaths extends Rewriter {
 
   case class Projectibles(paths: Map[Variable, PathExpression] = Map.empty,
-                          protectedVariables: Set[Ref[Variable]] = Set.empty,
-                          variableRewrites: Map[Ref[Variable], PathExpression] = Map.empty) {
+                          protectedVariables: Set[Ref[LogicalVariable]] = Set.empty,
+                          variableRewrites: Map[Ref[LogicalVariable], PathExpression] = Map.empty) {
 
     self =>
 
     def withoutNamedPaths = copy(paths = Map.empty)
-    def withProtectedVariable(ident: Ref[Variable]) = copy(protectedVariables = protectedVariables + ident)
+    def withProtectedVariable(ident: Ref[LogicalVariable]) = copy(protectedVariables = protectedVariables + ident)
     def withNamedPath(entry: (Variable, PathExpression)) = copy(paths = paths + entry)
-    def withRewrittenVariable(entry: (Ref[Variable], PathExpression)) = {
+    def withRewrittenVariable(entry: (Ref[LogicalVariable], PathExpression)) = {
       val (ref, pathExpr) = entry
       copy(variableRewrites = variableRewrites + (ref -> pathExpr.endoRewrite(copyVariables)))
     }

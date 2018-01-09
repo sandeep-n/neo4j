@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -79,6 +79,10 @@ public abstract class FutureAdapter<V> implements Future<V>
     }
 
     /**
+     * @param <T> type of values that this {@link Future} have.
+     * @param value result value.
+     * @return {@link Present} future with already specified result
+     *
      * This method will be deleted as part of next major release. Please use {@link CompletableFuture#complete(Object)}
      * instead.
      */

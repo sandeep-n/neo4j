@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -45,10 +45,10 @@ import org.neo4j.causalclustering.discovery.SharedDiscoveryService;
 import org.neo4j.causalclustering.discovery.procedures.ClusterOverviewProcedure;
 import org.neo4j.causalclustering.discovery.procedures.Role;
 import org.neo4j.collection.RawIterator;
+import org.neo4j.internal.kernel.api.Transaction.Type;
 import org.neo4j.internal.kernel.api.exceptions.KernelException;
-import org.neo4j.kernel.api.KernelAPI;
+import org.neo4j.kernel.api.InwardKernel;
 import org.neo4j.kernel.api.KernelTransaction;
-import org.neo4j.kernel.api.KernelTransaction.Type;
 import org.neo4j.kernel.api.Statement;
 import org.neo4j.kernel.api.exceptions.ProcedureException;
 import org.neo4j.kernel.api.exceptions.TransactionFailureException;
@@ -72,7 +72,7 @@ import static org.neo4j.test.assertion.Assert.assertEventually;
 public class ClusterOverviewIT
 {
     @Rule
-    public ClusterRule clusterRule = new ClusterRule( getClass() )
+    public ClusterRule clusterRule = new ClusterRule()
             .withSharedCoreParam( CausalClusteringSettings.cluster_topology_refresh, "5s" );
 
     private enum DiscoveryService
@@ -331,7 +331,7 @@ public class ClusterOverviewIT
     private List<MemberInfo> clusterOverview( GraphDatabaseFacade db )
             throws TransactionFailureException, ProcedureException
     {
-        KernelAPI kernel = db.getDependencyResolver().resolveDependency( KernelAPI.class );
+        InwardKernel kernel = db.getDependencyResolver().resolveDependency( InwardKernel.class );
         KernelTransaction transaction = kernel.newTransaction( Type.implicit, AnonymousContext.read() );
         List<MemberInfo> infos = new ArrayList<>();
         try ( Statement statement = transaction.acquireStatement() )
@@ -380,7 +380,7 @@ public class ClusterOverviewIT
         @Override
         public int hashCode()
         {
-            return Objects.hash( addresses, role );
+            return Objects.hash( Arrays.hashCode( addresses ), role );
         }
 
         @Override

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,13 +21,15 @@ package org.neo4j.cypher.internal.compatibility.v3_4.runtime.compiled
 
 import java.time.Clock
 
-import org.neo4j.cypher.internal.util.v3_4.{CypherException, InputPosition}
 import org.neo4j.cypher.internal.compatibility.v3_4.runtime.CommunityRuntimeContext
 import org.neo4j.cypher.internal.compatibility.v3_4.runtime.compiled.codegen.spi.CodeStructure
 import org.neo4j.cypher.internal.compiler.v3_4.planner.logical.{ExpressionEvaluator, Metrics, MetricsFactory, QueryGraphSolver}
 import org.neo4j.cypher.internal.compiler.v3_4.{ContextCreator, CypherCompilerConfiguration, SyntaxExceptionCreator, UpdateStrategy}
 import org.neo4j.cypher.internal.frontend.v3_4.phases.{CompilationPhaseTracer, InternalNotificationLogger, Monitors}
 import org.neo4j.cypher.internal.planner.v3_4.spi.PlanContext
+import org.neo4j.cypher.internal.runtime.vectorized.dispatcher.Dispatcher
+import org.neo4j.cypher.internal.util.v3_4.attribution.IdGen
+import org.neo4j.cypher.internal.util.v3_4.{CypherException, InputPosition}
 import org.neo4j.cypher.internal.v3_4.executionplan.GeneratedQuery
 
 class EnterpriseRuntimeContext(override val exceptionCreator: (String, InputPosition) => CypherException,
@@ -41,12 +43,14 @@ class EnterpriseRuntimeContext(override val exceptionCreator: (String, InputPosi
                                override val updateStrategy: UpdateStrategy,
                                override val debugOptions: Set[String],
                                override val clock: Clock,
-                               val codeStructure: CodeStructure[GeneratedQuery])
+                               override val logicalPlanIdGen: IdGen,
+                               val codeStructure: CodeStructure[GeneratedQuery],
+                               val dispatcher: Dispatcher)
   extends CommunityRuntimeContext(exceptionCreator, tracer,
                                   notificationLogger, planContext, monitors, metrics,
-                                  config, queryGraphSolver, updateStrategy, debugOptions, clock)
+                                  config, queryGraphSolver, updateStrategy, debugOptions, clock, logicalPlanIdGen)
 
-case class EnterpriseRuntimeContextCreator(codeStructure: CodeStructure[GeneratedQuery]) extends ContextCreator[EnterpriseRuntimeContext] {
+case class EnterpriseRuntimeContextCreator(codeStructure: CodeStructure[GeneratedQuery], dispatcher: Dispatcher) extends ContextCreator[EnterpriseRuntimeContext] {
 
   override def create(tracer: CompilationPhaseTracer,
                       notificationLogger: InternalNotificationLogger,
@@ -60,6 +64,7 @@ case class EnterpriseRuntimeContextCreator(codeStructure: CodeStructure[Generate
                       config: CypherCompilerConfiguration,
                       updateStrategy: UpdateStrategy,
                       clock: Clock,
+                      logicalPlanIdGen: IdGen,
                       evaluator: ExpressionEvaluator): EnterpriseRuntimeContext = {
     val exceptionCreator = new SyntaxExceptionCreator(queryText, offset)
 
@@ -69,6 +74,6 @@ case class EnterpriseRuntimeContextCreator(codeStructure: CodeStructure[Generate
       metricsFactory.newMetrics(planContext.statistics, evaluator)
 
     new EnterpriseRuntimeContext(exceptionCreator, tracer, notificationLogger, planContext,
-                                monitors, metrics, config, queryGraphSolver, updateStrategy, debugOptions, clock, codeStructure)
+                                monitors, metrics, config, queryGraphSolver, updateStrategy, debugOptions, clock, logicalPlanIdGen, codeStructure, dispatcher)
   }
 }

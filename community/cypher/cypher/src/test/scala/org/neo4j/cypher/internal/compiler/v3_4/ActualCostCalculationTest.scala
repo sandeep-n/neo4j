@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -37,9 +37,9 @@ import org.neo4j.cypher.internal.util.v3_4.{LabelId, PropertyKeyId}
 import org.neo4j.cypher.internal.v3_4.expressions.{LabelToken, PropertyKeyToken, SemanticDirection}
 import org.neo4j.cypher.internal.v3_4.logical.plans.SingleQueryExpression
 import org.neo4j.graphdb._
+import org.neo4j.internal.kernel.api.Transaction.Type
+import org.neo4j.internal.kernel.api.security.SecurityContext
 import org.neo4j.kernel.GraphDatabaseQueryService
-import org.neo4j.kernel.api.KernelTransaction
-import org.neo4j.kernel.api.security.SecurityContext
 import org.neo4j.kernel.impl.core.ThreadToStatementContextBridge
 import org.neo4j.kernel.impl.coreapi.{InternalTransaction, PropertyContainerLocker}
 import org.neo4j.kernel.impl.query.Neo4jTransactionalContextFactory
@@ -305,7 +305,7 @@ class ActualCostCalculationTest extends CypherFunSuite {
   private def indexSeek(graph: GraphDatabaseQueryService) = {
     graph.withTx { tx =>
       val transactionalContext = TransactionalContextWrapper(transactionContext(graph, tx))
-      val ctx = new TransactionBoundPlanContext(transactionalContext, devNullLogger)
+      val ctx = TransactionBoundPlanContext(transactionalContext, devNullLogger)
       val literal = Literal(42)
 
       val labelId = ctx.getOptLabelId(LABEL.name()).get
@@ -320,7 +320,7 @@ class ActualCostCalculationTest extends CypherFunSuite {
   private def indexScan(graph: GraphDatabaseQueryService): NodeIndexScanPipe = {
     graph.withTx { tx =>
       val transactionalContext = TransactionalContextWrapper(transactionContext(graph, tx))
-      val ctx = new TransactionBoundPlanContext(transactionalContext, devNullLogger)
+      val ctx = TransactionBoundPlanContext(transactionalContext, devNullLogger)
 
       val labelId = ctx.getOptLabelId(LABEL.name()).get
       val propKeyId = ctx.getOptPropertyKeyId(PROPERTY).get
@@ -345,7 +345,7 @@ class ActualCostCalculationTest extends CypherFunSuite {
     val gds = graph.asInstanceOf[GraphDatabaseCypherService].getGraphDatabaseService
 
     def withTx[T](f: InternalTransaction => T): T = {
-      val tx = graph.beginTransaction(KernelTransaction.Type.explicit, SecurityContext.AUTH_DISABLED)
+      val tx = graph.beginTransaction(Type.explicit, SecurityContext.AUTH_DISABLED)
       try {
         val result = f(tx)
         tx.success()

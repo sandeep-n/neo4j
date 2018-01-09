@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,7 +17,7 @@
 package org.neo4j.cypher.internal.frontend.v3_4.ast
 
 import org.neo4j.cypher.internal.util.v3_4.test_helpers.CypherFunSuite
-import org.neo4j.cypher.internal.v3_4.expressions.Variable
+import org.neo4j.cypher.internal.v3_4.expressions.{LogicalVariable, Variable}
 
 class ConnectedComponentsTest extends CypherFunSuite {
   import connectedComponents._
@@ -72,5 +72,5 @@ class ConnectedComponentsTest extends CypherFunSuite {
     ))
   }
 
-  private def varFor(name: String): Variable = Variable(name)(null)
+  private def varFor(name: String): LogicalVariable = Variable(name)(null)
 }

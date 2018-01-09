@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,13 +20,12 @@
 package org.neo4j.unsafe.impl.batchimport;
 
 import static org.neo4j.unsafe.impl.batchimport.RecordIdIterator.forwards;
-import static org.neo4j.unsafe.impl.batchimport.staging.Step.ORDER_SEND_DOWNSTREAM;
-
 import org.neo4j.kernel.impl.store.RelationshipStore;
 import org.neo4j.unsafe.impl.batchimport.cache.NodeRelationshipCache;
 import org.neo4j.unsafe.impl.batchimport.staging.BatchFeedStep;
 import org.neo4j.unsafe.impl.batchimport.staging.ReadRecordsStep;
 import org.neo4j.unsafe.impl.batchimport.staging.Stage;
+import org.neo4j.unsafe.impl.batchimport.stats.StatsProvider;
 
 /**
  * Goes through {@link RelationshipStore} and increments counts per start/end node,
@@ -34,11 +33,14 @@ import org.neo4j.unsafe.impl.batchimport.staging.Stage;
  */
 public class NodeDegreeCountStage extends Stage
 {
-    public NodeDegreeCountStage( Configuration config, RelationshipStore store, NodeRelationshipCache cache )
+    public static final String NAME = "Node Degrees";
+
+    public NodeDegreeCountStage( Configuration config, RelationshipStore store, NodeRelationshipCache cache,
+            StatsProvider memoryUsageStatsProvider )
     {
-        super( "Node Degrees", config );
+        super( NAME, null, config, 0 );
         add( new BatchFeedStep( control(), config, forwards( 0, store.getHighId(), config ), store.getRecordSize() ) );
         add( new ReadRecordsStep<>( control(), config, false, store, null ) );
-        add( new CalculateDenseNodesStep( control(), config, cache ) );
+        add( new CalculateDenseNodesStep( control(), config, cache, memoryUsageStatsProvider ) );
     }
 }

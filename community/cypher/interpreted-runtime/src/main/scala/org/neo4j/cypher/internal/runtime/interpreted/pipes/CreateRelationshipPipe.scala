@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,11 +22,10 @@ package org.neo4j.cypher.internal.runtime.interpreted.pipes
 import java.util.function.BiConsumer
 
 import org.neo4j.cypher.internal.runtime.QueryContext
-import org.neo4j.cypher.internal.util.v3_4.{CypherTypeException, InternalException, InvalidSemanticsException}
 import org.neo4j.cypher.internal.runtime.interpreted._
 import org.neo4j.cypher.internal.runtime.interpreted.commands.expressions.Expression
-import org.neo4j.cypher.internal.v3_4.logical.plans.LogicalPlanId
-import org.neo4j.kernel.impl.util.ValueUtils
+import org.neo4j.cypher.internal.util.v3_4.attribution.Id
+import org.neo4j.cypher.internal.util.v3_4.{CypherTypeException, InternalException, InvalidSemanticsException}
 import org.neo4j.values.AnyValue
 import org.neo4j.values.storable.Values
 import org.neo4j.values.virtual.{EdgeValue, NodeValue}
@@ -43,9 +42,9 @@ abstract class BaseRelationshipPipe(src: Pipe, key: String, startNode: String, t
     val end = getNode(context, endNode)
     val typeId = typ.typ(state.query)
     val relationship = state.query.createRelationship(start.id(), end.id(), typeId)
-    relationship.getType // we do this to make sure the relationship is loaded from the store into this object
-    setProperties(context, state, relationship.getId)
-    context += key -> ValueUtils.fromRelationshipProxy(relationship)
+    relationship.`type`() // we do this to make sure the relationship is loaded from the store into this object
+    setProperties(context, state, relationship.id())
+    context += key -> relationship
   }
 
   private def getNode(row: ExecutionContext, name: String): NodeValue =
@@ -85,7 +84,7 @@ abstract class BaseRelationshipPipe(src: Pipe, key: String, startNode: String, t
 case class CreateRelationshipPipe(src: Pipe,
                                   key: String, startNode: String, typ: LazyType, endNode: String,
                                   properties: Option[Expression])
-                                 (val id: LogicalPlanId = LogicalPlanId.DEFAULT)
+                                 (val id: Id = Id.INVALID_ID)
   extends BaseRelationshipPipe(src, key, startNode, typ, endNode, properties) {
   override protected def handleNull(key: String) {
     //do nothing
@@ -94,7 +93,7 @@ case class CreateRelationshipPipe(src: Pipe,
 
 case class MergeCreateRelationshipPipe(src: Pipe, key: String, startNode: String, typ: LazyType, endNode: String,
                                        properties: Option[Expression])
-                                      (val id: LogicalPlanId = LogicalPlanId.DEFAULT)
+                                      (val id: Id = Id.INVALID_ID)
   extends BaseRelationshipPipe(src, key, startNode, typ, endNode, properties) {
 
   override protected def handleNull(key: String) {

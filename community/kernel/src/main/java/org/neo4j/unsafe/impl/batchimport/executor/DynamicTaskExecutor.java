@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,7 +19,6 @@
  */
 package org.neo4j.unsafe.impl.batchimport.executor;
 
-import java.lang.Thread.UncaughtExceptionHandler;
 import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -31,9 +30,9 @@ import org.neo4j.function.Suppliers;
 
 import static java.lang.Integer.max;
 import static java.lang.Integer.min;
-import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static org.apache.commons.lang3.SystemUtils.IS_OS_WINDOWS;
+
+import static org.neo4j.helpers.Exceptions.SILENT_UNCAUGHT_EXCEPTION_HANDLER;
 import static org.neo4j.helpers.Exceptions.launderedException;
 
 /**
@@ -194,10 +193,6 @@ public class DynamicTaskExecutor<LOCAL> implements TaskExecutor<LOCAL>
     {
         parkStrategy.park( Thread.currentThread() );
     }
-
-    private static final UncaughtExceptionHandler SILENT_UNCAUGHT_EXCEPTION_HANDLER = ( t, e ) ->
-    {   // Don't print about it
-    };
 
     private class Processor extends Thread
     {

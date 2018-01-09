@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,6 +19,8 @@
  */
 package org.neo4j.kernel.stresstests.transaction.checkpoint;
 
+import java.util.function.ToIntFunction;
+
 import org.neo4j.unsafe.impl.batchimport.InputIterable;
 import org.neo4j.unsafe.impl.batchimport.InputIterator;
 import org.neo4j.unsafe.impl.batchimport.cache.NumberArrayFactory;
@@ -31,6 +33,9 @@ import org.neo4j.unsafe.impl.batchimport.input.Collectors;
 import org.neo4j.unsafe.impl.batchimport.input.Input;
 import org.neo4j.unsafe.impl.batchimport.input.InputNode;
 import org.neo4j.unsafe.impl.batchimport.input.InputRelationship;
+import org.neo4j.values.storable.Value;
+
+import static org.neo4j.unsafe.impl.batchimport.input.Inputs.knownEstimates;
 
 public class NodeCountInputs implements Input
 {
@@ -119,5 +124,12 @@ public class NodeCountInputs implements Input
     public Collector badCollector()
     {
         return bad;
+    }
+
+    @Override
+    public Estimates calculateEstimates( ToIntFunction<Value[]> valueSizeCalculator )
+    {
+        return knownEstimates( nodeCount, 0, nodeCount * properties.length / 2, 0, nodeCount * properties.length / 2 * Long.BYTES, 0,
+                nodeCount * labels.length );
     }
 }

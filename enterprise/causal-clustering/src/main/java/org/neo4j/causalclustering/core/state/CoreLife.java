@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,6 +25,7 @@ import org.neo4j.causalclustering.core.state.machines.CoreStateMachines;
 import org.neo4j.causalclustering.core.state.snapshot.CoreSnapshot;
 import org.neo4j.causalclustering.identity.BoundState;
 import org.neo4j.causalclustering.identity.ClusterBinder;
+import org.neo4j.causalclustering.messaging.LifecycleMessageHandler;
 import org.neo4j.kernel.lifecycle.Lifecycle;
 
 public class CoreLife implements Lifecycle
@@ -35,16 +36,16 @@ public class CoreLife implements Lifecycle
 
     private final CommandApplicationProcess applicationProcess;
     private final CoreStateMachines coreStateMachines;
-    private final RaftMessageHandler raftMessageHandler;
-    private CoreSnapshotService snapshotService;
+    private final LifecycleMessageHandler<?> raftMessageHandler;
+    private final CoreSnapshotService snapshotService;
 
-    public CoreLife(
-            RaftMachine raftMachine,
+    public CoreLife( RaftMachine raftMachine,
             LocalDatabase localDatabase,
             ClusterBinder clusterBinder,
             CommandApplicationProcess commandApplicationProcess,
             CoreStateMachines coreStateMachines,
-            RaftMessageHandler raftMessageHandler, CoreSnapshotService snapshotService )
+            LifecycleMessageHandler<?> raftMessageHandler,
+            CoreSnapshotService snapshotService )
     {
         this.raftMachine = raftMachine;
         this.localDatabase = localDatabase;

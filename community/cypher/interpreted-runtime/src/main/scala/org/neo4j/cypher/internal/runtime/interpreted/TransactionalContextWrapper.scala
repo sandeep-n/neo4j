@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,25 +22,24 @@ package org.neo4j.cypher.internal.runtime.interpreted
 import org.neo4j.cypher.internal.planner.v3_4.spi.KernelStatisticProvider
 import org.neo4j.cypher.internal.runtime.QueryTransactionalContext
 import org.neo4j.graphdb.{Lock, PropertyContainer}
+import org.neo4j.internal.kernel.api.security.SecurityContext
+import org.neo4j.internal.kernel.api.{CursorFactory, Read, Write}
 import org.neo4j.kernel.GraphDatabaseQueryService
 import org.neo4j.kernel.api.KernelTransaction.Revertable
 import org.neo4j.kernel.api.dbms.DbmsOperations
 import org.neo4j.kernel.api.query.PlannerInfo
-import org.neo4j.kernel.api.security.SecurityContext
 import org.neo4j.kernel.api.txstate.TxStateHolder
-import org.neo4j.kernel.api.{ReadOperations, Statement}
+import org.neo4j.kernel.api.{KernelTransaction, ReadOperations, Statement}
 import org.neo4j.kernel.impl.factory.DatabaseInfo
 import org.neo4j.kernel.impl.query.TransactionalContext
 
 case class TransactionalContextWrapper(tc: TransactionalContext) extends QueryTransactionalContext {
 
-  override type ReadOps = ReadOperations
-
-  override type DbmsOps = DbmsOperations
-
   def getOrBeginNewIfClosed(): TransactionalContextWrapper = TransactionalContextWrapper(tc.getOrBeginNewIfClosed())
 
   def isOpen: Boolean = tc.isOpen
+
+  def kernelTransaction: KernelTransaction = tc.kernelTransaction()
 
   def graph: GraphDatabaseQueryService = tc.graph()
 
@@ -52,6 +51,13 @@ case class TransactionalContextWrapper(tc: TransactionalContext) extends QueryTr
 
   // needed only for compatibility with 2.3
   def acquireWriteLock(p: PropertyContainer): Lock = tc.acquireWriteLock(p)
+
+
+  override def cursors: CursorFactory = tc.kernelTransaction.cursors()
+
+  override def dataRead: Read = tc.kernelTransaction().dataRead()
+
+  override def dataWrite: Write = tc.kernelTransaction().dataWrite()
 
   override def readOperations: ReadOperations = tc.readOperations()
 

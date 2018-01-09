@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,7 +22,6 @@ package org.neo4j.values;
 import org.neo4j.values.storable.TextArray;
 import org.neo4j.values.storable.TextValue;
 import org.neo4j.values.storable.ValueWriter;
-import org.neo4j.values.virtual.CoordinateReferenceSystem;
 import org.neo4j.values.virtual.EdgeValue;
 import org.neo4j.values.virtual.MapValue;
 import org.neo4j.values.virtual.NodeValue;
@@ -49,10 +48,6 @@ public interface AnyValueWriter<E extends Exception> extends ValueWriter<E>
     void endList() throws E;
 
     void writePath( NodeValue[] nodes, EdgeValue[] edges ) throws E;
-
-    void beginPoint( CoordinateReferenceSystem coordinateReferenceSystem ) throws E;
-
-    void endPoint() throws E;
 
     default void writeVirtualNodeHack( Object node )
     {

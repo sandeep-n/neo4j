@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,11 +19,21 @@
  */
 package org.neo4j.values.storable;
 
+import org.neo4j.graphdb.spatial.Geometry;
 import org.neo4j.values.AnyValue;
 import org.neo4j.values.AnyValueWriter;
+import org.neo4j.values.SequenceValue;
+
+import static org.neo4j.values.storable.Values.NO_VALUE;
 
 public abstract class Value extends AnyValue
 {
+    @Override
+    public boolean eq( Object other )
+    {
+        return other != null && other instanceof Value && equals( (Value) other );
+    }
+
     public abstract boolean equals( Value other );
 
     public abstract boolean equals( byte[] x );
@@ -42,6 +52,10 @@ public abstract class Value extends AnyValue
 
     public abstract boolean equals( boolean[] x );
 
+    public abstract boolean equals( long x );
+
+    public abstract boolean equals( double x );
+
     public abstract boolean equals( char x );
 
     public abstract boolean equals( String x );
@@ -49,6 +63,31 @@ public abstract class Value extends AnyValue
     public abstract boolean equals( char[] x );
 
     public abstract boolean equals( String[] x );
+
+    public abstract boolean equals( Geometry[] x );
+
+    @Override
+    public Boolean ternaryEquals( AnyValue other )
+    {
+        if ( other == null || other == NO_VALUE )
+        {
+            return null;
+        }
+        if ( other.isSequenceValue() && this.isSequenceValue() )
+        {
+            return ((SequenceValue) this).ternaryEquality( (SequenceValue) other );
+        }
+        if ( other instanceof Value && ((Value) other).valueGroup() == valueGroup() )
+        {
+            Value otherValue = (Value) other;
+            if ( this.isNaN() || otherValue.isNaN() )
+            {
+                return null;
+            }
+            return equals( otherValue );
+        }
+        return false;
+    }
 
     @Override
     public <E extends Exception> void writeTo( AnyValueWriter<E> writer ) throws E
@@ -85,4 +124,9 @@ public abstract class Value extends AnyValue
     public abstract ValueGroup valueGroup();
 
     public abstract NumberType numberType();
+
+    public boolean isNaN()
+    {
+        return false;
+    }
 }

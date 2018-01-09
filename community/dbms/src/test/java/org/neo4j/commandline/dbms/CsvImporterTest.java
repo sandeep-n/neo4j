@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,6 +22,7 @@ package org.neo4j.commandline.dbms;
 import org.junit.Rule;
 import org.junit.Test;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
@@ -30,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.neo4j.commandline.admin.RealOutsideWorld;
-import org.neo4j.dbms.DatabaseManagementSystemSettings;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.helpers.Args;
 import org.neo4j.kernel.configuration.Config;
@@ -58,11 +58,11 @@ public class CsvImporterTest
         List<String> lines = Collections.singletonList( "foo\\tbar\\tbaz" );
         Files.write( inputFile.toPath(), lines, Charset.defaultCharset() );
 
-        try ( RealOutsideWorld outsideWorld = new RealOutsideWorld() )
+        try ( RealOutsideWorld outsideWorld = new RealOutsideWorld( System.out, System.err, new ByteArrayInputStream( new byte[0] ) ) )
         {
             Config config = Config.builder()
                     .withSettings( additionalConfig() )
-                    .withSetting( DatabaseManagementSystemSettings.database_path, dbDir.getAbsolutePath() )
+                    .withSetting( GraphDatabaseSettings.database_path, dbDir.getAbsolutePath() )
                     .withSetting( GraphDatabaseSettings.logs_directory, logDir.getAbsolutePath() ).build();
 
             CsvImporter csvImporter = new CsvImporter(
@@ -80,7 +80,7 @@ public class CsvImporterTest
 
     private Map<String,String> additionalConfig()
     {
-        return stringMap( DatabaseManagementSystemSettings.database_path.name(), getDatabasePath(),
+        return stringMap( GraphDatabaseSettings.database_path.name(), getDatabasePath(),
                 GraphDatabaseSettings.logs_directory.name(), getLogsDirectory() );
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -110,12 +110,6 @@ public class ThrowingValueWriterTest
         }
 
         @Override
-        public void writeString( char[] value, int offset, int length ) throws TestException
-        {
-            throw new TestException();
-        }
-
-        @Override
         public void beginArray( int size, ArrayType arrayType ) throws TestException
         {
             throw new TestException();
@@ -129,6 +123,12 @@ public class ThrowingValueWriterTest
 
         @Override
         public void writeByteArray( byte[] value ) throws TestException
+        {
+            throw new TestException();
+        }
+
+        @Override
+        public void writePoint( CoordinateReferenceSystem crs, double[] coordinate ) throws TestException
         {
             throw new TestException();
         }

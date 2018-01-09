@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -28,25 +28,29 @@ class TaskCloser {
    * @param task This task will be called, with true if the query went OK, and a false if an error occurred
    */
   def addTask(task: Boolean => Unit) {
+    if(closed)
+      throw new IllegalStateException("Already closed")
     _tasks += task
   }
 
   def close(success: Boolean) {
     if (!closed) {
       closed = true
-      val errors = _tasks.flatMap {
+      var foundException: Option[Throwable] = None
+      _tasks foreach {
         f =>
           try {
             f(success)
             None
           } catch {
-            case e: Throwable => Some(e)
+            case e: Throwable => foundException = Some(e)
           }
+
       }
 
-      errors.map(e => throw e)
+      foundException.forall(throwable => throw throwable)
     }
   }
 
-  def isClosed = closed
+  def isClosed: Boolean = closed
 }

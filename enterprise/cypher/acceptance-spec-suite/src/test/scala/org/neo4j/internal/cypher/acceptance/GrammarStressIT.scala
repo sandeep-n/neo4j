@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -105,6 +105,10 @@ class GrammarStressIT extends ExecutionEngineFunSuite with PropertyChecks with C
         assertQuery(query)
       }
     }
+  }
+
+  test("Double var expand") {
+    assertQuery("MATCH (:L1)-[:T1 *..1 {p1: 1}]->(n2 :L2 {p2: 7})-[r2s :T2 *..2]->(:L3) RETURN 42")
   }
 
   case class Identifier( name:String, isSingleEntity:Boolean)

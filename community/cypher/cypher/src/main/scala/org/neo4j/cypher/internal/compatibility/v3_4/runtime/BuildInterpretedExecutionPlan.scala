@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,23 +19,22 @@
  */
 package org.neo4j.cypher.internal.compatibility.v3_4.runtime
 
-import org.neo4j.cypher.internal.util.v3_4.PeriodicCommitInOpenTransactionException
 import org.neo4j.cypher.internal.compatibility.v3_4.runtime.executionplan._
 import org.neo4j.cypher.internal.compatibility.v3_4.runtime.phases.CompilationState
 import org.neo4j.cypher.internal.compatibility.v3_4.runtime.profiler.Profiler
-import org.neo4j.cypher.internal.compiler.v3_4.CypherCompilerConfiguration
 import org.neo4j.cypher.internal.compiler.v3_4.phases._
-import org.neo4j.cypher.internal.frontend.v3_4.notification.InternalNotification
+import org.neo4j.cypher.internal.frontend.v3_4.PlannerName
 import org.neo4j.cypher.internal.frontend.v3_4.phases.CompilationPhaseTracer.CompilationPhase.PIPE_BUILDING
 import org.neo4j.cypher.internal.frontend.v3_4.phases.{InternalNotificationLogger, Phase}
-import org.neo4j.cypher.internal.frontend.v3_4.PlannerName
-import org.neo4j.cypher.internal.planner.v3_4.spi.{GraphStatistics, PlanContext}
+import org.neo4j.cypher.internal.planner.v3_4.spi.GraphStatistics
 import org.neo4j.cypher.internal.runtime.interpreted.UpdateCountingQueryContext
 import org.neo4j.cypher.internal.runtime.interpreted.commands.convert.{CommunityExpressionConverter, ExpressionConverters}
-import org.neo4j.cypher.internal.runtime.interpreted.pipes.Pipe
 import org.neo4j.cypher.internal.runtime.{ExecutionMode, InternalExecutionResult, ProfileMode, QueryContext}
-import org.neo4j.cypher.internal.v3_4.logical.plans.IndexUsage
+import org.neo4j.cypher.internal.util.v3_4.PeriodicCommitInOpenTransactionException
+import org.neo4j.cypher.internal.v3_4.logical.plans.{IndexUsage, LogicalPlan}
 import org.neo4j.values.virtual.MapValue
+
+import scala.util.Success
 
 object BuildInterpretedExecutionPlan extends Phase[CommunityRuntimeContext, LogicalPlanState, CompilationState] {
   override def phase = PIPE_BUILDING
@@ -53,36 +52,17 @@ object BuildInterpretedExecutionPlan extends Phase[CommunityRuntimeContext, Logi
     val pipeInfo = executionPlanBuilder.build(from.periodicCommit, logicalPlan)(pipeBuildContext, context.planContext)
     val PipeInfo(pipe, updating, periodicCommitInfo, fp, planner) = pipeInfo
     val columns = from.statement().returnColumns
-    val resultBuilderFactory = DefaultExecutionResultBuilderFactory(pipeInfo, columns, logicalPlan)
+    val resultBuilderFactory = new InterpretedExecutionResultBuilderFactory(pipeInfo, columns, logicalPlan)
     val func = getExecutionPlanFunction(periodicCommitInfo, from.queryText, updating, resultBuilderFactory,
                                         context.notificationLogger, InterpretedRuntimeName)
-    val execPlan = new ExecutionPlan {
-      private val fingerprint = context.createFingerprintReference(fp)
 
-      override def run(queryContext: QueryContext, planType: ExecutionMode, params: MapValue): InternalExecutionResult =
-        func(queryContext, planType, params)
+    val execPlan: ExecutionPlan = new InterpretedExecutionPlan(func,
+      logicalPlan,
+      periodicCommitInfo.isDefined,
+      planner,
+      context.createFingerprintReference(fp))
 
-      override def isPeriodicCommit: Boolean = periodicCommitInfo.isDefined
-
-      override def plannerUsed: PlannerName = planner
-
-      override def isStale(lastTxId: () => Long, statistics: GraphStatistics): Boolean = fingerprint.isStale(lastTxId, statistics)
-
-      override def runtimeUsed = InterpretedRuntimeName
-
-      override def notifications(planContext: PlanContext): Seq[InternalNotification] = checkForNotifications(pipe, planContext, context.config)
-
-      override def plannedIndexUsage: Seq[IndexUsage] = logicalPlan.indexUsage
-    }
-
-    new CompilationState(from, Some(execPlan))
-  }
-
-  def checkForNotifications(pipe: Pipe, planContext: PlanContext, config: CypherCompilerConfiguration): Seq[InternalNotification] = {
-    val notificationCheckers = Seq(checkForEagerLoadCsv,
-      CheckForLoadCsvAndMatchOnLargeLabel(planContext, config.nonIndexedLabelWarningThreshold))
-
-    notificationCheckers.flatMap(_ (pipe))
+    new CompilationState(from, Success(execPlan))
   }
 
   def getExecutionPlanFunction(periodicCommit: Option[PeriodicCommitInfo],
@@ -111,4 +91,24 @@ object BuildInterpretedExecutionPlan extends Phase[CommunityRuntimeContext, Logi
 
       builder.build(queryId, planType, params, notificationLogger, runtimeName)
     }
+
+  /**
+    * Executable plan for a single cypher query. Warning, this class will get cached! Do not leak transaction objects
+    * or other resources in here.
+    */
+  class InterpretedExecutionPlan(val executionPlanFunc: (QueryContext, ExecutionMode, MapValue) => InternalExecutionResult,
+                                 val logicalPlan: LogicalPlan,
+                                 override val isPeriodicCommit: Boolean,
+                                 override val plannerUsed: PlannerName,
+                                 val fingerprint: PlanFingerprintReference) extends ExecutionPlan {
+
+    override def run(queryContext: QueryContext, planType: ExecutionMode, params: MapValue): InternalExecutionResult =
+      executionPlanFunc(queryContext, planType, params)
+
+    override def checkPlanResusability(lastTxId: () => Long, statistics: GraphStatistics) = fingerprint.checkPlanReusability(lastTxId, statistics)
+
+    override def runtimeUsed: RuntimeName = InterpretedRuntimeName
+
+    override def plannedIndexUsage: Seq[IndexUsage] = logicalPlan.indexUsage
+  }
 }

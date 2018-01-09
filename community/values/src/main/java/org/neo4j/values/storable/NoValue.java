@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -18,6 +18,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.neo4j.values.storable;
+
+import org.neo4j.values.AnyValue;
+import org.neo4j.graphdb.spatial.Geometry;
 
 /**
  * Not a value.
@@ -38,6 +41,12 @@ final class NoValue extends Value
     public boolean eq( Object other )
     {
         return this == other;
+    }
+
+    @Override
+    public Boolean ternaryEquals( AnyValue other )
+    {
+        return null;
     }
 
     @Override
@@ -101,6 +110,18 @@ final class NoValue extends Value
     }
 
     @Override
+    public boolean equals( long x )
+    {
+        return false;
+    }
+
+    @Override
+    public boolean equals( double x )
+    {
+        return false;
+    }
+
+    @Override
     public boolean equals( char x )
     {
         return false;
@@ -120,6 +141,12 @@ final class NoValue extends Value
 
     @Override
     public boolean equals( String[] x )
+    {
+        return false;
+    }
+
+    @Override
+    public boolean equals( Geometry[] x )
     {
         return false;
     }

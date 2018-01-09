@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -38,7 +38,7 @@ import static org.neo4j.kernel.api.exceptions.Status.statusCodeOf;
 public class UnavailableIT
 {
     @Rule
-    public final ClusterRule clusterRule = new ClusterRule( getClass() ).withNumberOfCoreMembers( 3 );
+    public final ClusterRule clusterRule = new ClusterRule().withNumberOfCoreMembers( 3 );
 
     private Cluster cluster;
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -28,7 +28,7 @@ class ParameterValuesAcceptanceTest extends ExecutionEngineFunSuite with CypherC
   test("should be able to send in an array of nodes via parameter") {
     // given
     val node = createLabeledNode("Person")
-    val result = executeWith(Configs.All, "WITH {param} as p RETURN p", params = Map("param" -> Array(node)))
+    val result = executeWith(Configs.All + Configs.Morsel, "WITH {param} as p RETURN p", params = Map("param" -> Array(node)))
     val outputP = result.next.get("p").get
     outputP should equal(Array(node))
   }
@@ -41,7 +41,7 @@ class ParameterValuesAcceptanceTest extends ExecutionEngineFunSuite with CypherC
       """ WITH 1 AS node, [] AS nodes1
         | RETURN ANY(n IN collect(distinct node) WHERE n IN nodes1) as exists """.stripMargin
 
-    val r = executeWith(Configs.CommunityInterpreted - Configs.Version2_3, query)
+    val r = executeWith(Configs.Interpreted - Configs.Version2_3, query)
     r.next().apply("exists") should equal(false)
   }
 
@@ -53,7 +53,7 @@ class ParameterValuesAcceptanceTest extends ExecutionEngineFunSuite with CypherC
       emptyBooleanArray, Array[String]()).foreach { array =>
 
       val q = "CREATE (n) SET n.prop = $param RETURN n.prop AS p"
-      val r = executeWith(Configs.CommunityInterpreted - Configs.Version2_3, q, params = Map("param" -> array))
+      val r = executeWith(Configs.Interpreted - Configs.Version2_3, q, params = Map("param" -> array))
 
       assertStats(r, nodesCreated = 1, propertiesWritten = 1)
       val returned = r.columnAs[Array[_]]("p").next()
@@ -68,7 +68,7 @@ class ParameterValuesAcceptanceTest extends ExecutionEngineFunSuite with CypherC
       Array[Boolean](false, true), Array[String]("", " ")).foreach { array =>
 
       val q = "CREATE (n) SET n.prop = $param RETURN n.prop AS p"
-      val r = executeWith(Configs.CommunityInterpreted - Configs.Version2_3, q, params = Map("param" -> array))
+      val r = executeWith(Configs.Interpreted - Configs.Version2_3, q, params = Map("param" -> array))
 
       assertStats(r, nodesCreated = 1, propertiesWritten = 1)
       val returned = r.columnAs[Array[_]]("p").next()
@@ -81,7 +81,7 @@ class ParameterValuesAcceptanceTest extends ExecutionEngineFunSuite with CypherC
     // given
     val node = createLabeledNode("Person")
 
-    val result = executeWith(Configs.All, "MATCH (b) WHERE b = {param} RETURN b", params = Map("param" -> node))
+    val result = executeWith(Configs.All + Configs.Morsel, "MATCH (b) WHERE b = {param} RETURN b", params = Map("param" -> node))
     result.toList should equal(List(Map("b" -> node)))
   }
 
@@ -101,7 +101,7 @@ class ParameterValuesAcceptanceTest extends ExecutionEngineFunSuite with CypherC
   test("removing property when not sure if it is a node or relationship should still work - NODE") {
     val n = createNode("name" -> "Anders")
 
-    executeWith(Configs.CommunityInterpreted - Configs.Cost2_3, "WITH {p} as p SET p.lastname = p.name REMOVE p.name", params = Map("p" -> n))
+    executeWith(Configs.Interpreted - Configs.Cost2_3, "WITH {p} as p SET p.lastname = p.name REMOVE p.name", params = Map("p" -> n))
 
     graph.inTx {
       n.getProperty("lastname") should equal("Anders")
@@ -112,11 +112,58 @@ class ParameterValuesAcceptanceTest extends ExecutionEngineFunSuite with CypherC
   test("removing property when not sure if it is a node or relationship should still work - REL") {
     val r = relate(createNode(), createNode(), "name" -> "Anders")
 
-    executeWith(Configs.CommunityInterpreted - Configs.Cost2_3, "WITH {p} as p SET p.lastname = p.name REMOVE p.name", params = Map("p" -> r))
+    executeWith(Configs.Interpreted - Configs.Cost2_3, "WITH {p} as p SET p.lastname = p.name REMOVE p.name", params = Map("p" -> r))
 
     graph.inTx {
       r.getProperty("lastname") should equal("Anders")
       r.hasProperty("name") should equal(false)
     }
   }
+
+  test("match with missing parameter should return error for empty db") {
+    // all versions of 3.3 and 3.4
+    val config = Configs.Version3_4 + Configs.Version3_3 + Configs.Procs - Configs.AllRulePlanners
+    failWithError(config, "MATCH (n:Person {name:{name}}) RETURN n", Seq("Expected parameter(s): name"))
+  }
+
+  test("match with missing parameter should return error for non-empty db") {
+    // all versions of 3.3 and 3.4
+    val config = Configs.Version3_4 + Configs.Version3_3 + Configs.Procs - Configs.AllRulePlanners - Configs.Compiled
+    failWithError(config, "CREATE (n:Person) WITH n MATCH (n:Person {name:{name}}) RETURN n", Seq("Expected parameter(s): name"))
+  }
+
+  test("match with multiple missing parameters should return error for empty db") {
+    // all versions of 3.3 and 3.4
+    val config = Configs.Version3_4 + Configs.Version3_3 + Configs.Procs - Configs.AllRulePlanners
+    failWithError(config, "MATCH (n:Person {name:{name}, age:{age}}) RETURN n", Seq("Expected parameter(s): name, age"))
+  }
+
+  test("match with multiple missing parameters should return error for non-empty db") {
+    // all versions of 3.3 and 3.4
+    val config = Configs.Version3_4 + Configs.Version3_3 + Configs.Procs - Configs.AllRulePlanners - Configs.Compiled
+    failWithError(config, "CREATE (n:Person) WITH n MATCH (n:Person {name:{name}, age:{age}}) RETURN n", Seq("Expected parameter(s): name, age"))
+  }
+
+  test("match with misspelled parameter should return error for empty db") {
+    // all versions of 3.3 and 3.4
+    val config = Configs.Version3_4 + Configs.Version3_3 + Configs.Procs - Configs.AllRulePlanners
+    failWithError(config, "MATCH (n:Person {name:{name}}) RETURN n", Seq("Expected parameter(s): name"), params = "nam" -> "Neo")
+  }
+
+  test("match with misspelled parameter should return error for non-empty db") {
+    // all versions of 3.3 and 3.4
+    val config = Configs.Version3_4 + Configs.Version3_3 + Configs.Procs - Configs.AllRulePlanners - Configs.Compiled
+    failWithError(config, "CREATE (n:Person) WITH n MATCH (n:Person {name:{name}}) RETURN n", Seq("Expected parameter(s): name"), params = "nam" -> "Neo")
+  }
+
+  test("explain with missing parameter should NOT return error for empty db") {
+    val config = Configs.All
+    executeWith(config, "EXPLAIN MATCH (n:Person {name:{name}}) RETURN n")
+  }
+
+  test("explain with missing parameter should NOT return error for non-empty db") {
+    val config = Configs.Interpreted - Configs.Cost2_3
+    executeWith(config, "EXPLAIN CREATE (n:Person) WITH n MATCH (n:Person {name:{name}}) RETURN n")
+  }
+
 }

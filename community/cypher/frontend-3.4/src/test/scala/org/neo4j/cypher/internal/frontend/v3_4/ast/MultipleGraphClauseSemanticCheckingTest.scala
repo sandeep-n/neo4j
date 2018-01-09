@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -1230,6 +1230,8 @@ class MultipleGraphClauseSemanticCheckingTest
 
     override object plannerName extends PlannerName {
       override def name: String = "Test"
+
+      override def version: String = "3.4"
 
       override def toTextOutput: String = name
     }

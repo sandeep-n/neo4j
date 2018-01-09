@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,7 +24,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.neo4j.dbms.DatabaseManagementSystemSettings;
+import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.factory.CommunityEditionModule;
 import org.neo4j.kernel.impl.factory.DatabaseInfo;
@@ -53,7 +53,7 @@ public class CommunityNeoServer extends AbstractNeoServer
 {
     protected static final GraphFactory COMMUNITY_FACTORY = ( config, dependencies ) ->
     {
-        File storeDir = config.get( DatabaseManagementSystemSettings.database_path );
+        File storeDir = config.get( GraphDatabaseSettings.database_path );
         return new GraphDatabaseFacadeFactory( DatabaseInfo.COMMUNITY, CommunityEditionModule::new )
                 .newFacade( storeDir, config, dependencies );
     };

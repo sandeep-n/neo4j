@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -222,7 +222,7 @@ public class ConfigLoaderTest
     {
         File configFile = ConfigFileBuilder
                 .builder( folder.getRoot() )
-                .withoutSetting( DatabaseManagementSystemSettings.data_directory )
+                .withoutSetting( GraphDatabaseSettings.data_directory )
                 .build();
         Config config = Config.fromFile( configFile ).withHome( folder.getRoot() ).build();
 
@@ -234,7 +234,7 @@ public class ConfigLoaderTest
     public void shouldSetAValueForAuthStoreLocation() throws IOException
     {
         File configFile = ConfigFileBuilder.builder( folder.getRoot() )
-                .withSetting( DatabaseManagementSystemSettings.data_directory, "the-data-dir" )
+                .withSetting( GraphDatabaseSettings.data_directory, "the-data-dir" )
                 .build();
         Config config = Config.fromFile( configFile ).withHome( folder.getRoot() ).build();
 
@@ -246,7 +246,7 @@ public class ConfigLoaderTest
     public void shouldNotOverwriteAuthStoreLocationIfProvided() throws IOException
     {
         File configFile = ConfigFileBuilder.builder( folder.getRoot() )
-                .withSetting( DatabaseManagementSystemSettings.data_directory, "the-data-dir" )
+                .withSetting( GraphDatabaseSettings.data_directory, "the-data-dir" )
                 .withSetting( GraphDatabaseSettings.auth_store, "foo/bar/auth" )
                 .build();
         Config config = Config.fromFile( configFile ).withHome( folder.getRoot() ).build();

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -26,6 +26,7 @@ import org.junit.runner.RunWith;
 import org.mockito.junit.MockitoJUnitRunner;
 
 import java.io.IOException;
+import java.time.Clock;
 import java.util.UUID;
 
 import org.neo4j.causalclustering.core.consensus.RaftMessages;
@@ -94,7 +95,7 @@ public class RaftMessageProcessingTest
     @Before
     public void setup()
     {
-        channel = new EmbeddedChannel( new RaftMessageEncoder( serializer ), new RaftMessageDecoder( serializer ) );
+        channel = new EmbeddedChannel( new RaftMessageEncoder( serializer ), new RaftMessageDecoder( serializer, Clock.systemUTC() ) );
     }
 
     @Test
@@ -136,7 +137,8 @@ public class RaftMessageProcessingTest
         MemberId member = new MemberId( UUID.randomUUID() );
         RaftLogEntry logEntry = new RaftLogEntry( 1, ReplicatedInteger.valueOf( 1 ) );
         RaftMessages.AppendEntries.Request request =
-                new RaftMessages.AppendEntries.Request( member, 1, 1, 99, new RaftLogEntry[] { logEntry }, 1 );
+                new RaftMessages.AppendEntries.Request(
+                        member, 1, 1, 99, new RaftLogEntry[] { logEntry }, 1 );
 
         // when
         channel.writeOutbound( request );

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,7 +22,6 @@ package org.neo4j.csv.reader;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.io.StringReader;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -47,9 +46,9 @@ public class ProcessingSourceTest
     public void shouldBackUpChunkToClosestNewline() throws Exception
     {
         // GIVEN
-        CharReadable reader = Readables.wrap( new StringReader( "1234567\n8901234\n5678901234" ) );
-        // (next chunks):                                                     ^            ^
-        // (actual chunks):                                               ^        ^
+        CharReadable reader = Readables.wrap( "1234567\n8901234\n5678901234" );
+        // (next chunks):                                   ^            ^
+        // (actual chunks):                             ^        ^
         try ( ProcessingSource source = new ProcessingSource( reader, 12, 1 ) )
         {
             // WHEN
@@ -69,9 +68,9 @@ public class ProcessingSourceTest
     public void shouldFailIfNoNewlineInChunk() throws Exception
     {
         // GIVEN
-        CharReadable reader = Readables.wrap( new StringReader( "1234567\n89012345678901234" ) );
-        // (next chunks):                                                     ^
-        // (actual chunks):                                               ^
+        CharReadable reader = Readables.wrap( "1234567\n89012345678901234" );
+        // (next chunks):                                   ^
+        // (actual chunks):                             ^
         try ( ProcessingSource source = new ProcessingSource( reader, 12, 1 ) )
         {
             // WHEN
@@ -206,6 +205,12 @@ public class ProcessingSourceTest
             public SectionedCharBuffer read( SectionedCharBuffer buffer, int from ) throws IOException
             {
                 throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public long length()
+            {
+                return lineCount * 10;
             }
         };
     }

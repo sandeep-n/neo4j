@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,18 +19,18 @@
  */
 package org.neo4j.cypher.internal.compatibility.v3_4.runtime.slotted
 
-import org.neo4j.cypher.internal.compatibility.v3_4.runtime.PipelineInformation
+import org.neo4j.cypher.internal.compatibility.v3_4.runtime.SlotConfiguration
 import org.neo4j.cypher.internal.util.v3_4.InternalException
 import org.neo4j.cypher.internal.util.v3_4.test_helpers.CypherFunSuite
 import org.neo4j.values.storable.Values.stringValue
 
 class PrimitiveExecutionContextTest extends CypherFunSuite {
 
-  private def pipeline(longs: Int, refs: Int) = PipelineInformation(Map.empty, longs, refs)
+  private def slots(longs: Int, refs: Int) = SlotConfiguration(Map.empty, longs, refs)
 
   test("copy fills upp the first few elements") {
-    val input = PrimitiveExecutionContext(pipeline(2, 1))
-    val result = PrimitiveExecutionContext(pipeline(3, 2))
+    val input = SlottedExecutionContext(slots(2, 1))
+    val result = SlottedExecutionContext(slots(3, 2))
 
     input.setLongAt(0, 42)
     input.setLongAt(1, 666)
@@ -44,15 +44,15 @@ class PrimitiveExecutionContextTest extends CypherFunSuite {
   }
 
   test("copy fails if copy from larger") {
-    val input = PrimitiveExecutionContext(pipeline(4, 0))
-    val result = PrimitiveExecutionContext(pipeline(2, 0))
+    val input = SlottedExecutionContext(slots(4, 0))
+    val result = SlottedExecutionContext(slots(2, 0))
 
     intercept[InternalException](result.copyFrom(input, 4, 0))
   }
 
   test("copy fails if copy from larger 2") {
-    val input = PrimitiveExecutionContext(pipeline(0, 4))
-    val result = PrimitiveExecutionContext(pipeline(0, 2))
+    val input = SlottedExecutionContext(slots(0, 4))
+    val result = SlottedExecutionContext(slots(0, 2))
 
     intercept[InternalException](result.copyFrom(input, 0, 4))
   }

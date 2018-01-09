@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -183,6 +183,18 @@ public class RecordingPageCursorTracer extends RecordingTracer implements PageCu
         Objects.nonNull( tracer );
         tracer.pins( pins );
         tracer.faults( faults );
+    }
+
+    @Override
+    public long accumulatedHits()
+    {
+        return 0;
+    }
+
+    @Override
+    public long accumulatedFaults()
+    {
+        return 0;
     }
 
     private void pageFaulted( long filePageId, PageSwapper swapper )

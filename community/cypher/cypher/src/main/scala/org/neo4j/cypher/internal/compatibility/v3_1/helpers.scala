@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -37,8 +37,8 @@ object helpers {
   def as3_1(config: CypherCompilerConfiguration) =
     CypherCompilerConfiguration3_1(
       config.queryCacheSize,
-      config.statsDivergenceThreshold,
-      config.queryPlanTTL,
+      config.statsDivergenceCalculator.initialThreshold,
+      config.statsDivergenceCalculator.initialMillis,
       config.useErrorsOverWarnings,
       config.idpMaxTableSize,
       config.idpIterationDuration,

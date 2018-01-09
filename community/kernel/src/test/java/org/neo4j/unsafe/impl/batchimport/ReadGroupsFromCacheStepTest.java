@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -54,7 +54,7 @@ public class ReadGroupsFromCacheStepTest
                 new Group( 6, 35 ), // ^^^ much bigger than batch size
                 new Group( 7, 2 ) ).iterator();
         final AtomicInteger processCounter = new AtomicInteger();
-        Stage stage = new Stage( getClass().getSimpleName(), config )
+        Stage stage = new Stage( getClass().getSimpleName(), null, config, 0 )
         {
             {
                 add( new ReadGroupsFromCacheStep( control(), config, groups, 1 ) );

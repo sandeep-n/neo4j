@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,12 +22,13 @@ package org.neo4j.cypher.internal.compatibility.v3_4.runtime.compiled.codegen.ir
 import org.neo4j.cypher.internal.util.v3_4.IncomparableValuesException
 import org.neo4j.cypher.internal.compatibility.v3_4.runtime.compiled.codegen.CodeGenContext
 import org.neo4j.cypher.internal.compatibility.v3_4.runtime.compiled.codegen.spi.MethodStructure
-import org.neo4j.cypher.internal.util.v3_4.symbols.CTBoolean
+import org.neo4j.cypher.internal.util.v3_4.symbols.{CTBoolean, CTMap, ListType}
 import org.neo4j.cypher.internal.util.v3_4.symbols
 
 case class Equals(lhs: CodeGenExpression, rhs: CodeGenExpression) extends CodeGenExpression {
 
-  override def nullable(implicit context: CodeGenContext) = lhs.nullable || rhs.nullable
+  override def nullable(implicit context: CodeGenContext) = lhs.nullable || rhs.nullable ||
+    isCollectionOfNonPrimitives(lhs) || isCollectionOfNonPrimitives(rhs)
 
   override def codeGenType(implicit context: CodeGenContext) =
     if (nullable) CypherCodeGenType(CTBoolean, ReferenceType)
@@ -96,4 +97,14 @@ case class Equals(lhs: CodeGenExpression, rhs: CodeGenExpression) extends CodeGe
           CypherCodeGenType(CTBoolean, ReferenceType))
       }
   }
+
+  private def isCollectionOfNonPrimitives(e: CodeGenExpression)(implicit context: CodeGenContext) =
+    e.codeGenType match {
+      case CypherCodeGenType(ListType(_), ListReferenceType(inner)) if !RepresentationType.isPrimitive(inner) =>
+        true
+      case CypherCodeGenType(CTMap, _) =>
+        true
+      case _ =>
+        false
+    }
 }

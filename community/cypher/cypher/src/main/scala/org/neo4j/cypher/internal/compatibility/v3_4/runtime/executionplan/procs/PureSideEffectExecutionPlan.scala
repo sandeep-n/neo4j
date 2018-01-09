@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,15 +22,14 @@ package org.neo4j.cypher.internal.compatibility.v3_4.runtime.executionplan.procs
 import org.neo4j.cypher.CypherVersion
 import org.neo4j.cypher.internal.compatibility.v3_4.runtime._
 import org.neo4j.cypher.internal.compatibility.v3_4.runtime.executionplan.ExecutionPlan
-import org.neo4j.cypher.internal.compiler.v3_4._
+import org.neo4j.cypher.internal.compiler.v3_4.{CacheCheckResult, FineToReuse}
 import org.neo4j.cypher.internal.frontend.v3_4.PlannerName
-import org.neo4j.cypher.internal.frontend.v3_4.notification.InternalNotification
-import org.neo4j.cypher.internal.planner.v3_4.spi.{GraphStatistics, PlanContext, ProcedurePlannerName}
+import org.neo4j.cypher.internal.planner.v3_4.spi.{GraphStatistics, ProcedurePlannerName}
 import org.neo4j.cypher.internal.runtime._
 import org.neo4j.cypher.internal.runtime.interpreted.UpdateCountingQueryContext
 import org.neo4j.cypher.internal.runtime.planDescription.InternalPlanDescription.Arguments._
 import org.neo4j.cypher.internal.runtime.planDescription.{NoChildren, PlanDescriptionImpl}
-import org.neo4j.cypher.internal.v3_4.logical.plans.LogicalPlanId
+import org.neo4j.cypher.internal.util.v3_4.attribution.Id
 import org.neo4j.values.virtual.MapValue
 
 /**
@@ -59,21 +58,21 @@ case class PureSideEffectExecutionPlan(name: String, queryType: InternalQueryTyp
     }
   }
 
-  private def description = PlanDescriptionImpl(LogicalPlanId.DEFAULT, name, NoChildren,
+  private def description = PlanDescriptionImpl(Id.INVALID_ID, name, NoChildren,
                                                 Seq(Planner(plannerUsed.toTextOutput),
                                                     PlannerImpl(plannerUsed.name),
+                                                    PlannerVersion(plannerUsed.version),
                                                     Runtime(runtimeUsed.toTextOutput),
                                                     RuntimeImpl(runtimeUsed.name),
-                                                    Version(s"CYPHER ${CypherVersion.default.name}"))
+                                                    Version(s"CYPHER ${CypherVersion.default.name}"),
+                                                    RuntimeVersion(CypherVersion.default.name))
                                                 , Set.empty)
 
   override def runtimeUsed: RuntimeName = ProcedureRuntimeName
 
-  override def isStale(lastTxId: () => Long, statistics: GraphStatistics): Boolean = false
+  override def checkPlanResusability(lastTxId: () => Long, statistics: GraphStatistics): CacheCheckResult = FineToReuse // TODO: Should this really always be reused?
 
   override def plannerUsed: PlannerName = ProcedurePlannerName
-
-  override def notifications(planContext: PlanContext): Seq[InternalNotification] = Seq.empty
 
   override def isPeriodicCommit: Boolean = false
 }

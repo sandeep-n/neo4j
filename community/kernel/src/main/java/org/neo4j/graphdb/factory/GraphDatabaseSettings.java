@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -101,6 +101,19 @@ public class GraphDatabaseSettings implements LoadableConfig
     public static final Setting<File> neo4j_home =
             setting( "unsupported.dbms.directories.neo4j_home", PATH, NO_DEFAULT );
 
+    @Description( "Name of the database to load" )
+    public static final Setting<String> active_database = setting( "dbms.active_database", STRING, "graph.db" );
+
+    @Description( "Path of the data directory. You must not configure more than one Neo4j installation to use the " +
+            "same data directory." )
+    public static final Setting<File> data_directory = pathSetting( "dbms.directories.data", "data" );
+
+    @Internal
+    public static final Setting<File> database_path = derivedSetting( "unsupported.dbms.directories.database",
+            data_directory, active_database,
+            ( data, current ) -> new File( new File( data, "databases" ), current ),
+            PATH );
+
     @Title( "Read only database" )
     @Description( "Only allow read operations from this Neo4j instance. " +
             "This mode still requires write access to the directory for lock purposes." )
@@ -190,7 +203,7 @@ public class GraphDatabaseSettings implements LoadableConfig
     @Internal
     public static final Setting<String> cypher_runtime = setting(
             "unsupported.cypher.runtime",
-            options( "INTERPRETED", "COMPILED", "SLOTTED" ,  DEFAULT ), DEFAULT );
+            options( "INTERPRETED", "COMPILED", "SLOTTED" , "MORSEL", DEFAULT ), DEFAULT );
 
     @Description( "Enable tracing of compilation in cypher." )
     @Internal
@@ -200,12 +213,25 @@ public class GraphDatabaseSettings implements LoadableConfig
     public static Setting<Integer> query_cache_size =
             buildSetting( "dbms.query_cache_size", INTEGER, "1000" ).constraint( min( 0 ) ).build();
 
-    @Description( "The threshold when a plan is considered stale. If any of the underlying" +
-                  " statistics used to create the plan has changed more than this value, " +
-                  "the plan is considered stale and will be replanned. " +
-                  "A value of 0 means always replan, and 1 means never replan." )
-    public static Setting<Double> query_statistics_divergence_threshold = buildSetting(
-            "cypher.statistics_divergence_threshold", DOUBLE, "0.75" ).constraint( range( 0.0, 1.0 ) ).build();
+    @Description( "The threshold when a plan is considered stale. If any of the underlying " +
+                  "statistics used to create the plan have changed more than this value, " +
+                  "the plan will be considered stale and will be replanned. Change is calculated as " +
+                  "abs(a-b)/max(a,b). This means that a value of 0.75 requires the database to approximately " +
+                  "quadruple in size. A value of 0 means always replan, and 1 means never replan." )
+    public static Setting<Double> query_statistics_divergence_threshold =
+            buildSetting( "cypher.statistics_divergence_threshold", DOUBLE, "0.75" ).constraint( range( 0.0, 1.0 ) ).build();
+
+    @Description( "Large databases might change slowly, and so to prevent queries from never being replanned " +
+                  "the divergence threshold set by cypher.statistics_divergence_threshold is configured to " +
+                  "shrink over time. " +
+                  "The algorithm used to manage this change is set by cypher.statistics_divergence_algorithm " +
+                  "and will cause the threshold to reach the value set here once the time since the previous " +
+                  "replanning has reached unsupported.cypher.target_replan_interval. " +
+                  "Setting this value to higher than the cypher.statistics_divergence_threshold will cause the " +
+                  "threshold to not decay over time." )
+    @Internal
+    public static Setting<Double> query_statistics_divergence_target =
+            buildSetting( "unsupported.cypher.statistics_divergence_target", DOUBLE, "0.10" ).constraint( range( 0.0, 1.0 ) ).build();
 
     @Description( "The threshold when a warning is generated if a label scan is done after a load csv " +
                   "where the label has no index" )
@@ -227,8 +253,33 @@ public class GraphDatabaseSettings implements LoadableConfig
     public static Setting<Long> cypher_idp_solver_duration_threshold = buildSetting(
             "unsupported.cypher.idp_solver_duration_threshold", LONG, "1000" ).constraint( min( 10L ) ).build();
 
-    @Description( "The minimum lifetime of a query plan before a query is considered for replanning" )
+    @Description( "The minimum time between possible cypher query replanning events. After this time, the graph " +
+            "statistics will be evaluated, and if they have changed by more than the value set by " +
+            "cypher.statistics_divergence_threshold, the query will be replanned. If the statistics have " +
+            "not changed sufficiently, the same interval will need to pass before the statistics will be " +
+            "evaluated again." )
     public static Setting<Duration> cypher_min_replan_interval = setting( "cypher.min_replan_interval", DURATION, "10s" );
+
+    @Description( "Large databases might change slowly, and to prevent queries from never being replanned " +
+                  "the divergence threshold set by cypher.statistics_divergence_threshold is configured to " +
+                  "shrink over time. The algorithm used to manage this change is set by " +
+                  "unsupported.cypher.statistics_divergence_algorithm and will cause the threshold to reach " +
+                  "the value set by unsupported.cypher.statistics_divergence_target once the time since the " +
+                  "previous replanning has reached the value set here. Setting this value to less than the " +
+                  "value of cypher.min_replan_interval will cause the threshold to not decay over time." )
+    @Internal
+    public static Setting<Duration> cypher_replan_interval_target =
+            setting( "unsupported.cypher.target_replan_interval", DURATION, "7h" );
+
+    @Description( "Large databases might change slowly, and to prevent queries from never being replanned " +
+                  "the divergence threshold set by cypher.statistics_divergence_threshold is configured to " +
+                  "shrink over time using the algorithm set here. This will cause the threshold to reach " +
+                  "the value set by unsupported.cypher.statistics_divergence_target once the time since the " +
+                  "previous replanning has reached the value set in unsupported.cypher.target_replan_interval. " +
+                  "Setting the algorithm to 'none' will cause the threshold to not decay over time." )
+    @Internal
+    public static Setting<String> cypher_replan_algorithm = setting( "unsupported.cypher.replan_algorithm",
+            options( "inverse", "exponential", "none", DEFAULT ), DEFAULT );
 
     @Description( "Determines if Cypher will allow using file URLs when loading data using `LOAD CSV`. Setting this "
                   + "value to `false` will cause Neo4j to fail `LOAD CSV` clauses that load data from the file system." )
@@ -251,6 +302,17 @@ public class GraphDatabaseSettings implements LoadableConfig
     public static Setting<Boolean> track_query_cpu_time = setting( "dbms.track_query_cpu_time", BOOLEAN, TRUE );
     @Description( "Enables or disables tracking of how many bytes are allocated by the execution of a query." )
     public static Setting<Boolean> track_query_allocation = setting( "dbms.track_query_allocation", BOOLEAN, TRUE );
+
+    @Description( "The size of the morsels" )
+    @Internal
+    public static final Setting<Integer> cypher_morsel_size =
+            setting( "unsupported.cypher.morsel_size", INTEGER, "100000" );
+
+    @Description( "Number of threads to allocate to Cypher worker threads. If set to 0, two workers will be started" +
+            " for every physical core in the system." )
+    @Internal
+    public static final Setting<Integer> cypher_worker_count =
+            setting( "unsupported.cypher.number_of_workers", INTEGER, "0" );
 
     @Description( "The maximum amount of time to wait for the database to become available, when " +
                   "starting a new transaction." )
@@ -318,6 +380,17 @@ public class GraphDatabaseSettings implements LoadableConfig
     public static final Setting<Integer> store_internal_log_max_archives =
             buildSetting( "dbms.logs.debug.rotation.keep_number", INTEGER, "7" ).constraint( min( 1 ) ).build();
 
+    @Description( "Configures the general policy for when check-points should occur. The default policy is the " +
+                  "'periodic' check-point policy, as specified by the 'dbms.checkpoint.interval.tx' and " +
+                  "'dbms.checkpoint.interval.time' settings. " +
+                  "The Neo4j Enterprise Edition provides two alternative policies: " +
+                  "The first is the 'continuous' check-point policy, which will ignore those settings and run the " +
+                  "check-point process all the time. " +
+                  "The second is the 'volumetric' check-point policy, which makes a best-effort at check-pointing " +
+                  "often enough so that the database doesn't get too far behind on deleting old transaction logs in " +
+                  "accordance with the 'dbms.tx_log.rotation.retention_policy' setting." )
+    public static final Setting<String> check_point_policy = setting( "dbms.checkpoint", STRING, "periodic" );
+
     @Description( "Configures the transaction interval between check-points. The database will not check-point more " +
                   "often  than this (unless check pointing is triggered by a different event), but might check-point " +
                   "less often than this interval, if performing a check-point takes longer time than the configured " +
@@ -340,6 +413,7 @@ public class GraphDatabaseSettings implements LoadableConfig
     public static final Setting<Duration> check_point_interval_time =
             setting( "dbms.checkpoint.interval.time", DURATION, "15m" );
 
+    @Dynamic
     @Description( "Limit the number of IOs the background checkpoint process will consume per second. " +
                   "This setting is advisory, is ignored in Neo4j Community Edition, and is followed to " +
                   "best effort in Enterprise Edition. " +
@@ -421,6 +495,10 @@ public class GraphDatabaseSettings implements LoadableConfig
     public static final Setting<Boolean> enable_native_schema_index =
             setting( "unsupported.dbms.enable_native_schema_index", BOOLEAN, TRUE );
 
+    @Description( "Location where Neo4j keeps the logical transaction logs." )
+    public static final Setting<File> logical_logs_location =
+            pathSetting( "dbms.directories.tx_log", "", database_path );
+
     // Store settings
     @Description( "Make Neo4j keep the logical transaction logs for being able to backup the database. " +
             "Can be used for specifying the threshold to prune logical logs after. For example \"10 days\" will " +
@@ -457,9 +535,8 @@ public class GraphDatabaseSettings implements LoadableConfig
                   "JVM enough heap to hold all your transaction state and query context, and then leave the rest for " +
                   "the page cache. If no page cache memory is configured, then a heuristic setting is computed based " +
                   "on available system resources." )
-    public static final Setting<Long> pagecache_memory =
-            buildSetting( "dbms.memory.pagecache.size", BYTES, null)
-                    .constraint( min( 8192 * 30L ) ).build();
+    public static final Setting<String> pagecache_memory =
+            buildSetting( "dbms.memory.pagecache.size", STRING, null ).build();
 
     @Description( "Specify which page swapper to use for doing paged IO. " +
                   "This is only used when integrating with proprietary storage technology." )
@@ -561,9 +638,15 @@ public class GraphDatabaseSettings implements LoadableConfig
     public static final Setting<Boolean> log_queries_detailed_time_logging_enabled =
             setting( "dbms.logs.query.time_logging_enabled", BOOLEAN, FALSE );
 
-    @Description( "Log allocated bytes for the executed queries being logged." )
+    @Description( "Log allocated bytes for the executed queries being logged. " +
+            "The logged number is cumulative over the duration of the query, " +
+            "i.e. for memory intense or long-running queries the value may be larger than the current memory allocation." )
     public static final Setting<Boolean> log_queries_allocation_logging_enabled =
             setting( "dbms.logs.query.allocation_logging_enabled", BOOLEAN, FALSE );
+
+    @Description( "Logs which runtime that was used to run the query" )
+    public static final Setting<Boolean> log_queries_runtime_logging_enabled =
+            setting( "dbms.logs.query.runtime_logging_enabled", BOOLEAN, FALSE );
 
     @Description( "Log page hits and page faults for the executed queries being logged." )
     public static final Setting<Boolean> log_queries_page_detail_logging_enabled =
@@ -577,10 +660,12 @@ public class GraphDatabaseSettings implements LoadableConfig
 
     @Description( "The file size in bytes at which the query log will auto-rotate. If set to zero then no rotation " +
             "will occur. Accepts a binary suffix `k`, `m` or `g`." )
+    @Dynamic
     public static final Setting<Long> log_queries_rotation_threshold = buildSetting( "dbms.logs.query.rotation.size",
             BYTES, "20m" ).constraint( range( 0L, Long.MAX_VALUE ) ).build();
 
     @Description( "Maximum number of history files for the query log." )
+    @Dynamic
     public static final Setting<Integer> log_queries_max_archives = buildSetting( "dbms.logs.query.rotation.keep_number",
             INTEGER, "7" ).constraint( min( 1 ) ).build();
 
@@ -677,6 +762,25 @@ public class GraphDatabaseSettings implements LoadableConfig
     @Internal
     public static final Setting<File> bolt_log_filename = derivedSetting( "unsupported.dbms.logs.bolt.path",
             GraphDatabaseSettings.logs_directory, logsDir -> new File( logsDir, "bolt.log" ), PATH );
+
+    @Description( "Whether to apply network level write throttling" )
+    @Internal
+    public static final Setting<Boolean> bolt_write_throttle = setting( "unsupported.dbms.bolt.write_throttle", BOOLEAN, TRUE );
+
+    @Description( "When the size (in bytes) of write buffers, used by bolt's network layer, " +
+            "grows beyond this value bolt channel will advertise itself as unwritable and bolt worker " +
+            "threads will block until it becomes writable again." )
+    @Internal
+    public static final Setting<Integer> bolt_write_buffer_high_water_mark =
+            buildSetting( "unsupported.dbms.bolt.write_throttle.high_watermark", INTEGER, String.valueOf( ByteUnit.kibiBytes( 512 ) ) ).constraint(
+                    range( (int) ByteUnit.kibiBytes( 64 ), Integer.MAX_VALUE ) ).build();
+
+    @Description( "When the size (in bytes) of write buffers, previously advertised as unwritable, " +
+            "gets below this value bolt channel will re-advertise itself as writable and blocked bolt worker " + "threads will resume execution." )
+    @Internal
+    public static final Setting<Integer> bolt_write_buffer_low_water_mark =
+            buildSetting( "unsupported.dbms.bolt.write_throttle.low_watermark", INTEGER, String.valueOf( ByteUnit.kibiBytes( 128 ) ) ).constraint(
+                    range( (int) ByteUnit.kibiBytes( 16 ), Integer.MAX_VALUE ) ).build();
 
     @Description( "Create an archive of an index before re-creating it if failing to load on startup." )
     @Internal

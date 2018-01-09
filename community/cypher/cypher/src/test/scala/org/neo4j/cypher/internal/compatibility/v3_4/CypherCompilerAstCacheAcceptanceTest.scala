@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -32,6 +32,7 @@ import org.neo4j.cypher.internal.frontend.v3_4.ast.Statement
 import org.neo4j.cypher.internal.frontend.v3_4.phases.{CompilationPhaseTracer, Transformer}
 import org.neo4j.cypher.internal.util.v3_4.test_helpers.CypherFunSuite
 import org.neo4j.cypher.internal.PreParsedQuery
+import org.neo4j.cypher.internal.compatibility.{AstCacheMonitor, CacheAccessor}
 import org.neo4j.cypher.internal.runtime.interpreted.TransactionalContextWrapper
 import org.neo4j.graphdb.config.Setting
 import org.neo4j.graphdb.factory.GraphDatabaseSettings
@@ -44,12 +45,11 @@ class CypherCompilerAstCacheAcceptanceTest extends CypherFunSuite with GraphData
 
   def createCompiler(queryCacheSize: Int = 128, statsDivergenceThreshold: Double = 0.5, queryPlanTTL: Long = 1000,
                      clock: Clock = Clock.systemUTC(), log: Log = NullLog.getInstance):
-  CostCompatibility[CommunityRuntimeContext, Transformer[CommunityRuntimeContext, LogicalPlanState, CompilationState]] = {
+  Compatibility[CommunityRuntimeContext, Transformer[CommunityRuntimeContext, LogicalPlanState, CompilationState]] = {
 
     val config = CypherCompilerConfiguration(
       queryCacheSize,
-      statsDivergenceThreshold,
-      queryPlanTTL,
+      StatsDivergenceCalculator.divergenceNoDecayCalculator(statsDivergenceThreshold, queryPlanTTL),
       useErrorsOverWarnings = false,
       idpMaxTableSize = 128,
       idpIterationDuration = 1000,
@@ -58,8 +58,8 @@ class CypherCompilerAstCacheAcceptanceTest extends CypherFunSuite with GraphData
       legacyCsvQuoteEscaping = false,
       nonIndexedLabelWarningThreshold = 10000L
     )
-    CostCompatibility(config, clock, kernelMonitors,
-                      kernelAPI, log, CypherPlanner.default, CypherRuntime.default,
+    Compatibility(config, clock, kernelMonitors,
+                      log, CypherPlanner.default, CypherRuntime.default,
                       CypherUpdateStrategy.default, CommunityRuntimeBuilder, CommunityRuntimeContextCreator)
   }
 
@@ -67,7 +67,7 @@ class CypherCompilerAstCacheAcceptanceTest extends CypherFunSuite with GraphData
     override def toString = s"hits = $hits, misses = $misses, flushes = $flushes, evicted = $evicted"
   }
 
-  class CacheCounter(var counts: CacheCounts = CacheCounts()) extends AstCacheMonitor {
+  class CacheCounter(var counts: CacheCounts = CacheCounts()) extends AstCacheMonitor[Statement] {
     override def cacheHit(key: Statement) {
       counts = counts.copy(hits = counts.hits + 1)
     }
@@ -80,7 +80,7 @@ class CypherCompilerAstCacheAcceptanceTest extends CypherFunSuite with GraphData
       counts = counts.copy(flushes = counts.flushes + 1)
     }
 
-    override def cacheDiscard(key: Statement, ignored: String): Unit = {
+    override def cacheDiscard(key: Statement, ignored: String, secondsSinceReplan: Int): Unit = {
       counts = counts.copy(evicted = counts.evicted + 1)
     }
   }
@@ -88,7 +88,7 @@ class CypherCompilerAstCacheAcceptanceTest extends CypherFunSuite with GraphData
   override def databaseConfig(): Map[Setting[_], String] = Map(GraphDatabaseSettings.cypher_min_replan_interval -> "0")
 
   var counter: CacheCounter = _
-  var compiler: CostCompatibility[CommunityRuntimeContext, Transformer[CommunityRuntimeContext, LogicalPlanState, CompilationState]] = _
+  var compiler: Compatibility[CommunityRuntimeContext, Transformer[CommunityRuntimeContext, LogicalPlanState, CompilationState]] = _
 
   override protected def beforeEach(): Unit = {
     super.beforeEach()
@@ -199,7 +199,29 @@ class CypherCompilerAstCacheAcceptanceTest extends CypherFunSuite with GraphData
     runQuery(query)
 
     // then
-    counter.counts should equal(CacheCounts(hits = 1, misses = 2, flushes = 1, evicted = 1))
+    counter.counts should equal(CacheCounts(hits = 1, misses = 1, flushes = 1, evicted = 1))
+  }
+
+  test("should not evict query because of unrelated statistics change") {
+    // given
+    val clock: Clock = Clock.fixed(Instant.ofEpochMilli(1000L), ZoneOffset.UTC)
+    counter = new CacheCounter()
+    compiler = createCompiler(queryPlanTTL = 0, clock = clock)
+    compiler.monitors.addMonitorListener(counter)
+    val query: String = "match (n:Person) return n"
+
+    // when
+    runQuery(query)
+
+    // then
+    counter.counts should equal(CacheCounts(hits = 0, misses = 1, flushes = 1, evicted = 0))
+
+    // when
+    (0 until 5).foreach { _ => createLabeledNode("Dog") }
+    runQuery(query)
+
+    // then
+    counter.counts should equal(CacheCounts(hits = 1, misses = 1, flushes = 1, evicted = 0))
   }
 
   test("should log on cache remove") {
@@ -220,7 +242,7 @@ class CypherCompilerAstCacheAcceptanceTest extends CypherFunSuite with GraphData
 
     // then
     logProvider.assertExactly(
-      inLog(logName).info( s"Discarded stale query from the query cache: $query" )
+      inLog(logName).info( s"Discarded stale query from the query cache after 0 seconds: $query" )
     )
   }
 

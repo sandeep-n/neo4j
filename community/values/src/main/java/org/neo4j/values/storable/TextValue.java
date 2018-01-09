@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,8 +19,15 @@
  */
 package org.neo4j.values.storable;
 
+import org.neo4j.values.virtual.ListValue;
+
+import static org.neo4j.values.storable.Values.stringArray;
+import static org.neo4j.values.virtual.VirtualValues.fromArray;
+
 public abstract class TextValue extends ScalarValue
 {
+    protected static final ListValue EMPTY_SPLIT = fromArray( stringArray( "", "" ) );
+
     TextValue()
     {
     }
@@ -51,7 +58,7 @@ public abstract class TextValue extends ScalarValue
 
     public abstract TextValue toUpper();
 
-    public abstract TextArray split( String separator );
+    public abstract ListValue split( String separator );
 
     public abstract TextValue replace( String find, String replace );
 
@@ -66,6 +73,17 @@ public abstract class TextValue extends ScalarValue
     }
 
     @Override
+    public boolean equals( long x )
+    {
+        return false;
+    }
+
+    @Override
+    public boolean equals( double x )
+    {
+        return false;
+    }
+
     public ValueGroup valueGroup()
     {
         return ValueGroup.TEXT;

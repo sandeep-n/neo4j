@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,10 +25,12 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
+import org.neo4j.helpers.collection.Pair;
 import org.neo4j.kernel.impl.store.record.RelationshipRecord;
 import org.neo4j.unsafe.impl.batchimport.input.InputRelationship;
 import org.neo4j.unsafe.impl.batchimport.staging.BatchSender;
@@ -51,13 +53,15 @@ public class RelationshipTypeCheckerStep extends ProcessorStep<Batch<InputRelati
             ( e1, e2 ) -> Integer.compare( (Integer) e2.getKey(), (Integer) e1.getKey() );
     private final Map<Thread,Map<Object,MutableLong>> typeCheckers = new ConcurrentHashMap<>();
     private final BatchingRelationshipTypeTokenRepository typeTokenRepository;
-    private RelationshipTypeDistribution distribution;
+    private final CountingStoreUpdateMonitor counts;
+    private DataStatistics distribution;
 
     public RelationshipTypeCheckerStep( StageControl control, Configuration config,
-            BatchingRelationshipTypeTokenRepository typeTokenRepository )
+            BatchingRelationshipTypeTokenRepository typeTokenRepository, CountingStoreUpdateMonitor counts )
     {
         super( control, "TYPE", config, 0 );
         this.typeTokenRepository = typeTokenRepository;
+        this.counts = counts;
     }
 
     @Override
@@ -100,11 +104,22 @@ public class RelationshipTypeCheckerStep extends ProcessorStep<Batch<InputRelati
         {
             typeTokenRepository.getOrCreateId( sortedTypes[i].getKey() );
         }
-        distribution = new RelationshipTypeDistribution( sortedTypes );
+        distribution = new DataStatistics( counts.nodesWritten(), counts.propertiesWritten(), convert( sortedTypes ) );
         super.done();
     }
 
-    public RelationshipTypeDistribution getDistribution()
+    private static Pair<Object,Long>[] convert( Entry<Object,MutableLong>[] sortedTypes )
+    {
+        @SuppressWarnings( "unchecked" )
+        Pair<Object,Long>[] result = new Pair[sortedTypes.length];
+        for ( int i = 0; i < sortedTypes.length; i++ )
+        {
+            result[i] = Pair.of( sortedTypes[i].getKey(), sortedTypes[i].getValue().longValue() );
+        }
+        return result;
+    }
+
+    public DataStatistics getDistribution()
     {
         return distribution;
     }

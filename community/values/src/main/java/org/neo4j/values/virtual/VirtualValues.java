@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -156,6 +156,16 @@ public final class VirtualValues
         return new MapValue( map );
     }
 
+    public static MapValue copy( MapValue map )
+    {
+        HashMap<String,AnyValue> hashMap = new HashMap<>( map.size() );
+        for ( Map.Entry<String,AnyValue> entry : map.entrySet() )
+        {
+            hashMap.put( entry.getKey(), entry.getValue() );
+        }
+        return new MapValue( hashMap );
+    }
+
     public static NodeReference node( long id )
     {
         return new NodeReference( id );
@@ -176,16 +186,6 @@ public final class VirtualValues
                     "Tried to construct a path that is not built like a path: even number of elements" );
         }
         return new PathValue( nodes, edges );
-    }
-
-    public static PointValue pointCartesian( double x, double y )
-    {
-        return new PointValue.CartesianPointValue( x, y );
-    }
-
-    public static PointValue pointGeographic( double longitude, double latitude )
-    {
-        return new PointValue.GeographicPointValue( longitude, latitude );
     }
 
     public static NodeValue nodeValue( long id, TextArray labels, MapValue properties )

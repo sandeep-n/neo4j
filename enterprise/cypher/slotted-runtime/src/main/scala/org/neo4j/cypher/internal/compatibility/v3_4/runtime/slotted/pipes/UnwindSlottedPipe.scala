@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,26 +19,29 @@
  */
 package org.neo4j.cypher.internal.compatibility.v3_4.runtime.slotted.pipes
 
-import org.neo4j.cypher.internal.compatibility.v3_4.runtime.PipelineInformation
-import org.neo4j.cypher.internal.compatibility.v3_4.runtime.slotted.PrimitiveExecutionContext
+import org.neo4j.cypher.internal.compatibility.v3_4.runtime.SlotConfiguration
+import org.neo4j.cypher.internal.compatibility.v3_4.runtime.slotted.SlottedExecutionContext
 import org.neo4j.cypher.internal.runtime.interpreted.commands.expressions.Expression
 import org.neo4j.cypher.internal.runtime.interpreted.pipes.{Pipe, PipeWithSource, QueryState}
 import org.neo4j.cypher.internal.runtime.interpreted.{ExecutionContext, ListSupport}
-import org.neo4j.cypher.internal.v3_4.logical.plans.LogicalPlanId
+import org.neo4j.cypher.internal.util.v3_4.attribution.Id
 import org.neo4j.values.AnyValue
 
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 
-case class UnwindSlottedPipe(source: Pipe, collection: Expression, offset: Int, pipeline: PipelineInformation)
-                            (val id: LogicalPlanId = LogicalPlanId.DEFAULT) extends PipeWithSource(source) with ListSupport {
+case class UnwindSlottedPipe(source: Pipe,
+                             collection: Expression,
+                             offset: Int,
+                             slots: SlotConfiguration)
+                            (val id: Id = Id.INVALID_ID) extends PipeWithSource(source) with ListSupport {
   override protected def internalCreateResults(input: Iterator[ExecutionContext], state: QueryState): Iterator[ExecutionContext] =
     new UnwindIterator(input, state)
 
   private class UnwindIterator(input: Iterator[ExecutionContext], state: QueryState) extends Iterator[ExecutionContext] {
     private var currentInputRow: ExecutionContext = _
     private var unwindIterator: Iterator[AnyValue] = _
-    private var nextItem: PrimitiveExecutionContext = _
+    private var nextItem: SlottedExecutionContext = _
 
     prefetch()
 
@@ -57,7 +60,7 @@ case class UnwindSlottedPipe(source: Pipe, collection: Expression, offset: Int, 
     private def prefetch() {
       nextItem = null
       if (unwindIterator != null && unwindIterator.hasNext) {
-        nextItem = PrimitiveExecutionContext(pipeline)
+        nextItem = SlottedExecutionContext(slots)
         currentInputRow.copyTo(nextItem)
         nextItem.setRefAt(offset, unwindIterator.next())
       } else {

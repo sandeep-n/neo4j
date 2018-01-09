@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -37,6 +37,9 @@ public class CypherMetrics extends LifecycleAdapter
     @Documented( "The total number of times Cypher has decided to re-plan a query" )
     public static final String REPLAN_EVENTS = name( NAME_PREFIX, "replan_events" );
 
+    @Documented( "The total number of seconds waited between query replans" )
+    public static final String REPLAN_WAIT_TIME = name( NAME_PREFIX, "replan_wait_time" );
+
     private final MetricRegistry registry;
     private final Monitors monitors;
     private final PlanCacheMetricsMonitor cacheMonitor = new PlanCacheMetricsMonitor();
@@ -52,12 +55,14 @@ public class CypherMetrics extends LifecycleAdapter
     {
         monitors.addMonitorListener( cacheMonitor );
         registry.register( REPLAN_EVENTS, (Gauge<Long>) cacheMonitor::numberOfReplans );
+        registry.register( REPLAN_WAIT_TIME, (Gauge<Long>) cacheMonitor::replanWaitTime );
     }
 
     @Override
     public void stop()
     {
         registry.remove( REPLAN_EVENTS );
+        registry.remove( REPLAN_WAIT_TIME );
         monitors.removeMonitorListener( cacheMonitor );
     }
 }

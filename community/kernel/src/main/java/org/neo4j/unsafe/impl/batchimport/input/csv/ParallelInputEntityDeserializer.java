@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -28,6 +28,7 @@ import java.util.function.Supplier;
 
 import org.neo4j.csv.reader.BufferedCharSeeker;
 import org.neo4j.csv.reader.CharSeeker;
+import org.neo4j.csv.reader.MultiReadable;
 import org.neo4j.csv.reader.ProcessingSource;
 import org.neo4j.csv.reader.Source.Chunk;
 import org.neo4j.csv.reader.SourceTraceability;
@@ -73,7 +74,7 @@ public class ParallelInputEntityDeserializer<ENTITY extends InputEntity> extends
             Validator<ENTITY> validator, Class<ENTITY> entityClass )
     {
         // Reader of chunks, characters aligning to nearest newline
-        source = new ProcessingSource( data.stream(), config.bufferSize(), maxProcessors );
+        source = new ProcessingSource( new MultiReadable( data.stream() ), config.bufferSize(), maxProcessors );
         try
         {
             // Read first chunk explicitly here since it contains the header

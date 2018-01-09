@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -53,12 +53,12 @@ class Appending
             return;
         }
 
-        outcome.renewElectionTimeout();
+        outcome.setPreElection( false );
         outcome.setNextTerm( request.leaderTerm() );
         outcome.setLeader( request.from() );
         outcome.setLeaderCommit( request.leaderCommit() );
 
-        if ( !Follower.logHistoryMatches( state, request.prevLogIndex(), request.prevLogTerm(), log ) )
+        if ( !Follower.logHistoryMatches( state, request.prevLogIndex(), request.prevLogTerm() ) )
         {
             assert request.prevLogIndex() > -1 && request.prevLogTerm() > -1;
             RaftMessages.AppendEntries.Response appendResponse = new RaftMessages.AppendEntries.Response(

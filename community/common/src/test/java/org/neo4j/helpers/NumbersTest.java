@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -60,7 +60,7 @@ public class NumbersTest
         expectedException.expect( ArithmeticException.class );
         expectedException.expectMessage( "Value 131068 is too big to be represented as unsigned short" );
 
-        safeCastIntToUnsignedShort( Short.MAX_VALUE << 1 + 1 );
+        safeCastIntToUnsignedShort( Short.MAX_VALUE << 2 );
     }
 
     @Test

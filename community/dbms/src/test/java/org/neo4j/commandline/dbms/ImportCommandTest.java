@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,6 +22,7 @@ package org.neo4j.commandline.dbms;
 import org.junit.Rule;
 import org.junit.Test;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -65,7 +66,7 @@ public class ImportCommandTest
                 .getImporterForMode( eq( "csv" ), any( Args.class ), any( Config.class ), any( OutsideWorld.class ) ) )
                 .thenReturn( mock( Importer.class ) );
 
-        try ( RealOutsideWorld outsideWorld = new RealOutsideWorld() )
+        try ( RealOutsideWorld outsideWorld = new RealOutsideWorld( System.out, System.err, new ByteArrayInputStream( new byte[0] ) ) )
         {
             ImportCommand importCommand =
                     new ImportCommand( homeDir.toPath(), testDir.directory( "conf" ).toPath(), outsideWorld,
@@ -90,8 +91,8 @@ public class ImportCommandTest
                 .thenReturn( mock( Importer.class ) );
 
         ImportCommand importCommand =
-                new ImportCommand( homeDir.toPath(), testDir.directory( "conf" ).toPath(), new RealOutsideWorld(),
-                        mockImporterFactory );
+                new ImportCommand( homeDir.toPath(), testDir.directory( "conf" ).toPath(),
+                        new RealOutsideWorld( System.out, System.err, new ByteArrayInputStream( new byte[0] ) ), mockImporterFactory );
 
         String[] arguments = {"--database=foo", "--from=bar", "--nodes:PERSON:FRIEND=mock.csv"};
 
@@ -111,8 +112,8 @@ public class ImportCommandTest
                 .thenReturn( mock( Importer.class ) );
 
         ImportCommand importCommand =
-                new ImportCommand( homeDir.toPath(), testDir.directory( "conf" ).toPath(), new RealOutsideWorld(),
-                        mockImporterFactory );
+                new ImportCommand( homeDir.toPath(), testDir.directory( "conf" ).toPath(),
+                        new RealOutsideWorld( System.out, System.err, new ByteArrayInputStream( new byte[0] ) ), mockImporterFactory );
 
         String[] arguments = {"--database=foo", "--from=bar", "--relationships:LIKES:HATES=mock.csv"};
 
@@ -213,6 +214,7 @@ public class ImportCommandTest
                             "                          [--array-delimiter=<array-delimiter-character>]%n" +
                             "                          [--quote=<quotation-character>]%n" +
                             "                          [--max-memory=<max-memory-that-importer-can-use>]%n" +
+                            "                          [--f=<File containing all arguments to this import>]%n" +
                             "usage: neo4j-admin import --mode=database [--database=<name>]%n" +
                             "                          [--additional-config=<config-file-path>]%n" +
                             "                          [--from=<source-directory>]%n" +
@@ -274,9 +276,9 @@ public class ImportCommandTest
                             "  --multiline-fields=<true|false>%n" +
                             "      Whether or not fields from input source can span multiple lines, i.e.%n" +
                             "      contain newline characters. [default:false]%n" +
-                            "  --delimiter=<,>%n" +
+                            "  --delimiter=<delimiter-character>%n" +
                             "      Delimiter character between values in CSV data. [default:,]%n" +
-                            "  --array-delimiter=<,>%n" +
+                            "  --array-delimiter=<array-delimiter-character>%n" +
                             "      Delimiter character between array elements within a value in CSV data.%n" +
                             "      [default:;]%n" +
                             "  --quote=<quotation-character>%n" +
@@ -286,7 +288,13 @@ public class ImportCommandTest
                             "  --max-memory=<max-memory-that-importer-can-use>%n" +
                             "      Maximum memory that neo4j-admin can use for various data structures and%n" +
                             "      caching to improve performance. Values can be plain numbers, like 10000000%n" +
-                            "      or e.g. 20G for 20 gigabyte, or even e.g. 70%%. [default:90%%]%n"),
+                            "      or e.g. 20G for 20 gigabyte, or even e.g. 70%%. [default:90%%]%n" +
+                            "  --f=<File containing all arguments to this import>%n" +
+                            "      File containing all arguments, used as an alternative to supplying all%n" +
+                            "      arguments on the command line directly.Each argument can be on a separate%n" +
+                            "      line or multiple arguments per line separated by space.Arguments%n" +
+                            "      containing spaces needs to be quoted.Supplying other arguments in addition%n" +
+                            "      to this file argument is not supported. [default:]%n" ),
                     baos.toString() );
         }
     }

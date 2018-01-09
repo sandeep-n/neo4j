@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -70,7 +70,7 @@ import static org.neo4j.metrics.MetricsTestHelper.readLongValueAndAssert;
 public class MetricsKernelExtensionFactoryIT
 {
     @Rule
-    public final ClusterRule clusterRule = new ClusterRule( getClass() )
+    public final ClusterRule clusterRule = new ClusterRule()
             .withSharedSetting( GraphDatabaseSettings.record_id_batch_size, "1" );
 
     private HighlyAvailableGraphDatabase db;
@@ -173,7 +173,8 @@ public class MetricsKernelExtensionFactoryIT
             addNodes( 1 );
         }
 
-        File metricFile = metricsCsv( outputPath, CypherMetrics.REPLAN_EVENTS );
+        File replanCountMetricFile = metricsCsv( outputPath, CypherMetrics.REPLAN_EVENTS );
+        File replanWaitMetricFile = metricsCsv( outputPath, CypherMetrics.REPLAN_WAIT_TIME );
 
         // THEN see that the replan metric have pickup up at least one replan event
         // since reporting happens in an async fashion then give it some time and check now and then
@@ -181,7 +182,8 @@ public class MetricsKernelExtensionFactoryIT
         long events = 0;
         while ( currentTimeMillis() < endTime && events == 0 )
         {
-            events = readLongValueAndAssert( metricFile, ( newValue, currentValue ) -> newValue >= currentValue );
+            readLongValueAndAssert( replanWaitMetricFile, ( newValue, currentValue ) -> newValue >= currentValue );
+            events = readLongValueAndAssert( replanCountMetricFile, ( newValue, currentValue ) -> newValue >= currentValue );
             if ( events == 0 )
             {
                 Thread.sleep( 300 );

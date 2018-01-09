@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,4 +18,5 @@ package org.neo4j.cypher.internal.util
 
 package object v3_4 {
   type Rewriter = (AnyRef => AnyRef)
+  type RewriterWithArgs = (((AnyRef, Seq[AnyRef])) => AnyRef)
 }

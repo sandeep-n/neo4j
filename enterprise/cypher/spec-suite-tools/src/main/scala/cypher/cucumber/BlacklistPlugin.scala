@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -84,7 +84,10 @@ class BlacklistPlugin(blacklistFile: URI) extends CucumberAdapter {
       BlacklistPlugin._blacklist = itr.foldLeft(Set.empty[String]) {
         case (set, scenarioName) =>
           val normalizedName = BlacklistPlugin.normalizedScenarioName(scenarioName)
-          if (normalizedName.isEmpty || normalizedName.startsWith("//")) set else set + normalizedName
+          if (normalizedName.isEmpty || normalizedName.startsWith("//")) set
+          else if (set.contains(normalizedName))
+            throw new IllegalStateException(s"Scenario '$normalizedName' is present more than once in the blacklist '$blacklistFile'")
+          else set + normalizedName
       }
     }
   }

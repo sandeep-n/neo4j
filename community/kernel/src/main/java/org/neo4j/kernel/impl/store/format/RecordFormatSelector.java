@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,6 +23,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 import java.util.Optional;
 import java.util.stream.StreamSupport;
 import javax.annotation.Nonnull;
@@ -30,7 +31,6 @@ import javax.annotation.Nullable;
 
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.helpers.Service;
-import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.io.pagecache.PageCache;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.store.MetaDataStore;
@@ -39,6 +39,7 @@ import org.neo4j.kernel.impl.store.format.standard.Standard;
 import org.neo4j.kernel.impl.store.format.standard.StandardV2_3;
 import org.neo4j.kernel.impl.store.format.standard.StandardV3_0;
 import org.neo4j.kernel.impl.store.format.standard.StandardV3_2;
+import org.neo4j.kernel.impl.store.format.standard.StandardV3_4;
 import org.neo4j.logging.LogProvider;
 
 import static java.util.Arrays.asList;
@@ -57,10 +58,11 @@ public class RecordFormatSelector
 {
     private static final RecordFormats DEFAULT_FORMAT = Standard.LATEST_RECORD_FORMATS;
 
-    private static final Iterable<RecordFormats> KNOWN_FORMATS = asList(
+    private static final List<RecordFormats> KNOWN_FORMATS = asList(
             StandardV2_3.RECORD_FORMATS,
             StandardV3_0.RECORD_FORMATS,
-            StandardV3_2.RECORD_FORMATS
+            StandardV3_2.RECORD_FORMATS,
+            StandardV3_4.RECORD_FORMATS
     );
 
     private RecordFormatSelector()
@@ -130,17 +132,17 @@ public class RecordFormatSelector
      * <b>Note:</b> package private only for testing.
      *
      * @param storeDir directory with the store
-     * @param fs the file system
      * @param pageCache page cache to read store files
      * @return record format of the given store or <code>null</code> if {@value MetaDataStore#DEFAULT_NAME} file not
      * found or can't be read
      */
     @Nullable
-    static RecordFormats selectForStore( File storeDir, FileSystemAbstraction fs, PageCache pageCache,
-            LogProvider logProvider )
+    static RecordFormats selectForStore( File storeDir, PageCache pageCache, LogProvider logProvider )
     {
         File neoStoreFile = new File( storeDir, MetaDataStore.DEFAULT_NAME );
-        if ( fs.fileExists( neoStoreFile ) )
+        // It's important for the block device support, that we use the page cache file system to check for the
+        // neostore file.
+        if ( pageCache.getCachedFileSystem().fileExists( neoStoreFile ) )
         {
             try
             {
@@ -173,19 +175,18 @@ public class RecordFormatSelector
      *
      * @param config configuration parameters
      * @param storeDir directory with the store
-     * @param fs the file system
      * @param pageCache page cache to read store files
      * @return record format from the store (if it can be read) or configured record format or {@link #DEFAULT_FORMAT}
      * @throws IllegalArgumentException when configured format is different from the format present in the store
      */
     @Nonnull
-    public static RecordFormats selectForStoreOrConfig( Config config, File storeDir, FileSystemAbstraction fs,
-            PageCache pageCache, LogProvider logProvider )
+    public static RecordFormats selectForStoreOrConfig(
+            Config config, File storeDir, PageCache pageCache, LogProvider logProvider )
     {
         RecordFormats configuredFormat = loadRecordFormat( configuredRecordFormat( config ) );
         boolean formatConfigured = configuredFormat != null;
 
-        RecordFormats currentFormat = selectForStore( storeDir, fs, pageCache, logProvider );
+        RecordFormats currentFormat = selectForStore( storeDir, pageCache, logProvider );
         boolean storeWithFormatExists = currentFormat != null;
 
         if ( formatConfigured && storeWithFormatExists )
@@ -217,20 +218,40 @@ public class RecordFormatSelector
     }
 
     /**
+     * Check if store and configured formats are compatible. In case if format is not configured or store does not
+     * exist yet - we consider formats as compatible.
+     * @param config configuration parameters
+     * @param storeDir directory with the store
+     * @param pageCache page cache to read store files
+     * @param logProvider log provider
+     * @return true if configured and actual format is compatible, false otherwise.
+     */
+    public static boolean isStoreAndConfigFormatsCompatible(
+            Config config, File storeDir, PageCache pageCache, LogProvider logProvider )
+    {
+        RecordFormats configuredFormat = loadRecordFormat( configuredRecordFormat( config ) );
+
+        RecordFormats currentFormat = selectForStore( storeDir, pageCache, logProvider );
+
+        return (configuredFormat == null) || (currentFormat == null) ||
+                (currentFormat.getFormatFamily().equals( configuredFormat.getFormatFamily() ) &&
+                (currentFormat.generation() == configuredFormat.generation()));
+    }
+
+    /**
      * Select explicitly configured record format (via given {@code config}) or format from the store. If store does
      * not exist or has old format ({@link RecordFormats#generation()}) than this method returns
      * {@link #DEFAULT_FORMAT}.
      *
      * @param config configuration parameters
      * @param storeDir directory with the store
-     * @param fs the file system
      * @param pageCache page cache to read store files
      * @return record format from the store (if it can be read) or configured record format or {@link #DEFAULT_FORMAT}
      * @see RecordFormats#generation()
      */
     @Nonnull
-    public static RecordFormats selectNewestFormat( Config config, File storeDir, FileSystemAbstraction fs,
-            PageCache pageCache, LogProvider logProvider )
+    public static RecordFormats selectNewestFormat(
+            Config config, File storeDir, PageCache pageCache, LogProvider logProvider )
     {
         boolean formatConfigured = StringUtils.isNotEmpty( configuredRecordFormat( config ) );
         if ( formatConfigured )
@@ -240,7 +261,7 @@ public class RecordFormatSelector
         }
         else
         {
-            RecordFormats result = selectForStore( storeDir, fs, pageCache, logProvider );
+            RecordFormats result = selectForStore( storeDir, pageCache, logProvider );
             if ( result == null )
             {
                 // format was not explicitly configured and store does not exist, select default format
@@ -305,6 +326,13 @@ public class RecordFormatSelector
             if ( Standard.LATEST_NAME.equals( recordFormat ) )
             {
                 return Standard.LATEST_RECORD_FORMATS;
+            }
+            for ( RecordFormats knownFormat : KNOWN_FORMATS )
+            {
+                if ( recordFormat.equals( knownFormat.name() ) )
+                {
+                    return knownFormat;
+                }
             }
             RecordFormats.Factory formatFactory = Service.loadSilently( RecordFormats.Factory.class, recordFormat );
             if ( formatFactory != null )

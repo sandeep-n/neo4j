@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,17 +19,21 @@
  */
 package org.neo4j.cypher.internal.compatibility.v3_4.runtime.slotted.pipes
 
-import org.neo4j.cypher.internal.compatibility.v3_4.runtime.PipelineInformation
-import org.neo4j.cypher.internal.compatibility.v3_4.runtime.slotted.PrimitiveExecutionContext
+import org.neo4j.cypher.internal.compatibility.v3_4.runtime.SlotConfiguration
+import org.neo4j.cypher.internal.compatibility.v3_4.runtime.slotted.SlottedExecutionContext
 import org.neo4j.cypher.internal.compatibility.v3_4.runtime.slotted.helpers.NullChecker
 import org.neo4j.cypher.internal.runtime.interpreted.pipes.{Pipe, PipeWithSource, QueryState}
 import org.neo4j.cypher.internal.runtime.interpreted.ExecutionContext
-import org.neo4j.cypher.internal.v3_4.logical.plans.LogicalPlanId
+import org.neo4j.cypher.internal.util.v3_4.attribution.Id
 import org.neo4j.values.storable.Values
 
-case class ConditionalApplySlottedPipe(lhs: Pipe, rhs: Pipe, longOffsets: Seq[Int], refOffsets: Seq[Int], negated: Boolean,
-                                       pipelineInformation: PipelineInformation)
-                                      (val id: LogicalPlanId = LogicalPlanId.DEFAULT)
+case class ConditionalApplySlottedPipe(lhs: Pipe,
+                                       rhs: Pipe,
+                                       longOffsets: Seq[Int],
+                                       refOffsets: Seq[Int],
+                                       negated: Boolean,
+                                       slots: SlotConfiguration)
+                                      (val id: Id = Id.INVALID_ID)
   extends PipeWithSource(lhs) with Pipe {
 
   override protected def internalCreateResults(input: Iterator[ExecutionContext], state: QueryState): Iterator[ExecutionContext] =
@@ -41,14 +45,14 @@ case class ConditionalApplySlottedPipe(lhs: Pipe, rhs: Pipe, longOffsets: Seq[In
           rhs.createResults(rhsState)
         }
         else {
-          val output = PrimitiveExecutionContext(pipelineInformation)
-          output.copyFrom(lhsContext, pipelineInformation.initialNumberOfLongs, pipelineInformation.initialNumberOfReferences)
+          val output = SlottedExecutionContext(slots)
+          lhsContext.copyTo(output)
           Iterator.single(output)
         }
     }
 
   private def condition(context: ExecutionContext) = {
-    val cond = longOffsets.exists(offset => !NullChecker.nodeIsNull(context.getLongAt(offset))) ||
+    val cond = longOffsets.exists(offset => !NullChecker.entityIsNull(context.getLongAt(offset))) ||
       refOffsets.exists(context.getRefAt(_) != Values.NO_VALUE)
     if (negated) !cond else cond
   }

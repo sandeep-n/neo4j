@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -61,12 +61,11 @@ public class AbstractCheckPointThresholdTest
     private static class TheAbstractCheckPointThreshold extends AbstractCheckPointThreshold
     {
         private final boolean reached;
-        private final String description;
 
         TheAbstractCheckPointThreshold( boolean reached, String description )
         {
+            super( description );
             this.reached = reached;
-            this.description = description;
         }
 
         @Override
@@ -82,15 +81,15 @@ public class AbstractCheckPointThresholdTest
         }
 
         @Override
-        protected boolean thresholdReached( long lastCommittedTransactionId )
+        public long checkFrequencyMillis()
         {
-            return reached;
+            return DEFAULT_CHECKING_FREQUENCY_MILLIS;
         }
 
         @Override
-        protected String description()
+        protected boolean thresholdReached( long lastCommittedTransactionId )
         {
-            return description;
+            return reached;
         }
     }
 }

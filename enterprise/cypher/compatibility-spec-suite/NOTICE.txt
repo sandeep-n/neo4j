@@ -1,5 +1,5 @@
 Neo4j
-Copyright © 2002-2017 Network Engine for Objects in Lund AB (referred to
+Copyright © 2002-2018 Network Engine for Objects in Lund AB (referred to
 in this notice as "Neo Technology")
    [http://neotechnology.com]
 
@@ -28,6 +28,8 @@ Apache Software License, Version 2.0
   Apache Commons Lang
   Caffeine cache
   ConcurrentLinkedHashMap
+  FindBugs-jsr305
+  Guava: Google Core Libraries for Java
   Lucene codecs
   Lucene Common Analyzers
   Lucene Core
@@ -46,9 +48,16 @@ BSD License
   ASM Core
   ASM Tree
   ASM Util
+  JLine
   Scala Compiler
 
 Bouncy Castle License
   Bouncy Castle PKIX, CMS, EAC, TSP, PKCS, OCSP, CMP, and CRMF APIs
   Bouncy Castle Provider
+
+MIT License
+  scallop
+
+Mozilla Public License, Version 2.0
+  kiama
 

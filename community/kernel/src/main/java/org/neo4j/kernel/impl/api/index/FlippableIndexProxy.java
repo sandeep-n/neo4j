@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -28,6 +28,9 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.neo4j.graphdb.ResourceIterator;
+import org.neo4j.internal.kernel.api.IndexCapability;
+import org.neo4j.internal.kernel.api.InternalIndexState;
+import org.neo4j.internal.kernel.api.schema.LabelSchemaDescriptor;
 import org.neo4j.kernel.api.exceptions.index.ExceptionDuringFlipKernelException;
 import org.neo4j.kernel.api.exceptions.index.FlipFailedKernelException;
 import org.neo4j.kernel.api.exceptions.index.IndexActivationFailedKernelException;
@@ -37,10 +40,8 @@ import org.neo4j.kernel.api.exceptions.index.IndexPopulationFailedKernelExceptio
 import org.neo4j.kernel.api.exceptions.index.IndexProxyAlreadyClosedKernelException;
 import org.neo4j.kernel.api.exceptions.schema.UniquePropertyValueValidationException;
 import org.neo4j.kernel.api.index.IndexUpdater;
-import org.neo4j.kernel.api.index.InternalIndexState;
 import org.neo4j.kernel.api.index.PropertyAccessor;
 import org.neo4j.kernel.api.index.SchemaIndexProvider;
-import org.neo4j.kernel.api.schema.LabelSchemaDescriptor;
 import org.neo4j.kernel.api.schema.index.IndexDescriptor;
 import org.neo4j.kernel.impl.api.index.updater.DelegatingIndexUpdater;
 import org.neo4j.storageengine.api.schema.IndexReader;
@@ -64,7 +65,7 @@ public class FlippableIndexProxy implements IndexProxy
         this( null );
     }
 
-    public FlippableIndexProxy( IndexProxy originalDelegate )
+    FlippableIndexProxy( IndexProxy originalDelegate )
     {
         this.delegate = originalDelegate;
     }
@@ -133,6 +134,20 @@ public class FlippableIndexProxy implements IndexProxy
         try
         {
             delegate.force();
+        }
+        finally
+        {
+            lock.readLock().unlock();
+        }
+    }
+
+    @Override
+    public void refresh() throws IOException
+    {
+        lock.readLock();
+        try
+        {
+            delegate.refresh();
         }
         finally
         {
@@ -255,6 +270,20 @@ public class FlippableIndexProxy implements IndexProxy
     }
 
     @Override
+    public IndexCapability getIndexCapability()
+    {
+        lock.readLock().lock();
+        try
+        {
+            return delegate.getIndexCapability();
+        }
+        finally
+        {
+            lock.readLock().unlock();
+        }
+    }
+
+    @Override
     public Future<Void> close() throws IOException
     {
         lock.readLock().lock();
@@ -292,7 +321,7 @@ public class FlippableIndexProxy implements IndexProxy
             lock.readLock().lock();
             proxy = delegate;
             lock.readLock().unlock();
-        } while ( proxy.awaitStoreScanCompleted() );
+        } while ( !closed && proxy.awaitStoreScanCompleted() );
         return true;
     }
 
@@ -367,7 +396,7 @@ public class FlippableIndexProxy implements IndexProxy
         }
     }
 
-    public void setFlipTarget( IndexProxyFactory flipTarget )
+    void setFlipTarget( IndexProxyFactory flipTarget )
     {
         lock.writeLock().lock();
         try
@@ -380,7 +409,7 @@ public class FlippableIndexProxy implements IndexProxy
         }
     }
 
-    public void flipTo( IndexProxy targetDelegate )
+    void flipTo( IndexProxy targetDelegate )
     {
         lock.writeLock().lock();
         try

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,16 +24,17 @@ import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import org.neo4j.collection.primitive.PrimitiveLongCollections;
-import org.neo4j.collection.primitive.PrimitiveLongIterator;
+import org.neo4j.collection.primitive.PrimitiveLongResourceCollections;
+import org.neo4j.collection.primitive.PrimitiveLongResourceIterator;
 import org.neo4j.helpers.TaskCoordinator;
 import org.neo4j.io.IOUtils;
 import org.neo4j.kernel.api.exceptions.index.IndexNotApplicableKernelException;
 import org.neo4j.kernel.api.impl.index.partition.PartitionSearcher;
 import org.neo4j.kernel.api.impl.index.sampler.AggregatingIndexSampler;
-import org.neo4j.kernel.api.schema.IndexQuery;
+import org.neo4j.internal.kernel.api.IndexQuery;
 import org.neo4j.kernel.api.schema.index.IndexDescriptor;
 import org.neo4j.kernel.impl.api.index.sampling.IndexSamplingConfig;
+import org.neo4j.storageengine.api.schema.AbstractIndexReader;
 import org.neo4j.storageengine.api.schema.IndexReader;
 import org.neo4j.storageengine.api.schema.IndexSampler;
 import org.neo4j.values.storable.Value;
@@ -44,7 +45,7 @@ import org.neo4j.values.storable.Value;
  *
  * @see SimpleIndexReader
  */
-public class PartitionedIndexReader implements IndexReader
+public class PartitionedIndexReader extends AbstractIndexReader
 {
 
     private final List<SimpleIndexReader> indexReaders;
@@ -54,19 +55,20 @@ public class PartitionedIndexReader implements IndexReader
             IndexSamplingConfig samplingConfig,
             TaskCoordinator taskCoordinator )
     {
-        this( partitionSearchers.stream()
+        this( descriptor, partitionSearchers.stream()
                 .map( partitionSearcher -> new SimpleIndexReader( partitionSearcher, descriptor,
                         samplingConfig, taskCoordinator ) )
                 .collect( Collectors.toList() ) );
     }
 
-    PartitionedIndexReader( List<SimpleIndexReader> readers )
+    PartitionedIndexReader( IndexDescriptor descriptor, List<SimpleIndexReader> readers )
     {
+        super( descriptor );
         this.indexReaders = readers;
     }
 
     @Override
-    public PrimitiveLongIterator query( IndexQuery... predicates ) throws IndexNotApplicableKernelException
+    public PrimitiveLongResourceIterator query( IndexQuery... predicates ) throws IndexNotApplicableKernelException
     {
         try
         {
@@ -84,7 +86,7 @@ public class PartitionedIndexReader implements IndexReader
         return false;
     }
 
-    private PrimitiveLongIterator innerQuery( IndexReader reader, IndexQuery[] predicates )
+    private PrimitiveLongResourceIterator innerQuery( IndexReader reader, IndexQuery[] predicates )
     {
         try
         {
@@ -140,11 +142,11 @@ public class PartitionedIndexReader implements IndexReader
         }
     }
 
-    private PrimitiveLongIterator partitionedOperation(
-            Function<SimpleIndexReader,PrimitiveLongIterator> readerFunction )
+    private PrimitiveLongResourceIterator partitionedOperation(
+            Function<SimpleIndexReader,PrimitiveLongResourceIterator> readerFunction )
     {
-        return PrimitiveLongCollections.concat( indexReaders.parallelStream()
-                .map( readerFunction::apply )
+        return PrimitiveLongResourceCollections.concat( indexReaders.parallelStream()
+                .map( readerFunction )
                 .collect( Collectors.toList() ) );
     }
 }

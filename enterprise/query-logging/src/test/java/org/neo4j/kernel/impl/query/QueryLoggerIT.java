@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -69,18 +69,24 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.lessThan;
+import static org.hamcrest.Matchers.lessThanOrEqualTo;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
+import static org.neo4j.graphdb.factory.GraphDatabaseSettings.log_queries;
+import static org.neo4j.graphdb.factory.GraphDatabaseSettings.log_queries_max_archives;
+import static org.neo4j.graphdb.factory.GraphDatabaseSettings.log_queries_rotation_threshold;
+import static org.neo4j.graphdb.factory.GraphDatabaseSettings.logs_directory;
 import static org.neo4j.helpers.collection.MapUtil.stringMap;
-import static org.neo4j.kernel.api.security.AuthSubject.AUTH_DISABLED;
+import static org.neo4j.internal.kernel.api.security.AuthSubject.AUTH_DISABLED;
 
 public class QueryLoggerIT
 {
 
-    // It is imperitive that this test executes using a real filesystem; otherwise rotation failures will not be
+    // It is imperative that this test executes using a real filesystem; otherwise rotation failures will not be
     // detected on Windows.
     @Rule
     public final DefaultFileSystemRule fileSystem = new DefaultFileSystemRule();
@@ -112,8 +118,8 @@ public class QueryLoggerIT
     {
         // turn on query logging
         final Map<String, String> config = stringMap(
-            GraphDatabaseSettings.logs_directory.name(), logsDirectory.getPath(),
-            GraphDatabaseSettings.log_queries.name(), Settings.TRUE );
+            logs_directory.name(), logsDirectory.getPath(),
+            log_queries.name(), Settings.TRUE );
         EmbeddedInteraction db = new EmbeddedInteraction( databaseBuilder, config );
 
         // create users
@@ -147,8 +153,8 @@ public class QueryLoggerIT
     public void shouldLogTXMetaDataInQueryLog() throws Throwable
     {
         // turn on query logging
-        databaseBuilder.setConfig( GraphDatabaseSettings.logs_directory, logsDirectory.getPath() );
-        databaseBuilder.setConfig( GraphDatabaseSettings.log_queries, Settings.TRUE );
+        databaseBuilder.setConfig( logs_directory, logsDirectory.getPath() );
+        databaseBuilder.setConfig( log_queries, Settings.TRUE );
         EmbeddedInteraction db = new EmbeddedInteraction( databaseBuilder, Collections.emptyMap() );
         GraphDatabaseFacade graph = db.getLocalGraph();
 
@@ -197,8 +203,8 @@ public class QueryLoggerIT
     @Test
     public void shouldLogQuerySlowerThanThreshold() throws Exception
     {
-        GraphDatabaseService database = databaseBuilder.setConfig( GraphDatabaseSettings.log_queries, Settings.TRUE )
-                .setConfig( GraphDatabaseSettings.logs_directory, logsDirectory.getPath() )
+        GraphDatabaseService database = databaseBuilder.setConfig( log_queries, Settings.TRUE )
+                .setConfig( logs_directory, logsDirectory.getPath() )
                 .setConfig( GraphDatabaseSettings.log_queries_parameter_logging_enabled, Settings.FALSE )
                 .newGraphDatabase();
 
@@ -213,8 +219,8 @@ public class QueryLoggerIT
     @Test
     public void shouldLogParametersWhenNestedMap() throws Exception
     {
-        GraphDatabaseService database = databaseBuilder.setConfig( GraphDatabaseSettings.log_queries, Settings.TRUE )
-                .setConfig( GraphDatabaseSettings.logs_directory, logsDirectory.getPath() )
+        GraphDatabaseService database = databaseBuilder.setConfig( log_queries, Settings.TRUE )
+                .setConfig( logs_directory, logsDirectory.getPath() )
                 .setConfig( GraphDatabaseSettings.log_queries_parameter_logging_enabled, Settings.TRUE )
                 .newGraphDatabase();
 
@@ -239,6 +245,25 @@ public class QueryLoggerIT
         assertThat( logLines.get( 0 ), containsString( AUTH_DISABLED.username() ) );
     }
 
+    @Test
+    public void shouldLogRuntime() throws Exception
+    {
+        GraphDatabaseService database = databaseBuilder.setConfig( GraphDatabaseSettings.log_queries, Settings.TRUE )
+                .setConfig( GraphDatabaseSettings.logs_directory, logsDirectory.getPath() )
+                .setConfig( GraphDatabaseSettings.log_queries_runtime_logging_enabled, Settings.TRUE )
+                .newGraphDatabase();
+
+        String query = "RETURN 42";
+        executeQueryAndShutdown( database, query, Collections.emptyMap() );
+
+        List<String> logLines = readAllLines( logFilename );
+        assertEquals( 1, logLines.size() );
+        assertThat( logLines.get( 0 ), endsWith( String.format(
+                " ms: %s - %s - {} - runtime=interpreted - {}",
+                clientConnectionInfo(),
+                query ) ) );
+    }
+
     private String clientConnectionInfo()
     {
         return ClientConnectionInfo.EMBEDDED_CONNECTION.withUsername( AUTH_DISABLED.username() ).asConnectionDetails();
@@ -247,8 +272,8 @@ public class QueryLoggerIT
     @Test
     public void shouldLogParametersWhenList() throws Exception
     {
-        GraphDatabaseService database = databaseBuilder.setConfig( GraphDatabaseSettings.log_queries, Settings.TRUE )
-                .setConfig( GraphDatabaseSettings.logs_directory, logsDirectory.getPath() )
+        GraphDatabaseService database = databaseBuilder.setConfig( log_queries, Settings.TRUE )
+                .setConfig( logs_directory, logsDirectory.getPath() )
                 .newGraphDatabase();
 
         Map<String,Object> params = new HashMap<>();
@@ -266,14 +291,13 @@ public class QueryLoggerIT
     @Test
     public void disabledQueryLogging() throws IOException
     {
-        GraphDatabaseService database = databaseBuilder.setConfig( GraphDatabaseSettings.log_queries, Settings.FALSE )
+        GraphDatabaseService database = databaseBuilder.setConfig( log_queries, Settings.FALSE )
                 .setConfig( GraphDatabaseSettings.log_queries_filename, logFilename.getPath() )
                 .newGraphDatabase();
 
         executeQueryAndShutdown( database );
 
-        List<String> strings = readAllLines( logFilename );
-        assertEquals( 0, strings.size() );
+        assertFalse( fileSystem.fileExists( logFilename ) );
     }
 
     @Test
@@ -282,9 +306,9 @@ public class QueryLoggerIT
         final File logsDirectory = new File( testDirectory.graphDbDir(), "logs" );
         final File logFilename = new File( logsDirectory, "query.log" );
         final File shiftedLogFilename1 = new File( logsDirectory, "query.log.1" );
-        GraphDatabaseService database = databaseBuilder.setConfig( GraphDatabaseSettings.log_queries, Settings.TRUE )
-                .setConfig( GraphDatabaseSettings.logs_directory, logsDirectory.getPath() )
-                .setConfig( GraphDatabaseSettings.log_queries_rotation_threshold, "0" )
+        GraphDatabaseService database = databaseBuilder.setConfig( log_queries, Settings.TRUE )
+                .setConfig( logs_directory, logsDirectory.getPath() )
+                .setConfig( log_queries_rotation_threshold, "0" )
                 .newGraphDatabase();
 
         // Logging is done asynchronously, so write many times to make sure we would have rotated something
@@ -306,11 +330,11 @@ public class QueryLoggerIT
     public void queryLogRotation() throws Exception
     {
         final File logsDirectory = new File( testDirectory.graphDbDir(), "logs" );
-        GraphDatabaseService database = databaseBuilder.setConfig( GraphDatabaseSettings.log_queries, Settings.TRUE )
-                .setConfig( GraphDatabaseSettings.logs_directory, logsDirectory.getPath() )
-                .setConfig( GraphDatabaseSettings.log_queries_max_archives, "100" )
-                .setConfig( GraphDatabaseSettings.log_queries_rotation_threshold, "1" )
-                .newGraphDatabase();
+        databaseBuilder.setConfig( log_queries, Settings.TRUE )
+                .setConfig( logs_directory, logsDirectory.getPath() )
+                .setConfig( log_queries_max_archives, "100" )
+                .setConfig( log_queries_rotation_threshold, "1" );
+        GraphDatabaseService database = databaseBuilder.newGraphDatabase();
 
         // Logging is done asynchronously, and it turns out it's really hard to make it all work the same on Linux
         // and on Windows, so just write many times to make sure we rotate several times.
@@ -323,22 +347,41 @@ public class QueryLoggerIT
         database.shutdown();
 
         File[] queryLogs = fileSystem.get().listFiles( logsDirectory, ( dir, name ) -> name.startsWith( "query.log" ) );
-
         assertThat( "Expect to have more then one query log file.", queryLogs.length, greaterThanOrEqualTo( 2 ) );
 
         List<String> loggedQueries = Arrays.stream( queryLogs )
-                                        .map( this::readAllLinesSilent )
-                                        .flatMap( Collection::stream )
-                                        .collect( Collectors.toList() );
+                                           .map( this::readAllLinesSilent )
+                                           .flatMap( Collection::stream )
+                                           .collect( Collectors.toList() );
         assertThat( "Expected log file to have at least one log entry", loggedQueries, hasSize( 100 ) );
+
+        database = databaseBuilder.newGraphDatabase();
+        // Now modify max_archives and rotation_threshold at runtime, and observe that we end up with fewer larger files
+        database.execute( "CALL dbms.setConfigValue('" + log_queries_max_archives.name() + "','1')" );
+        database.execute( "CALL dbms.setConfigValue('" + log_queries_rotation_threshold.name() + "','20m')" );
+        for ( int i = 0; i < 100; i++ )
+        {
+            database.execute( QUERY );
+        }
+
+        database.shutdown();
+
+        queryLogs = fileSystem.get().listFiles( logsDirectory, ( dir, name ) -> name.startsWith( "query.log" ) );
+        assertThat( "Expect to have more then one query log file.", queryLogs.length, lessThan( 100 ) );
+
+        loggedQueries = Arrays.stream( queryLogs )
+                              .map( this::readAllLinesSilent )
+                              .flatMap( Collection::stream )
+                              .collect( Collectors.toList() );
+        assertThat( "Expected log file to have at least one log entry", loggedQueries.size(), lessThanOrEqualTo( 202 ) );
     }
 
     @Test
     public void shouldNotLogPassword() throws Exception
     {
         GraphDatabaseFacade database = (GraphDatabaseFacade) databaseBuilder
-                .setConfig( GraphDatabaseSettings.log_queries, Settings.TRUE )
-                .setConfig( GraphDatabaseSettings.logs_directory, logsDirectory.getPath() )
+                .setConfig( log_queries, Settings.TRUE )
+                .setConfig( logs_directory, logsDirectory.getPath() )
                 .setConfig( GraphDatabaseSettings.auth_enabled, Settings.TRUE )
                 .newGraphDatabase();
 
@@ -369,23 +412,24 @@ public class QueryLoggerIT
     @Test
     public void canBeEnabledAndDisabledAtRuntime() throws Exception
     {
-        GraphDatabaseService database = databaseBuilder.setConfig( GraphDatabaseSettings.log_queries, Settings.FALSE )
+        GraphDatabaseService database = databaseBuilder.setConfig( log_queries, Settings.FALSE )
                 .setConfig( GraphDatabaseSettings.log_queries_filename, logFilename.getPath() )
                 .newGraphDatabase();
+        List<String> strings;
 
         database.execute( QUERY ).close();
 
-        List<String> strings = readAllLines( logFilename );
-        assertEquals( 0, strings.size() );
+        // File will not be created until query logging is enabled.
+        assertFalse( fileSystem.fileExists( logFilename ) );
 
-        database.execute( "CALL dbms.setConfigValue('" + GraphDatabaseSettings.log_queries.name() + "', 'true')" ).close();
+        database.execute( "CALL dbms.setConfigValue('" + log_queries.name() + "', 'true')" ).close();
         database.execute( QUERY ).close();
 
         // Both config change and query should exist
         strings = readAllLines( logFilename );
         assertEquals( 2, strings.size() );
 
-        database.execute( "CALL dbms.setConfigValue('" + GraphDatabaseSettings.log_queries.name() + "', 'false')" ).close();
+        database.execute( "CALL dbms.setConfigValue('" + log_queries.name() + "', 'false')" ).close();
         database.execute( QUERY ).close();
 
         // Value should not change when disabled
@@ -416,9 +460,9 @@ public class QueryLoggerIT
     private void executeSingleQueryWithTimeZoneLog()
     {
         GraphDatabaseFacade database =
-                (GraphDatabaseFacade) databaseBuilder.setConfig( GraphDatabaseSettings.log_queries, Settings.TRUE )
+                (GraphDatabaseFacade) databaseBuilder.setConfig( log_queries, Settings.TRUE )
                         .setConfig( GraphDatabaseSettings.log_timezone, LogTimeZone.SYSTEM.name() )
-                        .setConfig( GraphDatabaseSettings.logs_directory, logsDirectory.getPath() )
+                        .setConfig( logs_directory, logsDirectory.getPath() )
                         .newGraphDatabase();
         database.execute( QUERY ).close();
         database.shutdown();

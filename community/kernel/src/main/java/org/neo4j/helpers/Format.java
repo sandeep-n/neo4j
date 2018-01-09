@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,6 +22,7 @@ package org.neo4j.helpers;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Locale;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
@@ -34,10 +35,12 @@ public class Format
      * sources is an easier task.
      */
     public static final TimeZone DEFAULT_TIME_ZONE = TimeZone.getTimeZone( "UTC" );
-    public static final String DATE_FORMAT = "yyyy-MM-dd HH:mm:ss.SSSZ";
-    public static final String TIME_FORMAT = "HH:mm:ss.SSS";
 
     private static final String[] BYTE_SIZES = { "B", "kB", "MB", "GB" };
+    private static final String[] COUNT_SIZES = { "", "k", "M", "G", "T" };
+
+    public static final String DATE_FORMAT = "yyyy-MM-dd HH:mm:ss.SSSZ";
+    public static final String TIME_FORMAT = "HH:mm:ss.SSS";
 
     private static final ThreadLocalFormat DATE = new ThreadLocalFormat( DATE_FORMAT );
     private static final ThreadLocalFormat TIME = new ThreadLocalFormat( TIME_FORMAT );
@@ -105,16 +108,26 @@ public class Format
 
     public static String bytes( long bytes )
     {
-        double size = bytes;
-        for ( String suffix : BYTE_SIZES )
+        return suffixCount( bytes, BYTE_SIZES, KB );
+    }
+
+    public static String count( long count )
+    {
+        return suffixCount( count, COUNT_SIZES, 1_000 );
+    }
+
+    private static String suffixCount( long value, String[] sizes, int stride )
+    {
+        double size = value;
+        for ( String suffix : sizes )
         {
-            if ( size < KB )
+            if ( size < stride )
             {
-                return String.format( "%.2f %s", Double.valueOf( size ), suffix );
+                return String.format( Locale.ROOT, "%.2f %s", Double.valueOf( size ), suffix );
             }
-            size /= KB;
+            size /= stride;
         }
-        return String.format( "%.2f TB", Double.valueOf( size ) );
+        return String.format( Locale.ROOT, "%.2f TB", Double.valueOf( size ) );
     }
 
     public static String duration( long durationMillis )

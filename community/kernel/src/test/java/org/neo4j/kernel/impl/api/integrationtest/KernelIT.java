@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,6 +24,7 @@ import org.junit.Test;
 
 import java.util.Collections;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.neo4j.collection.primitive.PrimitiveIntCollections;
@@ -36,20 +37,17 @@ import org.neo4j.graphdb.Label;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.TransactionFailureException;
-import org.neo4j.graphdb.TransactionTerminatedException;
+import org.neo4j.internal.kernel.api.exceptions.InvalidTransactionTypeKernelException;
+import org.neo4j.internal.kernel.api.schema.LabelSchemaDescriptor;
+import org.neo4j.internal.kernel.api.security.SecurityContext;
 import org.neo4j.kernel.api.KernelTransaction;
 import org.neo4j.kernel.api.SchemaWriteOperations;
 import org.neo4j.kernel.api.Statement;
 import org.neo4j.kernel.api.TokenWriteOperations;
 import org.neo4j.kernel.api.exceptions.EntityNotFoundException;
-import org.neo4j.kernel.api.exceptions.InvalidTransactionTypeKernelException;
 import org.neo4j.kernel.api.exceptions.Status;
 import org.neo4j.kernel.api.exceptions.schema.SchemaKernelException;
-import org.neo4j.kernel.api.schema.LabelSchemaDescriptor;
 import org.neo4j.kernel.api.schema.index.IndexDescriptor;
-import org.neo4j.kernel.api.security.AnonymousContext;
-import org.neo4j.kernel.api.security.SecurityContext;
-import org.neo4j.kernel.impl.api.Kernel;
 import org.neo4j.kernel.impl.transaction.log.TransactionIdStore;
 import org.neo4j.kernel.internal.GraphDatabaseAPI;
 import org.neo4j.storageengine.api.NodeItem;
@@ -57,16 +55,16 @@ import org.neo4j.storageengine.api.NodeItem;
 import static java.util.Collections.emptySet;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.instanceOf;
+import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.junit.Assume.assumeThat;
 import static org.neo4j.graphdb.Label.label;
+import static org.neo4j.internal.kernel.api.security.SecurityContext.AUTH_DISABLED;
 import static org.neo4j.kernel.api.schema.SchemaDescriptorFactory.forLabel;
-import static org.neo4j.kernel.api.security.SecurityContext.AUTH_DISABLED;
+import static org.neo4j.test.assertion.Assert.assertEventually;
 
 public class KernelIT extends KernelIntegrationTest
 {
@@ -511,8 +509,10 @@ public class KernelIT extends KernelIntegrationTest
             db.schema().awaitIndexesOnline( 20, SECONDS );
             tx.success();
         }
-        // THEN
-        assertFalse( schemaStateContains( "my key" ) );
+        // THEN schema state is eventually updated (clearing the schema cache is not atomic with respect to flipping
+        // the new index to the ONLINE state, but happens as soon as possible *after* the index becomes ONLINE).
+        assertEventually( "Schema state should have been updated",
+                () -> schemaStateContains( "my key" ), is( false ), 1, TimeUnit.SECONDS );
     }
 
     @Test
@@ -532,27 +532,9 @@ public class KernelIT extends KernelIntegrationTest
         schemaWriteOperationsInNewTransaction().indexDrop( idx );
         commit();
 
-        // THEN
+        // THEN schema state should be immediately updated (this works because the schema cache is updated during
+        // transaction apply, while the schema lock is held).
         assertFalse( schemaStateContains("my key") );
-    }
-
-    @Test
-    public void shouldKillTransactionsOnShutdown() throws Throwable
-    {
-        // Given
-        assumeThat(kernel, instanceOf( Kernel.class ));
-
-        // Then
-        try ( KernelTransaction tx = kernel.newTransaction( KernelTransaction.Type.implicit, AnonymousContext.read() ) )
-        {
-            ((Kernel)kernel).stop();
-            tx.acquireStatement().readOperations().nodeExists( 0L );
-            fail("Should have been terminated.");
-        }
-        catch ( TransactionTerminatedException e )
-        {
-            // Success
-        }
     }
 
     @Test

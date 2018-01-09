@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,19 +19,16 @@
  */
 package org.neo4j.cypher.internal.runtime.interpreted.commands.expressions
 
-import org.neo4j.cypher.internal.util.v3_4.ParameterWrongTypeException
 import org.neo4j.cypher.internal.runtime.interpreted.ExecutionContext
 import org.neo4j.cypher.internal.runtime.interpreted.pipes.QueryState
+import org.neo4j.cypher.internal.util.v3_4.ParameterWrongTypeException
 import org.neo4j.values.AnyValue
-import org.neo4j.values.storable.Values
-import org.neo4j.values.virtual.{NodeValue, VirtualValues}
+import org.neo4j.values.virtual.NodeValue
 
 case class LabelsFunction(nodeExpr: Expression) extends NullInNullOutExpression(nodeExpr) {
 
   override def compute(value: AnyValue, m: ExecutionContext, state: QueryState): AnyValue = value match {
-    case n: NodeValue =>
-      val ctx = state.query
-      VirtualValues.list(ctx.getLabelsForNode(n.id()).map(t => Values.stringValue(ctx.getLabelName(t))).toArray:_*)
+    case n: NodeValue => state.query.getLabelsForNode(n.id())
     case x => throw new ParameterWrongTypeException("Expected a Node, got: " + x)
   }
 

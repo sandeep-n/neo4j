@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -1051,7 +1051,7 @@ class NodeIndexSeekByRangeAcceptanceTest extends ExecutionEngineFunSuite with Cy
       planComparisonStrategy = ComparePlansWithAssertion((plan) => {
         //THEN
         plan should useOperators(IndexSeekByRange.name)
-      }, Configs.AllRulePlanners))
+      }, Configs.AllRulePlanners), params = Map("param" -> Array[Int](1, 2, 3)))
     result.toList should be(empty)
 
     an[IllegalArgumentException] should be thrownBy {

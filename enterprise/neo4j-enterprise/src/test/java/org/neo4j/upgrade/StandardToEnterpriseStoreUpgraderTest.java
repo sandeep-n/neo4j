@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,19 +19,18 @@
  */
 package org.neo4j.upgrade;
 
-import upgrade.StoreUpgraderTest;
-
 import org.neo4j.kernel.impl.store.format.RecordFormats;
 import org.neo4j.kernel.impl.store.format.highlimit.HighLimit;
+import org.neo4j.kernel.impl.storemigration.StoreUpgraderTest;
 
 /**
  * Runs the store upgrader tests from older versions, migrating to the current enterprise version.
  */
 public class StandardToEnterpriseStoreUpgraderTest extends StoreUpgraderTest
 {
-    public StandardToEnterpriseStoreUpgraderTest( String version )
+    public StandardToEnterpriseStoreUpgraderTest( RecordFormats recordFormats )
     {
-        super( version );
+        super( recordFormats );
     }
 
     @Override

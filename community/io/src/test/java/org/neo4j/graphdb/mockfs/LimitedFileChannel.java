@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -112,15 +112,15 @@ public class LimitedFileChannel implements StoreChannel
     }
 
     @Override
-    public FileLock tryLock() throws IOException
+    public void readAll( ByteBuffer dst ) throws IOException
     {
-        return inner.tryLock();
+        inner.readAll( dst );
     }
 
     @Override
-    public int write( ByteBuffer byteBuffer, long l ) throws IOException
+    public FileLock tryLock() throws IOException
     {
-        return inner.write( byteBuffer, l );
+        return inner.tryLock();
     }
 
     @Override

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -299,7 +299,7 @@ public class KeyValueStoreFile implements Closeable
         { // The current page is a full page (either because it has pages after it, or the last page is actually full).
             entryCount = file.pageSize() / entrySize;
         }
-        int entryOffset = findEntryOffset( cursor, searchKey, key, value, firstEntry, /*lastEntry=*/entryCount - 1 );
+        int entryOffset = findEntryOffset( cursor, searchKey, key, value, firstEntry, entryCount - 1 );
         return entryOffset * entrySize;
     }
 

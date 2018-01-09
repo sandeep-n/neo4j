@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,8 +24,8 @@ import org.neo4j.cypher.internal.javacompat.GraphDatabaseCypherService
 import org.neo4j.cypher.internal.util.v3_4.test_helpers.CypherFunSuite
 import org.neo4j.cypher.internal.util.v3_4.{Cardinality, LabelId, RelTypeId}
 import org.neo4j.graphdb.{GraphDatabaseService, Label, RelationshipType}
-import org.neo4j.kernel.api.KernelTransaction.Type._
-import org.neo4j.kernel.api.security.SecurityContext.AUTH_DISABLED
+import org.neo4j.internal.kernel.api.Transaction.Type._
+import org.neo4j.internal.kernel.api.security.SecurityContext.AUTH_DISABLED
 import org.neo4j.kernel.impl.coreapi.{InternalTransaction, PropertyContainerLocker}
 import org.neo4j.kernel.impl.query.Neo4jTransactionalContextFactory
 import org.neo4j.kernel.impl.query.clientconnection.ClientConnectionInfo
@@ -53,12 +53,12 @@ class TransactionBoundPlanContextTest extends CypherFunSuite {
     val graph = new GraphDatabaseCypherService(database)
     val transaction = graph.beginTransaction(explicit, AUTH_DISABLED)
     val transactionalContext = createTransactionContext(graph, transaction)
-    val planContext = new TransactionBoundPlanContext(TransactionalContextWrapper(transactionalContext), devNullLogger)
+    val planContext = TransactionBoundPlanContext(TransactionalContextWrapper(transactionalContext), devNullLogger)
     val statistics = planContext.statistics
 
     // label stats
     statistics.nodesWithLabelCardinality(Some(LabelId(0))) should equal(Cardinality.SINGLE)
-    statistics.nodesWithLabelCardinality(None) should equal(Cardinality.SINGLE)
+    statistics.nodesAllCardinality() should equal(Cardinality.SINGLE)
 
     // pattern stats
     Set(Some(LabelId(0)), None).foreach { label1 =>
@@ -86,13 +86,13 @@ class TransactionBoundPlanContextTest extends CypherFunSuite {
 
     val transaction = graph.beginTransaction(explicit, AUTH_DISABLED)
     val transactionalContext = createTransactionContext(graph, transaction)
-    val planContext = new TransactionBoundPlanContext(TransactionalContextWrapper(transactionalContext), devNullLogger)
+    val planContext = TransactionBoundPlanContext(TransactionalContextWrapper(transactionalContext), devNullLogger)
     val statistics = planContext.statistics
 
     // label stats
     statistics.nodesWithLabelCardinality(Some(LabelId(0))) should equal(Cardinality(100))
     statistics.nodesWithLabelCardinality(Some(LabelId(1))) should equal(Cardinality.SINGLE)
-    statistics.nodesWithLabelCardinality(None) should equal(Cardinality(200))
+    statistics.nodesAllCardinality() should equal(Cardinality(200))
 
     // pattern stats
     statistics.cardinalityByLabelsAndRelationshipType(

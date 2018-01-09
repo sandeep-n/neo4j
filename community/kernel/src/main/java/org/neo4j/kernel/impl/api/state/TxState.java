@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -28,17 +28,21 @@ import java.util.TreeMap;
 import java.util.function.Consumer;
 
 import org.neo4j.collection.primitive.Primitive;
+import org.neo4j.collection.primitive.PrimitiveIntObjectMap;
+import org.neo4j.collection.primitive.PrimitiveIntObjectVisitor;
 import org.neo4j.collection.primitive.PrimitiveIntSet;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
+import org.neo4j.collection.primitive.PrimitiveLongObjectMap;
+import org.neo4j.collection.primitive.PrimitiveLongResourceIterator;
 import org.neo4j.collection.primitive.PrimitiveLongSet;
 import org.neo4j.cursor.Cursor;
 import org.neo4j.helpers.collection.Iterables;
-import org.neo4j.kernel.api.exceptions.schema.ConstraintValidationException;
+import org.neo4j.internal.kernel.api.exceptions.schema.ConstraintValidationException;
+import org.neo4j.internal.kernel.api.schema.LabelSchemaDescriptor;
+import org.neo4j.internal.kernel.api.schema.SchemaDescriptor;
+import org.neo4j.internal.kernel.api.schema.SchemaDescriptorPredicates;
+import org.neo4j.internal.kernel.api.schema.constraints.ConstraintDescriptor;
 import org.neo4j.kernel.api.exceptions.schema.CreateConstraintFailureException;
-import org.neo4j.kernel.api.schema.LabelSchemaDescriptor;
-import org.neo4j.kernel.api.schema.SchemaDescriptor;
-import org.neo4j.kernel.api.schema.SchemaDescriptorPredicates;
-import org.neo4j.kernel.api.schema.constaints.ConstraintDescriptor;
 import org.neo4j.kernel.api.schema.constaints.IndexBackedConstraintDescriptor;
 import org.neo4j.kernel.api.schema.index.IndexDescriptor;
 import org.neo4j.kernel.api.txstate.RelationshipChangeVisitorAdapter;
@@ -87,55 +91,17 @@ import static org.neo4j.helpers.collection.Iterables.map;
  */
 public final class TxState implements TransactionState, RelationshipVisitor.Home
 {
-    private Map<Integer/*Label ID*/, LabelState.Mutable> labelStatesMap;
-    private static final LabelState.Defaults LABEL_STATE = new LabelState.Defaults()
-    {
-        @Override
-        Map<Integer, LabelState.Mutable> getMap( TxState state )
-        {
-            return state.labelStatesMap;
-        }
+    private static final LabelState.Defaults LABEL_STATE = new TransactionLabelState();
+    private static final NodeStateImpl.Defaults NODE_STATE = new TransactionNodeState();
+    private static final RelationshipStateImpl.Defaults RELATIONSHIP_STATE = new TransactionRelationshipState();
 
-        @Override
-        void setMap( TxState state, Map<Integer, LabelState.Mutable> map )
-        {
-            state.labelStatesMap = map;
-        }
-    };
-    private Map<Long/*Node ID*/, NodeStateImpl> nodeStatesMap;
-    private static final NodeStateImpl.Defaults NODE_STATE = new NodeStateImpl.Defaults()
-    {
-        @Override
-        Map<Long, NodeStateImpl> getMap( TxState state )
-        {
-            return state.nodeStatesMap;
-        }
+    private PrimitiveLongObjectMap<LabelState.Mutable> labelStatesMap;
+    private PrimitiveLongObjectMap<NodeStateImpl> nodeStatesMap;
+    private PrimitiveLongObjectMap<RelationshipStateImpl> relationshipStatesMap;
 
-        @Override
-        void setMap( TxState state, Map<Long, NodeStateImpl> map )
-        {
-            state.nodeStatesMap = map;
-        }
-    };
-    private Map<Long/*Relationship ID*/, RelationshipStateImpl> relationshipStatesMap;
-    private static final RelationshipStateImpl.Defaults RELATIONSHIP_STATE = new RelationshipStateImpl.Defaults()
-    {
-        @Override
-        Map<Long, RelationshipStateImpl> getMap( TxState state )
-        {
-            return state.relationshipStatesMap;
-        }
-
-        @Override
-        void setMap( TxState state, Map<Long, RelationshipStateImpl> map )
-        {
-            state.relationshipStatesMap = map;
-        }
-    };
-
-    private Map<Integer/*Token ID*/, String> createdLabelTokens;
-    private Map<Integer/*Token ID*/, String> createdPropertyKeyTokens;
-    private Map<Integer/*Token ID*/, String> createdRelationshipTypeTokens;
+    private PrimitiveIntObjectMap<String> createdLabelTokens;
+    private PrimitiveIntObjectMap<String> createdPropertyKeyTokens;
+    private PrimitiveIntObjectMap<String> createdRelationshipTypeTokens;
 
     private GraphState graphState;
     private DiffSets<IndexDescriptor> indexChanges;
@@ -267,26 +233,17 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
 
         if ( createdLabelTokens != null )
         {
-            for ( Map.Entry<Integer, String> entry : createdLabelTokens.entrySet() )
-            {
-                visitor.visitCreatedLabelToken( entry.getValue(), entry.getKey() );
-            }
+            createdLabelTokens.visitEntries( new LabelTokenStateVisitor( visitor ) );
         }
 
         if ( createdPropertyKeyTokens != null )
         {
-            for ( Map.Entry<Integer, String> entry : createdPropertyKeyTokens.entrySet() )
-            {
-                visitor.visitCreatedPropertyKeyToken( entry.getValue(), entry.getKey() );
-            }
+            createdPropertyKeyTokens.visitEntries( new PropertyKeyTokenStateVisitor( visitor ) );
         }
 
         if ( createdRelationshipTypeTokens != null )
         {
-            for ( Map.Entry<Integer, String> entry : createdRelationshipTypeTokens.entrySet() )
-            {
-                visitor.visitCreatedRelationshipTypeToken( entry.getValue(), entry.getKey() );
-            }
+            createdRelationshipTypeTokens.visitEntries( new RelationshipTypeTokenStateVisitor( visitor ) );
         }
     }
 
@@ -342,29 +299,6 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
     private static DiffSetsVisitor<ConstraintDescriptor> constraintsVisitor( final TxStateVisitor visitor )
     {
         return new ConstraintDiffSetsVisitor( visitor );
-    }
-
-    private static class ConstraintDiffSetsVisitor implements DiffSetsVisitor<ConstraintDescriptor>
-    {
-        private final TxStateVisitor visitor;
-
-        ConstraintDiffSetsVisitor( TxStateVisitor visitor )
-        {
-            this.visitor = visitor;
-        }
-
-        @Override
-        public void visitAdded( ConstraintDescriptor constraint )
-                throws ConstraintValidationException, CreateConstraintFailureException
-        {
-            visitor.visitAddedConstraint( constraint );
-        }
-
-        @Override
-        public void visitRemoved( ConstraintDescriptor constraint ) throws ConstraintValidationException
-        {
-            visitor.visitRemovedConstraint( constraint );
-        }
     }
 
     private static DiffSetsVisitor<IndexDescriptor> indexVisitor( final TxStateVisitor visitor )
@@ -673,7 +607,7 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
     {
         if ( createdLabelTokens == null )
         {
-            createdLabelTokens = new HashMap<>();
+            createdLabelTokens = Primitive.intObjectMap();
         }
         createdLabelTokens.put( id, labelName );
         changed();
@@ -684,7 +618,7 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
     {
         if ( createdPropertyKeyTokens == null )
         {
-            createdPropertyKeyTokens = new HashMap<>();
+            createdPropertyKeyTokens = Primitive.intObjectMap();
         }
         createdPropertyKeyTokens.put( id, propertyKeyName );
         changed();
@@ -695,7 +629,7 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
     {
         if ( createdRelationshipTypeTokens == null )
         {
-            createdRelationshipTypeTokens = new HashMap<>();
+            createdRelationshipTypeTokens = Primitive.intObjectMap();
         }
         createdRelationshipTypeTokens.put( id, labelName );
         changed();
@@ -723,7 +657,7 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
     public Cursor<PropertyItem> augmentPropertyCursor( Cursor<PropertyItem> cursor,
             PropertyContainerState propertyContainerState )
     {
-        return propertyContainerState.hasChanges() ?
+        return propertyContainerState.hasPropertyChanges() ?
                 propertyCursor.get().init( cursor, propertyContainerState ) : cursor;
     }
 
@@ -731,7 +665,7 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
     public Cursor<PropertyItem> augmentSinglePropertyCursor( Cursor<PropertyItem> cursor,
             PropertyContainerState propertyContainerState, int propertyKeyId )
     {
-        return propertyContainerState.hasChanges() ?
+        return propertyContainerState.hasPropertyChanges() ?
                 singlePropertyCursor.get().init( cursor, propertyContainerState, propertyKeyId ) : cursor;
     }
 
@@ -759,7 +693,7 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
             NodeState nodeState,
             Direction direction )
     {
-        return nodeState.hasChanges()
+        return nodeState.hasPropertyChanges() || nodeState.hasRelationshipChanges()
                ? iteratorRelationshipCursor.get().init( cursor, nodeState.getAddedRelationships( direction ) )
                : cursor;
     }
@@ -769,7 +703,7 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
             Direction direction,
             int[] relTypes )
     {
-        return nodeState.hasChanges()
+        return nodeState.hasPropertyChanges() || nodeState.hasRelationshipChanges()
                ? iteratorRelationshipCursor.get().init( cursor, nodeState.getAddedRelationships( direction, relTypes ) )
                : cursor;
     }
@@ -1312,7 +1246,7 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
     }
 
     @Override
-    public PrimitiveLongIterator augmentNodesGetAll( PrimitiveLongIterator committed )
+    public PrimitiveLongResourceIterator augmentNodesGetAll( PrimitiveLongIterator committed )
     {
         return addedAndRemovedNodes().augment( committed );
     }
@@ -1351,5 +1285,124 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
             relationshipsDeletedInTx = Primitive.longSet();
         }
         relationshipsDeletedInTx.add( id );
+    }
+
+    private static class LabelTokenStateVisitor implements PrimitiveIntObjectVisitor<String,RuntimeException>
+    {
+        private final TxStateVisitor visitor;
+
+        LabelTokenStateVisitor( TxStateVisitor visitor )
+        {
+            this.visitor = visitor;
+        }
+
+        @Override
+        public boolean visited( int key, String value )
+        {
+            visitor.visitCreatedLabelToken( value, key );
+            return false;
+        }
+    }
+
+    private static class PropertyKeyTokenStateVisitor implements PrimitiveIntObjectVisitor<String,RuntimeException>
+    {
+        private final TxStateVisitor visitor;
+
+        PropertyKeyTokenStateVisitor( TxStateVisitor visitor )
+        {
+            this.visitor = visitor;
+        }
+
+        @Override
+        public boolean visited( int key, String value ) throws RuntimeException
+        {
+            visitor.visitCreatedPropertyKeyToken( value, key );
+            return false;
+        }
+    }
+
+    private static class RelationshipTypeTokenStateVisitor implements PrimitiveIntObjectVisitor<String,RuntimeException>
+    {
+        private final TxStateVisitor visitor;
+
+        RelationshipTypeTokenStateVisitor( TxStateVisitor visitor )
+        {
+            this.visitor = visitor;
+        }
+
+        @Override
+        public boolean visited( int key, String value ) throws RuntimeException
+        {
+            visitor.visitCreatedRelationshipTypeToken( value, key );
+            return false;
+        }
+    }
+
+    private static class ConstraintDiffSetsVisitor implements DiffSetsVisitor<ConstraintDescriptor>
+    {
+        private final TxStateVisitor visitor;
+
+        ConstraintDiffSetsVisitor( TxStateVisitor visitor )
+        {
+            this.visitor = visitor;
+        }
+
+        @Override
+        public void visitAdded( ConstraintDescriptor constraint )
+                throws ConstraintValidationException, CreateConstraintFailureException
+        {
+            visitor.visitAddedConstraint( constraint );
+        }
+
+        @Override
+        public void visitRemoved( ConstraintDescriptor constraint ) throws ConstraintValidationException
+        {
+            visitor.visitRemovedConstraint( constraint );
+        }
+    }
+
+    private static class TransactionLabelState extends LabelState.Defaults
+    {
+        @Override
+        PrimitiveLongObjectMap<LabelState.Mutable> getMap( TxState state )
+        {
+            return state.labelStatesMap;
+        }
+
+        @Override
+        void setMap( TxState state, PrimitiveLongObjectMap<LabelState.Mutable> map )
+        {
+            state.labelStatesMap = map;
+        }
+    }
+
+    private static class TransactionNodeState extends NodeStateImpl.Defaults
+    {
+        @Override
+        PrimitiveLongObjectMap<NodeStateImpl> getMap( TxState state )
+        {
+            return state.nodeStatesMap;
+        }
+
+        @Override
+        void setMap( TxState state, PrimitiveLongObjectMap<NodeStateImpl> map )
+        {
+            state.nodeStatesMap = map;
+        }
+    }
+
+    private static class TransactionRelationshipState extends RelationshipStateImpl.Defaults
+    {
+        @Override
+        PrimitiveLongObjectMap<RelationshipStateImpl> getMap( TxState state )
+        {
+            return state.relationshipStatesMap;
+        }
+
+        @Override
+        void setMap( TxState state, PrimitiveLongObjectMap<RelationshipStateImpl> map )
+        {
+            state.relationshipStatesMap = map;
+        }
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,18 +22,21 @@ package org.neo4j.cypher.internal.compiled_runtime.v3_4
 import org.neo4j.cypher.internal.compatibility.v3_4.WrappedMonitors
 import org.neo4j.cypher.internal.compatibility.v3_4.runtime.compiled.BuildCompiledExecutionPlan
 import org.neo4j.cypher.internal.compatibility.v3_4.runtime.executionplan.NewRuntimeSuccessRateMonitor
+import org.neo4j.cypher.internal.compiler.v3_4.NotImplementedPlanContext
 import org.neo4j.cypher.internal.compiler.v3_4.phases.LogicalPlanState
 import org.neo4j.cypher.internal.compiler.v3_4.planner.{CantCompileQueryException, HardcodedGraphStatistics}
-import org.neo4j.cypher.internal.compiler.v3_4.NotImplementedPlanContext
-import org.neo4j.cypher.internal.util.v3_4.test_helpers.CypherFunSuite
 import org.neo4j.cypher.internal.frontend.v3_4.semantics.SemanticTable
 import org.neo4j.cypher.internal.ir.v3_4.{CardinalityEstimation, QueryGraph, RegularPlannerQuery}
 import org.neo4j.cypher.internal.planner.v3_4.spi.{CostBasedPlannerName, GraphStatistics}
 import org.neo4j.cypher.internal.spi.v3_4.codegen.GeneratedQueryStructure
-import org.neo4j.cypher.internal.v3_4.logical.plans.{LogicalPlan, ProduceResult, SingleRow}
+import org.neo4j.cypher.internal.util.v3_4.attribution.SequentialIdGen
+import org.neo4j.cypher.internal.util.v3_4.test_helpers.CypherFunSuite
+import org.neo4j.cypher.internal.v3_4.logical.plans.{Argument, LogicalPlan, ProduceResult}
 import org.neo4j.kernel.monitoring.Monitors
 
 class BuildCompiledExecutionPlanTest extends CypherFunSuite {
+
+  implicit val idGen = new SequentialIdGen()
 
   private val solved = CardinalityEstimation.lift(RegularPlannerQuery(QueryGraph.empty), 0.0)
 
@@ -44,7 +47,7 @@ class BuildCompiledExecutionPlanTest extends CypherFunSuite {
     monitors.addMonitorListener(monitor)
 
     // When
-    process(monitors, ProduceResult(SingleRow()(solved)(), Seq.empty))
+    process(monitors, ProduceResult(Argument()(solved), Seq.empty))
 
     // Then
     monitor.successfullyPlanned should equal(true)
@@ -56,14 +59,13 @@ class BuildCompiledExecutionPlanTest extends CypherFunSuite {
     val monitor = new SpyingMonitor
     monitors.addMonitorListener(monitor)
 
-    process(monitors, SingleRow()(solved)())
+    process(monitors, Argument()(solved))
 
     // Then
     monitor.failedToPlan should equal(true)
   }
 
   private def process(monitors: WrappedMonitors, plan: LogicalPlan) = {
-    plan.assignIds()
     val context = codegen.CompiledRuntimeContextHelper.create(
       monitors = monitors,
       planContext = new NotImplementedPlanContext {

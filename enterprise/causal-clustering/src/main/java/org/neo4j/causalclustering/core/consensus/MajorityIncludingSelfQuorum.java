@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,12 +19,19 @@
  */
 package org.neo4j.causalclustering.core.consensus;
 
+import java.util.Collection;
+
 public class MajorityIncludingSelfQuorum
 {
     private static final int MIN_QUORUM = 2;
 
     private MajorityIncludingSelfQuorum()
     {
+    }
+
+    public static boolean isQuorum( Collection<?> cluster, Collection<?> countNotIncludingMyself )
+    {
+        return isQuorum( cluster.size(), countNotIncludingMyself.size() );
     }
 
     public static boolean isQuorum( int clusterSize, int countNotIncludingSelf )

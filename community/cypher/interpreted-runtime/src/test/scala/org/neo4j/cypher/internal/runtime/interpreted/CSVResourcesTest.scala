@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,7 +25,7 @@ import org.apache.commons.lang3.SystemUtils
 import org.mockito.ArgumentMatchers._
 import org.mockito.Mockito._
 import org.neo4j.cypher.internal.runtime.CreateTempFileTestSupport
-import org.neo4j.cypher.internal.util.v3_4.TaskCloser
+import org.neo4j.cypher.internal.util.v3_4.{LoadExternalResourceException, TaskCloser}
 import org.neo4j.cypher.internal.util.v3_4.test_helpers.CypherFunSuite
 import org.neo4j.io.fs.FileUtils
 
@@ -200,6 +200,11 @@ class CSVResourcesTest extends CypherFunSuite with CreateTempFileTestSupport {
       path = FileUtils.fixSeparatorsInPath(path)
     }
     e.getMessage should include(path)
+  }
+
+  test("should handle local missing file") {
+    intercept[LoadExternalResourceException](resources.getCsvIterator(new URL("file:///this/file/url/probably/doesnt/exist"), None, legacyCsvQuoteEscaping = false).toList)
+    intercept[LoadExternalResourceException](resources.getCsvIterator(new URL("http://127.0.0.1/url/probably/doesnt/exist"), None, legacyCsvQuoteEscaping = false).toList)
   }
 
   test("should parse multiline fields") {

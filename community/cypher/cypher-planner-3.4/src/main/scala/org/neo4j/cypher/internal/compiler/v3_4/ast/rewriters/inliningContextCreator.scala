@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,7 +20,7 @@
 package org.neo4j.cypher.internal.compiler.v3_4.ast.rewriters
 
 import org.neo4j.cypher.internal.frontend.v3_4.ast
-import org.neo4j.cypher.internal.v3_4.expressions.{Expression, NodePattern, RelationshipPattern, Variable}
+import org.neo4j.cypher.internal.v3_4.expressions._
 
 object inliningContextCreator extends (ast.Statement => InliningContext) {
 
@@ -57,10 +57,10 @@ object inliningContextCreator extends (ast.Statement => InliningContext) {
     }
   }
 
-  private def spoilVariableIfNotAliased(variable: Variable, context: InliningContext): InliningContext =
+  private def spoilVariableIfNotAliased(variable: LogicalVariable, context: InliningContext): InliningContext =
     if (context.isAliasedVarible(variable)) context
     else context.spoilVariable(variable)
 
-  private def aliasedReturnItems(items: Seq[ast.ReturnItem]): Map[Variable, Expression] =
+  private def aliasedReturnItems(items: Seq[ast.ReturnItem]): Map[LogicalVariable, Expression] =
     items.collect { case ast.AliasedReturnItem(expr, ident) => ident -> expr }.toMap
 }

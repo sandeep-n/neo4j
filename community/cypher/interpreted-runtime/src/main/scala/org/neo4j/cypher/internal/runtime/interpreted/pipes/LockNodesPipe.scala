@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,16 +20,16 @@
 package org.neo4j.cypher.internal.runtime.interpreted.pipes
 
 import org.neo4j.cypher.internal.runtime.interpreted.ExecutionContext
-import org.neo4j.cypher.internal.v3_4.logical.plans.LogicalPlanId
-import org.neo4j.values.virtual.NodeValue
+import org.neo4j.cypher.internal.util.v3_4.attribution.Id
+import org.neo4j.values.virtual.VirtualNodeValue
 
-case class LockNodesPipe(src: Pipe, variablesToLock: Set[String])(val id: LogicalPlanId = LogicalPlanId.DEFAULT)
+case class LockNodesPipe(src: Pipe, variablesToLock: Set[String])(val id: Id = Id.INVALID_ID)
   extends PipeWithSource(src)  {
 
   protected def internalCreateResults(input: Iterator[ExecutionContext], state: QueryState): Iterator[ExecutionContext] =
     input.map { ctx =>
       val nodesToLock: Set[Long] = variablesToLock.flatMap { varName =>
-        Option(ctx(varName).asInstanceOf[NodeValue]).map(_.id)
+        Option(ctx(varName).asInstanceOf[VirtualNodeValue]).map(_.id)
       }
       state.query.lockNodes(nodesToLock.toSeq: _*)
       ctx

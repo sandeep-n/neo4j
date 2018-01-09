@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,29 +19,41 @@
  */
 package org.neo4j.kernel.impl.index.schema.fusion;
 
-import org.neo4j.collection.primitive.PrimitiveLongCollections;
-import org.neo4j.collection.primitive.PrimitiveLongIterator;
+import java.util.ArrayDeque;
+import java.util.Arrays;
+import java.util.Queue;
+
+import org.neo4j.collection.primitive.PrimitiveLongResourceCollections;
+import org.neo4j.collection.primitive.PrimitiveLongResourceIterator;
+import org.neo4j.internal.kernel.api.IndexOrder;
+import org.neo4j.internal.kernel.api.IndexQuery;
+import org.neo4j.internal.kernel.api.IndexQuery.ExactPredicate;
+import org.neo4j.internal.kernel.api.IndexQuery.ExistsPredicate;
+import org.neo4j.internal.kernel.api.IndexQuery.NumberRangePredicate;
 import org.neo4j.kernel.api.exceptions.index.IndexNotApplicableKernelException;
-import org.neo4j.kernel.api.schema.IndexQuery;
-import org.neo4j.kernel.api.schema.IndexQuery.ExactPredicate;
-import org.neo4j.kernel.api.schema.IndexQuery.ExistsPredicate;
-import org.neo4j.kernel.api.schema.IndexQuery.NumberRangePredicate;
+import org.neo4j.kernel.api.schema.index.IndexDescriptor;
 import org.neo4j.kernel.impl.index.schema.fusion.FusionSchemaIndexProvider.Selector;
+import org.neo4j.storageengine.api.schema.IndexProgressor;
 import org.neo4j.storageengine.api.schema.IndexReader;
 import org.neo4j.storageengine.api.schema.IndexSampler;
 import org.neo4j.values.storable.Value;
+
+import static java.lang.String.format;
 
 class FusionIndexReader implements IndexReader
 {
     private final IndexReader nativeReader;
     private final IndexReader luceneReader;
     private final Selector selector;
+    private final IndexDescriptor descriptor;
 
-    FusionIndexReader( IndexReader nativeReader, IndexReader luceneReader, Selector selector )
+    FusionIndexReader( IndexReader nativeReader, IndexReader luceneReader, Selector selector,
+            IndexDescriptor descriptor )
     {
         this.nativeReader = nativeReader;
         this.luceneReader = luceneReader;
         this.selector = selector;
+        this.descriptor = descriptor;
     }
 
     @Override
@@ -70,7 +82,7 @@ class FusionIndexReader implements IndexReader
     }
 
     @Override
-    public PrimitiveLongIterator query( IndexQuery... predicates ) throws IndexNotApplicableKernelException
+    public PrimitiveLongResourceIterator query( IndexQuery... predicates ) throws IndexNotApplicableKernelException
     {
         if ( predicates.length > 1 )
         {
@@ -91,12 +103,55 @@ class FusionIndexReader implements IndexReader
         // todo: There will be no ordering of the node ids here. Is this a problem?
         if ( predicates[0] instanceof ExistsPredicate )
         {
-            PrimitiveLongIterator nativeResult = nativeReader.query( predicates[0] );
-            PrimitiveLongIterator luceneResult = luceneReader.query( predicates[0] );
-            return PrimitiveLongCollections.concat( nativeResult, luceneResult );
+            PrimitiveLongResourceIterator nativeResult = nativeReader.query( predicates[0] );
+            PrimitiveLongResourceIterator luceneResult = luceneReader.query( predicates[0] );
+            return PrimitiveLongResourceCollections.concat( nativeResult, luceneResult );
         }
 
         return luceneReader.query( predicates );
+    }
+
+    @Override
+    public void query( IndexProgressor.NodeValueClient cursor, IndexOrder indexOrder, IndexQuery... predicates )
+            throws IndexNotApplicableKernelException
+    {
+        if ( predicates.length > 1 )
+        {
+            luceneReader.query( cursor, indexOrder, predicates );
+            return;
+        }
+
+        if ( predicates[0] instanceof ExactPredicate )
+        {
+            ExactPredicate exactPredicate = (ExactPredicate) predicates[0];
+            selector.select( nativeReader, luceneReader, exactPredicate.value() ).query( cursor, indexOrder, predicates );
+            return;
+        }
+
+        if ( predicates[0] instanceof NumberRangePredicate )
+        {
+            nativeReader.query( cursor, indexOrder, predicates[0] );
+            return;
+        }
+
+        // todo: There will be no ordering of the node ids here. Is this a problem?
+        if ( predicates[0] instanceof ExistsPredicate )
+        {
+            if ( indexOrder != IndexOrder.NONE )
+            {
+                throw new UnsupportedOperationException(
+                        format( "Tried to query index with unsupported order %s. Supported orders for query %s are %s.",
+                                indexOrder, Arrays.toString( predicates ), IndexOrder.NONE ) );
+            }
+            BridgingIndexProgressor multiProgressor = new BridgingIndexProgressor( cursor,
+                    descriptor.schema().getPropertyIds() );
+            cursor.initialize( descriptor, multiProgressor, predicates );
+            nativeReader.query( multiProgressor, indexOrder, predicates[0] );
+            luceneReader.query( multiProgressor, indexOrder, predicates[0] );
+            return;
+        }
+
+        luceneReader.query( cursor, indexOrder, predicates );
     }
 
     @Override
@@ -115,10 +170,76 @@ class FusionIndexReader implements IndexReader
                     nativeReader.hasFullNumberPrecision( predicates ),
                     luceneReader.hasFullNumberPrecision( predicates ), value );
         }
-        if ( predicates[0] instanceof NumberRangePredicate )
+        return predicates[0] instanceof NumberRangePredicate && nativeReader.hasFullNumberPrecision( predicates );
+    }
+
+    /**
+     * Combine multiple progressor to act like one single logical progressor seen from clients perspective.
+     */
+    private class BridgingIndexProgressor implements IndexProgressor.NodeValueClient, IndexProgressor
+    {
+        private final NodeValueClient client;
+        private final int[] keys;
+        private final Queue<IndexProgressor> progressors;
+        private IndexProgressor current;
+
+        BridgingIndexProgressor( NodeValueClient client, int[] keys )
         {
-            return nativeReader.hasFullNumberPrecision( predicates );
+            this.client = client;
+            this.keys = keys;
+            progressors = new ArrayDeque<>();
         }
-        return false;
+
+        @Override
+        public boolean next()
+        {
+            if ( current == null )
+            {
+                current = progressors.poll();
+            }
+            while ( current != null )
+            {
+                if ( current.next() )
+                {
+                    return true;
+                }
+                else
+                {
+                    current.close();
+                    current = progressors.poll();
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public void close()
+        {
+            progressors.forEach( IndexProgressor::close );
+        }
+
+        @Override
+        public void initialize( IndexDescriptor descriptor, IndexProgressor progressor, IndexQuery[] queries )
+        {
+            assertKeysAlign( descriptor.schema().getPropertyIds() );
+            progressors.add( progressor );
+        }
+
+        private void assertKeysAlign( int[] keys )
+        {
+            for ( int i = 0; i < this.keys.length; i++ )
+            {
+                if ( this.keys[i] != keys[i] )
+                {
+                    throw new UnsupportedOperationException( "Can not chain multiple progressors with different key set." );
+                }
+            }
+        }
+
+        @Override
+        public boolean acceptNode( long reference, Value[] values )
+        {
+            return client.acceptNode( reference, values );
+        }
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -29,9 +29,9 @@ import org.neo4j.collection.primitive.Primitive;
 import org.neo4j.collection.primitive.PrimitiveIntCollections;
 import org.neo4j.collection.primitive.PrimitiveIntSet;
 import org.neo4j.cursor.Cursor;
+import org.neo4j.internal.kernel.api.schema.LabelSchemaDescriptor;
 import org.neo4j.kernel.api.exceptions.EntityNotFoundException;
 import org.neo4j.kernel.api.properties.PropertyKeyValue;
-import org.neo4j.kernel.api.schema.LabelSchemaDescriptor;
 import org.neo4j.kernel.api.schema.index.IndexDescriptor;
 import org.neo4j.kernel.api.schema.index.IndexDescriptorFactory;
 import org.neo4j.kernel.api.txstate.TransactionState;
@@ -52,8 +52,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.neo4j.helpers.collection.Iterators.filter;
-import static org.neo4j.kernel.api.schema.SchemaDescriptorPredicates.hasLabel;
-import static org.neo4j.kernel.api.schema.SchemaDescriptorPredicates.hasProperty;
+import static org.neo4j.internal.kernel.api.schema.SchemaDescriptorPredicates.hasLabel;
+import static org.neo4j.internal.kernel.api.schema.SchemaDescriptorPredicates.hasProperty;
 import static org.neo4j.kernel.impl.api.state.IndexTxStateUpdater.LabelChangeType.ADDED_LABEL;
 import static org.neo4j.kernel.impl.api.state.IndexTxStateUpdater.LabelChangeType.REMOVED_LABEL;
 
@@ -91,10 +91,18 @@ public class IndexTxStateUpdaterTest
         StoreReadLayer storeReadLayer = mock( StoreReadLayer.class );
         when( storeReadLayer.indexesGetAll() ).thenAnswer( x -> indexes.iterator() );
         when( storeReadLayer.indexesGetForLabel(anyInt() ) )
-                .thenAnswer( x -> filter( hasLabel( x.getArgument( 0 ) ), indexes.iterator() ) );
+                .thenAnswer( x ->
+                {
+                    Integer argument = x.getArgument( 0 );
+                    return filter( hasLabel( argument ), indexes.iterator() );
+                } );
 
         when( storeReadLayer.indexesGetRelatedToProperty( anyInt() ) )
-                .thenAnswer( x -> filter( hasProperty( x.getArgument( 0 ) ), indexes.iterator() ) );
+                .thenAnswer( x ->
+                {
+                    Integer argument = x.getArgument( 0 );
+                    return filter( hasProperty( argument ), indexes.iterator() );
+                } );
 
         PrimitiveIntSet labels = Primitive.intSet();
         labels.add( labelId1 );

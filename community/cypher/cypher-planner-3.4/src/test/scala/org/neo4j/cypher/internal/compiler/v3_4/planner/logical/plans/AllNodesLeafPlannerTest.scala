@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -36,12 +36,12 @@ class AllNodesLeafPlannerTest extends CypherFunSuite with LogicalPlanningTestSup
     val queryGraph = QueryGraph(patternNodes = Set(IdName("n")))
 
     implicit val planContext = newMockedPlanContext
-    implicit val context = newMockedLogicalPlanningContext(
+    val context = newMockedLogicalPlanningContext(
       planContext = planContext,
       metrics = newMockedMetricsFactory.newMetrics(hardcodedStatistics, mock[ExpressionEvaluator]))
 
     // when
-    val resultPlans = allNodesLeafPlanner(queryGraph)
+    val resultPlans = allNodesLeafPlanner(queryGraph, context)
 
     // then
     resultPlans should equal(Seq(AllNodesScan(IdName("n"), Set.empty)(solved)))

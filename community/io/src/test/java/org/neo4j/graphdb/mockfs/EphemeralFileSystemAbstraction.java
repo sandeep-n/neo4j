@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -541,6 +541,13 @@ public class EphemeralFileSystemAbstraction implements FileSystemAbstraction
     }
 
     @Override
+    public void copyToDirectory( File file, File toDirectory ) throws IOException
+    {
+        File targetFile = new File( toDirectory, file.getName() );
+        copyFile( file, targetFile );
+    }
+
+    @Override
     public void copyFile( File from, File to ) throws IOException
     {
         EphemeralFileData data = files.get( canonicalFile( from ) );
@@ -626,6 +633,7 @@ public class EphemeralFileSystemAbstraction implements FileSystemAbstraction
         try ( StoreChannel source = fromFs.open( from, OpenMode.READ );
               StoreChannel sink = this.open( to, OpenMode.READ_WRITE ) )
         {
+            sink.truncate( 0 );
             for ( int available; (available = (int) (source.size() - source.position())) > 0; )
             {
                 buffer.clear();

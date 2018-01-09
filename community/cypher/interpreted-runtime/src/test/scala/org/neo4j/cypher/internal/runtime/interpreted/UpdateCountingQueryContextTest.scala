@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -28,6 +28,7 @@ import org.neo4j.cypher.internal.runtime.{Operations, QueryContext, QueryStatist
 import org.neo4j.cypher.internal.util.v3_4.test_helpers.CypherFunSuite
 import org.neo4j.graphdb.{Node, Relationship}
 import org.neo4j.values.storable.Values
+import org.neo4j.values.virtual.{EdgeValue, NodeValue}
 
 class UpdateCountingQueryContextTest extends CypherFunSuite {
 
@@ -38,8 +39,8 @@ class UpdateCountingQueryContextTest extends CypherFunSuite {
   val rel = mock[Relationship]
   val relId = 42
 
-  val nodeOps = mock[Operations[Node]]
-  val relOps = mock[Operations[Relationship]]
+  val nodeOps = mock[Operations[NodeValue]]
+  val relOps = mock[Operations[EdgeValue]]
 
   when(inner.nodeOps).thenReturn(nodeOps)
   when(inner.relationshipOps).thenReturn(relOps)
@@ -58,6 +59,8 @@ class UpdateCountingQueryContextTest extends CypherFunSuite {
   } )
 
   when(inner.createUniqueConstraint(any())).thenReturn(true)
+
+  when(inner.createNodeKeyConstraint(any())).thenReturn(true)
 
   when( inner.createNodePropertyExistenceConstraint(anyInt(), anyInt()) ).thenReturn(true)
 
@@ -86,7 +89,7 @@ class UpdateCountingQueryContextTest extends CypherFunSuite {
   }
 
   test("create_relationship") {
-    context.createRelationship(nodeA, nodeB, "FOO")
+    context.createRelationship(nodeA.getId, nodeB.getId, 13)
 
     context.getStatistics should equal(QueryStatistics(relationshipsCreated = 1))
   }
@@ -179,5 +182,17 @@ class UpdateCountingQueryContextTest extends CypherFunSuite {
     context.dropRelationshipPropertyExistenceConstraint(0, 1)
 
     context.getStatistics should equal(QueryStatistics(existenceConstraintsRemoved = 1))
+  }
+
+  test("create node key constraint") {
+    context.createNodeKeyConstraint(IndexDescriptor(0, 1))
+
+    context.getStatistics should equal(QueryStatistics(nodekeyConstraintsAdded = 1))
+  }
+
+  test("drop node key constraint") {
+    context.dropNodeKeyConstraint(IndexDescriptor(0, 42))
+
+    context.getStatistics should equal(QueryStatistics(nodekeyConstraintsRemoved = 1))
   }
 }

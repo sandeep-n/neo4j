@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -41,6 +41,7 @@ import org.neo4j.kernel.impl.store.RecordCursors;
 import org.neo4j.kernel.impl.store.RecordStore;
 import org.neo4j.kernel.impl.store.RelationshipStore;
 import org.neo4j.kernel.impl.store.StoreFactory;
+import org.neo4j.kernel.impl.store.id.DefaultIdGeneratorFactory;
 import org.neo4j.kernel.impl.store.record.Record;
 import org.neo4j.kernel.impl.store.record.RecordLoad;
 import org.neo4j.kernel.impl.store.record.RelationshipGroupRecord;
@@ -100,11 +101,14 @@ public class StoreNodeRelationshipCursorTest
     {
         File storeDir = directory.absolutePath();
         fs = new DefaultFileSystemAbstraction();
+        Config config = Config.defaults( pagecache_memory, "8m" );
         pageCache = new ConfiguringPageCacheFactory( fs,
-                Config.defaults( pagecache_memory, "8m" ), NULL,
-                PageCursorTracerSupplier.NULL, NullLog.getInstance() )
+                config, NULL, PageCursorTracerSupplier.NULL, NullLog.getInstance() )
                 .getOrCreatePageCache();
-        StoreFactory storeFactory = new StoreFactory( storeDir, pageCache, fs, NullLogProvider.getInstance() );
+        DefaultIdGeneratorFactory idGeneratorFactory = new DefaultIdGeneratorFactory( fs );
+        NullLogProvider logProvider = NullLogProvider.getInstance();
+        StoreFactory storeFactory =
+                new StoreFactory( storeDir, config, idGeneratorFactory, pageCache, fs, logProvider );
         neoStores = storeFactory.openAllNeoStores( true );
     }
 

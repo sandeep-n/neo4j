@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -38,12 +38,6 @@ public class DelegatingStoreChannel implements StoreChannel
     public FileLock tryLock() throws IOException
     {
         return delegate.tryLock();
-    }
-
-    @Override
-    public int write( ByteBuffer src, long position ) throws IOException
-    {
-        return delegate.write( src, position );
     }
 
     @Override
@@ -123,6 +117,12 @@ public class DelegatingStoreChannel implements StoreChannel
     public int read( ByteBuffer dst, long position ) throws IOException
     {
         return delegate.read( dst, position );
+    }
+
+    @Override
+    public void readAll( ByteBuffer dst ) throws IOException
+    {
+        delegate.readAll( dst );
     }
 
     @Override

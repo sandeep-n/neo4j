@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,26 +21,26 @@ package org.neo4j.cypher.internal.compatibility.v3_4.runtime.profiler
 
 import org.neo4j.collection.primitive.PrimitiveLongIterator
 import org.neo4j.cypher.internal.compatibility.v3_4.runtime.helpers.PrimitiveLongHelper
-import org.neo4j.cypher.internal.runtime.{Operations, QueryContext}
-import org.neo4j.cypher.internal.runtime.interpreted.{DelegatingOperations, DelegatingQueryContext, ExecutionContext}
 import org.neo4j.cypher.internal.runtime.interpreted.pipes.{Pipe, PipeDecorator, QueryState}
+import org.neo4j.cypher.internal.runtime.interpreted.{DelegatingOperations, DelegatingQueryContext, ExecutionContext}
 import org.neo4j.cypher.internal.runtime.planDescription.InternalPlanDescription
 import org.neo4j.cypher.internal.runtime.planDescription.InternalPlanDescription.Arguments
-import org.neo4j.cypher.internal.v3_4.logical.plans.LogicalPlanId
-import org.neo4j.graphdb.{Node, PropertyContainer, Relationship}
+import org.neo4j.cypher.internal.runtime.{Operations, QueryContext}
+import org.neo4j.cypher.internal.util.v3_4.attribution.Id
 import org.neo4j.helpers.MathUtil
 import org.neo4j.kernel.impl.api.RelationshipVisitor
 import org.neo4j.kernel.impl.api.store.RelationshipIterator
 import org.neo4j.kernel.impl.factory.{DatabaseInfo, Edition}
+import org.neo4j.values.virtual.{EdgeValue, NodeValue}
 
 import scala.collection.mutable
 
 class Profiler(databaseInfo: DatabaseInfo = DatabaseInfo.COMMUNITY) extends PipeDecorator {
   outerProfiler =>
 
-  val pageCacheStats: mutable.Map[LogicalPlanId, (Long, Long)] = mutable.Map.empty
-  val dbHitsStats: mutable.Map[LogicalPlanId, ProfilingPipeQueryContext] = mutable.Map.empty
-  val rowStats: mutable.Map[LogicalPlanId, ProfilingIterator] = mutable.Map.empty
+  val pageCacheStats: mutable.Map[Id, (Long, Long)] = mutable.Map.empty
+  val dbHitsStats: mutable.Map[Id, ProfilingPipeQueryContext] = mutable.Map.empty
+  val rowStats: mutable.Map[Id, ProfilingIterator] = mutable.Map.empty
   private var parentPipe: Option[Pipe] = None
 
 
@@ -67,7 +67,7 @@ class Profiler(databaseInfo: DatabaseInfo = DatabaseInfo.COMMUNITY) extends Pipe
     state.withQueryContext(decoratedContext)
   }
 
-  private def updatePageCacheStatistics(pipeId: LogicalPlanId) = {
+  private def updatePageCacheStatistics(pipeId: Id) = {
     val context = dbHitsStats(pipeId)
     val statisticProvider = context.transactionalContext.kernelStatisticProvider
     val currentStat = pageCacheStats(pipeId)
@@ -129,6 +129,8 @@ final class ProfilingPipeQueryContext(inner: QueryContext, val p: Pipe)
   extends DelegatingQueryContext(inner) with Counter {
   self =>
 
+  override def createNewQueryContext() = new ProfilingPipeQueryContext(inner.createNewQueryContext(), p)
+
   override protected def singleDbHit[A](value: A): A = {
     increment()
     value
@@ -164,19 +166,19 @@ final class ProfilingPipeQueryContext(inner: QueryContext, val p: Pipe)
     override def hasNext: Boolean = inner.hasNext
   }
 
-  class ProfilerOperations[T <: PropertyContainer](inner: Operations[T]) extends DelegatingOperations[T](inner) {
+  class ProfilerOperations[T](inner: Operations[T]) extends DelegatingOperations[T](inner) {
     override protected def singleDbHit[A](value: A): A = self.singleDbHit(value)
     override protected def manyDbHits[A](value: Iterator[A]): Iterator[A] = self.manyDbHits(value)
 
     override protected def manyDbHits[A](value: PrimitiveLongIterator): PrimitiveLongIterator = self.manyDbHits(value)
   }
 
-  override def nodeOps: Operations[Node] = new ProfilerOperations(inner.nodeOps)
-  override def relationshipOps: Operations[Relationship] = new ProfilerOperations(inner.relationshipOps)
+  override def nodeOps: Operations[NodeValue] = new ProfilerOperations(inner.nodeOps)
+  override def relationshipOps: Operations[EdgeValue] = new ProfilerOperations(inner.relationshipOps)
 }
 
-class ProfilingIterator(inner: Iterator[ExecutionContext], startValue: Long, pipeId: LogicalPlanId,
-                        updatePageCacheStatistics: LogicalPlanId => Unit) extends Iterator[ExecutionContext]
+class ProfilingIterator(inner: Iterator[ExecutionContext], startValue: Long, pipeId: Id,
+                        updatePageCacheStatistics: Id => Unit) extends Iterator[ExecutionContext]
   with Counter {
 
   _count = startValue

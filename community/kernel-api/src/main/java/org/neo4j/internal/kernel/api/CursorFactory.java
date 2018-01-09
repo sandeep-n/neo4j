@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,6 +19,10 @@
  */
 package org.neo4j.internal.kernel.api;
 
+/**
+ * Allocates Cursors. To read data from the Kernel, Cursors are needed. A Cursor factory let's the Kernel consumer
+ * allocate all types of cursors, which can then be reused for multiple read operations.
+ */
 public interface CursorFactory
 {
     // entities
@@ -43,9 +47,9 @@ public interface CursorFactory
 
     NodeLabelIndexCursor allocateNodeLabelIndexCursor();
 
-    // manual indexes
+    // explicit indexes
 
-    NodeManualIndexCursor allocateNodeManualIndexCursor();
+    NodeExplicitIndexCursor allocateNodeExplicitIndexCursor();
 
-    RelationshipManualIndexCursor allocateRelationshipManualIndexCursor();
+    RelationshipExplicitIndexCursor allocateRelationshipExplicitIndexCursor();
 }

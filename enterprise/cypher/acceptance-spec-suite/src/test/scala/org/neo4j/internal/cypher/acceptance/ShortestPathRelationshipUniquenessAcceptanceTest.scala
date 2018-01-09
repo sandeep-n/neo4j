@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -78,7 +78,6 @@ class ShortestPathRelationshipUniquenessAcceptanceTest extends ExecutionEngineFu
       """MATCH p=shortestpath((a:Model)-[r*]-(b:Model))
     WHERE a.id="2228" AND b.id="2638" AND ANY ( n IN nodes(p)[1..-1] WHERE (n.id = "32") )
     RETURN nodes(p) as nodes"""
-
     val result = executeUsingCostPlannerOnly(query).columnAs("nodes").toList
     result should be(List(List(p0, pLongPath0, pLongPath1, pLongPath2, pLongPath3, pLongPath4, pLongPath5, p3, p2, p4, p5)))
   }

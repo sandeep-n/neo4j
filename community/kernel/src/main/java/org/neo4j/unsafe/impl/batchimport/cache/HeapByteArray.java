@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -52,12 +52,15 @@ public class HeapByteArray extends HeapNumberArray<ByteArray> implements ByteArr
     @Override
     public void swap( long fromIndex, long toIndex )
     {
-        byte[] a = defaultValue.clone();
-        byte[] b = defaultValue.clone();
-        get( fromIndex, a );
-        get( toIndex, b );
-        set( fromIndex, b );
-        set( toIndex, a );
+        // Byte-wise swap
+        for ( int i = 0; i < itemSize; i++ )
+        {
+            int fromOffset = index( fromIndex, i );
+            int toOffset = index( toIndex, i );
+            byte intermediary = array[fromOffset];
+            array[fromOffset] = array[toOffset];
+            array[toOffset] = intermediary;
+        }
     }
 
     @Override

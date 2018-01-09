@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -189,8 +189,11 @@ public enum NotificationCode
     START_DEPRECATED(
             SeverityLevel.WARNING,
             Status.Statement.FeatureDeprecationWarning,
-            "START has been deprecated and will be removed in a future version."
-    );
+            "START has been deprecated and will be removed in a future version." ),
+    EXPERIMENTAL_FEATURE(
+            SeverityLevel.WARNING,
+            Status.Statement.ExperimentalFeature,
+            "You are using an experimental feature" );
 
     private final Status status;
     private final String description;

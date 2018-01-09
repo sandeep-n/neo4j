@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -75,7 +75,7 @@ case class AssumeIndependenceQueryGraphCardinalityModel(stats: GraphStatistics, 
                                       (implicit semanticTable: SemanticTable): Cardinality = {
     val (selectivity, numberOfZeroZeroRels) = calculateSelectivity(qg, input.labelInfo)
     val numberOfPatternNodes = calculateNumberOfPatternNodes(qg) - numberOfZeroZeroRels
-    val numberOfGraphNodes = stats.nodesWithLabelCardinality(None)
+    val numberOfGraphNodes = stats.nodesAllCardinality()
 
     val c = if (qg.argumentIds.nonEmpty) {
       if ((qg.argumentIds intersect qg.patternNodes).isEmpty) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,12 +19,10 @@
  */
 package org.neo4j.cypher.internal.compatibility.v3_4.runtime
 
-import org.neo4j.cypher.internal.util.v3_4.{Eagerly, InternalException}
 import org.neo4j.cypher.internal.compatibility.v3_4.runtime.executionplan.builders.prepare.KeyTokenResolver
 import org.neo4j.cypher.internal.compatibility.v3_4.runtime.pipes.DropResultPipe
 import org.neo4j.cypher.internal.frontend.v3_4.phases.Monitors
 import org.neo4j.cypher.internal.frontend.v3_4.semantics.SemanticTable
-import org.neo4j.cypher.internal.v3_4.expressions.{Equals => ASTEquals, Expression => ASTExpression, _}
 import org.neo4j.cypher.internal.ir.v3_4.{IdName, VarPatternLength}
 import org.neo4j.cypher.internal.planner.v3_4.spi.PlanContext
 import org.neo4j.cypher.internal.runtime.ProcedureCallMode
@@ -34,6 +32,8 @@ import org.neo4j.cypher.internal.runtime.interpreted.commands.convert.PatternCon
 import org.neo4j.cypher.internal.runtime.interpreted.commands.expressions.{AggregationExpression, Literal}
 import org.neo4j.cypher.internal.runtime.interpreted.commands.predicates.{Predicate, True}
 import org.neo4j.cypher.internal.runtime.interpreted.pipes._
+import org.neo4j.cypher.internal.util.v3_4.{Eagerly, InternalException}
+import org.neo4j.cypher.internal.v3_4.expressions.{Equals => ASTEquals, Expression => ASTExpression, _}
 import org.neo4j.cypher.internal.v3_4.logical.plans
 import org.neo4j.cypher.internal.v3_4.logical.plans.{ColumnOrder, Limit => LimitPlan, LoadCSV => LoadCSVPlan, Skip => SkipPlan, _}
 import org.neo4j.values.AnyValue
@@ -56,10 +56,10 @@ case class CommunityPipeBuilder(monitors: Monitors, recurse: LogicalPlan => Pipe
 
 
   def build(plan: LogicalPlan): Pipe = {
-    val id = plan.assignedId
+    val id = plan.id
     plan match {
-      case SingleRow(_) =>
-        SingleRowPipe()(id)
+      case Argument(_) =>
+        ArgumentPipe()(id)
 
       case AllNodesScan(IdName(ident), _) =>
         AllNodesScanPipe(ident)(id = id)
@@ -103,7 +103,7 @@ case class CommunityPipeBuilder(monitors: Monitors, recurse: LogicalPlan => Pipe
   }
 
   def build(plan: LogicalPlan, source: Pipe): Pipe = {
-    val id = plan.assignedId
+    val id = plan.id
     plan match {
       case Projection(_, expressions) =>
         ProjectionPipe(source, Eagerly.immutableMapValues(expressions, buildExpression))(id = id)
@@ -256,20 +256,24 @@ case class CommunityPipeBuilder(monitors: Monitors, recurse: LogicalPlan => Pipe
         SetPipe(source, SetLabelsOperation(name, labels.map(LazyLabel.apply)))(id = id)
 
       case SetNodeProperty(_, IdName(name), propertyKey, expression) =>
+        val needsExclusiveLock = ASTExpression.hasPropertyReadDependency(name, expression, propertyKey)
         SetPipe(source, SetNodePropertyOperation(name, LazyPropertyKey(propertyKey),
-          buildExpression(expression)))(id = id)
+          buildExpression(expression), needsExclusiveLock))(id = id)
 
       case SetNodePropertiesFromMap(_, IdName(name), expression, removeOtherProps) =>
+        val needsExclusiveLock = ASTExpression.mapExpressionHasPropertyReadDependency(name, expression)
         SetPipe(source,
-          SetNodePropertyFromMapOperation(name, buildExpression(expression), removeOtherProps))(id = id)
+          SetNodePropertyFromMapOperation(name, buildExpression(expression), removeOtherProps, needsExclusiveLock))(id = id)
 
       case SetRelationshipPropery(_, IdName(name), propertyKey, expression) =>
+        val needsExclusiveLock = ASTExpression.hasPropertyReadDependency(name, expression, propertyKey)
         SetPipe(source,
-          SetRelationshipPropertyOperation(name, LazyPropertyKey(propertyKey), buildExpression(expression)))(id = id)
+          SetRelationshipPropertyOperation(name, LazyPropertyKey(propertyKey), buildExpression(expression), needsExclusiveLock))(id = id)
 
       case SetRelationshipPropertiesFromMap(_, IdName(name), expression, removeOtherProps) =>
+        val needsExclusiveLock = ASTExpression.mapExpressionHasPropertyReadDependency(name, expression)
         SetPipe(source,
-          SetRelationshipPropertyFromMapOperation(name, buildExpression(expression), removeOtherProps))(id = id)
+          SetRelationshipPropertyFromMapOperation(name, buildExpression(expression), removeOtherProps, needsExclusiveLock))(id = id)
 
       case SetProperty(_, entityExpr, propertyKey, expression) =>
         SetPipe(source, SetPropertyOperation(
@@ -310,14 +314,14 @@ case class CommunityPipeBuilder(monitors: Monitors, recurse: LogicalPlan => Pipe
     }
   }
 
-  private def varLengthPredicate(predicates: Seq[(Variable, ASTExpression)]): VarLengthPredicate  = {
+  private def varLengthPredicate(predicates: Seq[(LogicalVariable, ASTExpression)]): VarLengthPredicate  = {
     //Creates commands out of the predicates
-    def asCommand(predicates: Seq[(Variable, ASTExpression)]) = {
-      val (keys: Seq[Variable], exprs) = predicates.unzip
+    def asCommand(predicates: Seq[(LogicalVariable, ASTExpression)]) = {
+      val (keys: Seq[LogicalVariable], exprs) = predicates.unzip
 
       val commands = exprs.map(buildPredicate)
       (context: ExecutionContext, state: QueryState, entity: AnyValue) => {
-        keys.zip(commands).forall { case (variable: Variable, expr: Predicate) =>
+        keys.zip(commands).forall { case (variable: LogicalVariable, expr: Predicate) =>
           context(variable.name) = entity
           val result = expr.isTrue(context, state)
           context.remove(variable.name)
@@ -339,7 +343,7 @@ case class CommunityPipeBuilder(monitors: Monitors, recurse: LogicalPlan => Pipe
   }
 
   def build(plan: LogicalPlan, lhs: Pipe, rhs: Pipe): Pipe = {
-    val id = plan.assignedId
+    val id = plan.id
     plan match {
       case CartesianProduct(_, _) =>
         CartesianProductPipe(lhs, rhs)(id = id)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -39,12 +39,16 @@ public class DynamicByteArray extends DynamicNumberArray<ByteArray> implements B
     @Override
     public void swap( long fromIndex, long toIndex )
     {
-        byte[] a = defaultValue.clone();
-        byte[] b = defaultValue.clone();
-        get( fromIndex, a );
-        get( toIndex, b );
-        set( fromIndex, b );
-        set( toIndex, a );
+        ByteArray fromArray = at( fromIndex );
+        ByteArray toArray = at( toIndex );
+
+        // Byte-wise swap
+        for ( int i = 0; i < defaultValue.length; i++ )
+        {
+            byte intermediary = fromArray.getByte( fromIndex, i );
+            fromArray.setByte( fromIndex, i, toArray.getByte( toIndex, i ) );
+            toArray.setByte( toIndex, i, intermediary );
+        }
     }
 
     @Override

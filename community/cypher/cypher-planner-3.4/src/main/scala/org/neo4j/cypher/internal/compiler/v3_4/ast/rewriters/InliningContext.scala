@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,14 +24,14 @@ import org.neo4j.cypher.internal.compiler.v3_4.ast.rewriters.InliningContext._
 import org.neo4j.cypher.internal.frontend.v3_4.ast.rewriters.copyVariables
 import org.neo4j.cypher.internal.v3_4.expressions._
 
-case class InliningContext(projections: Map[Variable, Expression] = Map.empty,
-                           seenVariables: Set[Variable] = Set.empty,
-                           usageCount: Map[Variable, Int] = Map.empty) {
+case class InliningContext(projections: Map[LogicalVariable, Expression] = Map.empty,
+                           seenVariables: Set[LogicalVariable] = Set.empty,
+                           usageCount: Map[LogicalVariable, Int] = Map.empty) {
 
   def trackUsageOfVariable(id: Variable) =
     copy(usageCount = usageCount + (id -> (usageCount.withDefaultValue(0)(id) + 1)))
 
-  def enterQueryPart(newProjections: Map[Variable, Expression]): InliningContext = {
+  def enterQueryPart(newProjections: Map[LogicalVariable, Expression]): InliningContext = {
     val inlineExpressions = TypedRewriter[Expression](variableRewriter)
     val containsAggregation = newProjections.values.exists(containsAggregate)
     val shadowing = newProjections.filterKeys(seenVariables.contains).filter {
@@ -49,7 +49,7 @@ case class InliningContext(projections: Map[Variable, Expression] = Map.empty,
     copy(projections = resultProjections, seenVariables = seenVariables ++ newProjections.keys)
   }
 
-  def spoilVariable(variable: Variable): InliningContext =
+  def spoilVariable(variable: LogicalVariable): InliningContext =
     copy(projections = projections - variable)
 
   def variableRewriter: Rewriter = bottomUp(Rewriter.lift {
@@ -57,7 +57,7 @@ case class InliningContext(projections: Map[Variable, Expression] = Map.empty,
       projections.get(variable).map(_.endoRewrite(copyVariables)).getOrElse(variable.copyId)
   })
 
-  def okToRewrite(i: Variable) =
+  def okToRewrite(i: LogicalVariable) =
     projections.contains(i) &&
     usageCount.withDefaultValue(0)(i) < INLINING_THRESHOLD
 
@@ -74,9 +74,9 @@ case class InliningContext(projections: Map[Variable, Expression] = Map.empty,
       }
   })
 
-  def isAliasedVarible(variable: Variable) = alias(variable).nonEmpty
+  def isAliasedVarible(variable: LogicalVariable) = alias(variable).nonEmpty
 
-  def alias(variable: Variable): Option[Variable] = projections.get(variable) match {
+  def alias(variable: LogicalVariable): Option[LogicalVariable] = projections.get(variable) match {
     case Some(other: Variable) => Some(other.copyId)
     case _                       => None
   }

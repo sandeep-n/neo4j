@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,11 +22,8 @@ package org.neo4j.cypher.internal.compatibility.v3_4.runtime.executionplan.procs
 import org.neo4j.cypher.CypherVersion
 import org.neo4j.cypher.internal.compatibility.v3_4.runtime._
 import org.neo4j.cypher.internal.compatibility.v3_4.runtime.executionplan.ExecutionPlan
-import org.neo4j.cypher.internal.v3_4.logical.plans.LogicalPlanId
-import org.neo4j.cypher.internal.v3_4.expressions.Expression
-import org.neo4j.cypher.internal.frontend.v3_4.notification.InternalNotification
-import org.neo4j.cypher.internal.planner.v3_4.spi.{GraphStatistics, PlanContext, ProcedurePlannerName}
-import org.neo4j.cypher.internal.util.v3_4.symbols.CypherType
+import org.neo4j.cypher.internal.compiler.v3_4.FineToReuse
+import org.neo4j.cypher.internal.planner.v3_4.spi.{GraphStatistics, ProcedurePlannerName}
 import org.neo4j.cypher.internal.runtime._
 import org.neo4j.cypher.internal.runtime.interpreted.ExecutionContext
 import org.neo4j.cypher.internal.runtime.interpreted.commands.convert.ExpressionConverters
@@ -35,6 +32,9 @@ import org.neo4j.cypher.internal.runtime.interpreted.pipes.{ExternalCSVResource,
 import org.neo4j.cypher.internal.runtime.planDescription.InternalPlanDescription.Arguments._
 import org.neo4j.cypher.internal.runtime.planDescription.{Argument, NoChildren, PlanDescriptionImpl}
 import org.neo4j.cypher.internal.util.v3_4.TaskCloser
+import org.neo4j.cypher.internal.util.v3_4.attribution.Id
+import org.neo4j.cypher.internal.util.v3_4.symbols.CypherType
+import org.neo4j.cypher.internal.v3_4.expressions.Expression
 import org.neo4j.cypher.internal.v3_4.logical.plans.ProcedureSignature
 import org.neo4j.graphdb.Notification
 import org.neo4j.values.virtual.MapValue
@@ -71,6 +71,7 @@ case class ProcedureCallExecutionPlan(signature: ProcedureSignature,
     val input = evaluateArguments(ctx, params)
 
     val taskCloser = new TaskCloser
+    taskCloser.addTask(ctx.resources.close)
     taskCloser.addTask(ctx.transactionalContext.close)
 
     planType match {
@@ -114,13 +115,13 @@ case class ProcedureCallExecutionPlan(signature: ProcedureSignature,
   }
 
   private def createNormalPlan =
-    PlanDescriptionImpl(LogicalPlanId.DEFAULT, "ProcedureCall", NoChildren,
+    PlanDescriptionImpl(Id.INVALID_ID, "ProcedureCall", NoChildren,
                         arguments,
                         resultSymbols.map(_._1).toSet
     )
 
   private def createProfilePlanGenerator(rowCounter: Counter) = () =>
-    PlanDescriptionImpl(LogicalPlanId.DEFAULT, "ProcedureCall", NoChildren,
+    PlanDescriptionImpl(Id.INVALID_ID, "ProcedureCall", NoChildren,
                         Seq(createSignatureArgument, DbHits(1), Rows(rowCounter.counted)) ++ arguments,
                         resultSymbols.map(_._1).toSet
     )
@@ -130,19 +131,19 @@ case class ProcedureCallExecutionPlan(signature: ProcedureSignature,
                                                                RuntimeImpl(runtimeUsed.name),
                                                                Planner(plannerUsed.toTextOutput),
                                                                PlannerImpl(plannerUsed.name),
-                                                               Version(s"CYPHER ${CypherVersion.default.name}"))
+                                                               PlannerVersion(plannerUsed.version),
+                                                               Version(s"CYPHER ${CypherVersion.default.name}"),
+                                                               RuntimeVersion(CypherVersion.default.name))
 
 
   private def createSignatureArgument: Argument =
     Signature(signature.name, Seq.empty, resultSymbols)
 
-  override def notifications(planContext: PlanContext): Seq[InternalNotification] = Seq.empty
-
   override def isPeriodicCommit: Boolean = false
 
   override def runtimeUsed = ProcedureRuntimeName
 
-  override def isStale(lastTxId: () => Long, statistics: GraphStatistics) = false
+  override def checkPlanResusability(lastTxId: () => Long, statistics: GraphStatistics) = FineToReuse
 
   override def plannerUsed = ProcedurePlannerName
 }

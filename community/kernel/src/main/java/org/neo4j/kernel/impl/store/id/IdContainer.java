@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -138,12 +138,7 @@ public class IdContainer
     private static long readAndValidate( StoreChannel channel, File fileName ) throws IOException
     {
         ByteBuffer buffer = ByteBuffer.allocate( HEADER_SIZE );
-        int read = channel.read( buffer );
-        if ( read != HEADER_SIZE )
-        {
-            throw new InvalidIdGeneratorException(
-                    "Unable to read header, bytes read: " + read );
-        }
+        readHeader( channel, buffer );
         buffer.flip();
         byte storageStatus = buffer.get();
         if ( storageStatus != CLEAN_GENERATOR )
@@ -162,12 +157,20 @@ public class IdContainer
         }
     }
 
+    static long readDefragCount( FileSystemAbstraction fileSystem, File file ) throws IOException
+    {
+        try ( StoreChannel channel = fileSystem.open( file, OpenMode.READ ) )
+        {
+            return FreeIdKeeper.countFreeIds( new OffsetChannel( channel, HEADER_SIZE ) );
+        }
+    }
+
     private void markAsSticky() throws IOException
     {
         ByteBuffer buffer = ByteBuffer.allocate( Byte.BYTES );
         buffer.put( STICKY_GENERATOR ).flip();
         fileChannel.position( 0 );
-        fileChannel.write( buffer );
+        fileChannel.writeAll( buffer );
         fileChannel.force( false );
     }
 
@@ -177,7 +180,7 @@ public class IdContainer
         ByteBuffer buffer = ByteBuffer.allocate( Byte.BYTES );
         buffer.put( CLEAN_GENERATOR ).flip();
         fileChannel.position( 0 );
-        fileChannel.write( buffer );
+        fileChannel.writeAll( buffer );
     }
 
     public void close( long highId )
@@ -211,7 +214,7 @@ public class IdContainer
         ByteBuffer buffer = ByteBuffer.allocate( HEADER_SIZE );
         buffer.put( STICKY_GENERATOR ).putLong( highId ).flip();
         fileChannel.position( 0 );
-        fileChannel.write( buffer );
+        fileChannel.writeAll( buffer );
     }
 
     public void delete()
@@ -240,6 +243,11 @@ public class IdContainer
     public long getReusableId()
     {
         return freeIdKeeper.getId();
+    }
+
+    public long[] getReusableIds( int numberOfIds )
+    {
+        return freeIdKeeper.getIds( numberOfIds );
     }
 
     public IdRange getReusableIdBatch( int maxSize )
@@ -298,12 +306,26 @@ public class IdContainer
             channel.truncate( 0 );
             ByteBuffer buffer = ByteBuffer.allocate( HEADER_SIZE );
             buffer.put( CLEAN_GENERATOR ).putLong( highId ).flip();
-            channel.write( buffer );
+            channel.writeAll( buffer );
             channel.force( false );
         }
         catch ( IOException e )
         {
             throw new UnderlyingStorageException( "Unable to create id file " + file, e );
+        }
+    }
+
+    private static void readHeader( StoreChannel channel, ByteBuffer buffer ) throws IOException
+    {
+        try
+        {
+            channel.readAll( buffer );
+        }
+        catch ( IllegalStateException e )
+        {
+            ByteBuffer exceptionBuffer = buffer.duplicate();
+            exceptionBuffer.flip();
+            throw new InvalidIdGeneratorException( "Unable to read header, bytes read: " + Arrays.toString( getBufferBytes( exceptionBuffer ) ) );
         }
     }
 
@@ -313,5 +335,12 @@ public class IdContainer
         return "IdContainer{" + "file=" + file + ", fs=" + fs + ", fileChannel=" + fileChannel + ", defragCount=" +
                 freeIdKeeper.getCount() + ", grabSize=" + grabSize + ", aggressiveReuse=" +
                 aggressiveReuse + ", closed=" + closed + '}';
+    }
+
+    private static byte[] getBufferBytes( ByteBuffer buffer )
+    {
+        byte[] bytes = new byte[buffer.position()];
+        buffer.get( bytes );
+        return bytes;
     }
 }

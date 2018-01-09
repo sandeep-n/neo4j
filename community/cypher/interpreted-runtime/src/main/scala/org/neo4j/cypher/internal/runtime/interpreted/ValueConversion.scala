@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -47,7 +47,7 @@ object ValueConversion {
       case ListType(_)  => l => ValueUtils.asListValue(l.asInstanceOf[java.util.Collection[_]])
       case CTAny => o => ValueUtils.of(o)
       case CTPoint => o => ValueUtils.asPointValue(o.asInstanceOf[Point])
-      case CTGeometry => o => ValueUtils.asPointValue(o.asInstanceOf[Geometry])
+      case CTGeometry => o => ValueUtils.asGeometryValue(o.asInstanceOf[Geometry])
     }
 
     (v) => if (v == null) Values.NO_VALUE else converter(v)
@@ -66,7 +66,7 @@ object ValueConversion {
     case r: Relationship => ValueUtils.fromRelationshipProxy(r)
     case p: Path => ValueUtils.asPathValue(p)
     case p: Point => ValueUtils.asPointValue(p)
-    case p: Geometry => ValueUtils.asPointValue(p)
+    case p: Geometry => ValueUtils.asGeometryValue(p)
     case m: Map[_, _] => VirtualValues.map(Eagerly.immutableMapValues(m.asInstanceOf[Map[String, Any]], asValue).asJava)
     case m: java.util.Map[_, _] => ValueUtils.asMapValue(m.asInstanceOf[java.util.Map[String, AnyRef]])
     case a: TraversableOnce[_] => VirtualValues.list(a.map(asValue).toArray:_*)

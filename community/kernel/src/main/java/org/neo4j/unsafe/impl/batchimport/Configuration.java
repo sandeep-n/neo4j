@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,6 +19,7 @@
  */
 package org.neo4j.unsafe.impl.batchimport;
 
+import org.neo4j.io.ByteUnit;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.pagecache.ConfiguringPageCacheFactory;
 import org.neo4j.kernel.impl.util.OsBeanUtil;
@@ -201,12 +202,12 @@ public interface Configuration
         @Override
         public long pageCacheMemory()
         {
-            Long pageCacheMemory = config.get( pagecache_memory );
+            String pageCacheMemory = config.get( pagecache_memory );
             if ( pageCacheMemory == null )
             {
-                pageCacheMemory = ConfiguringPageCacheFactory.defaultHeuristicPageCacheMemory();
+                pageCacheMemory = ConfiguringPageCacheFactory.defaultHeuristicPageCacheMemory() + "";
             }
-            return min( MAX_PAGE_CACHE_MEMORY, pageCacheMemory );
+            return min( MAX_PAGE_CACHE_MEMORY, ByteUnit.parse( pageCacheMemory ) );
         }
 
         @Override

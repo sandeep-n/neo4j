@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,7 +19,10 @@
  */
 package org.neo4j.values.storable;
 
+import org.neo4j.values.virtual.ListValue;
+
 import static java.lang.String.format;
+import static org.neo4j.values.virtual.VirtualValues.list;
 
 public final class CharValue extends TextValue
 {
@@ -40,12 +43,6 @@ public final class CharValue extends TextValue
     public boolean equals( Value other )
     {
         return other.equals( value );
-    }
-
-    @Override
-    public boolean equals( boolean x )
-    {
-        return false;
     }
 
     @Override
@@ -146,15 +143,15 @@ public final class CharValue extends TextValue
     }
 
     @Override
-    public TextArray split( String separator )
+    public ListValue split( String separator )
     {
         if ( separator.equals( stringValue() ) )
         {
-            return Values.EMPTY_TEXT_ARRAY;
+            return EMPTY_SPLIT;
         }
         else
         {
-            return Values.stringArray( stringValue() );
+            return list( Values.stringValue( stringValue() ) );
         }
     }
 

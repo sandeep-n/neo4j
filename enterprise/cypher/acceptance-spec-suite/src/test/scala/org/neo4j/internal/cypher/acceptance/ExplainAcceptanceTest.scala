@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -26,7 +26,7 @@ class ExplainAcceptanceTest extends ExecutionEngineFunSuite with CypherCompariso
 
   test("normal query is marked as such") {
     createNode()
-    val result = executeWith(Configs.All, "match (n) return n")
+    val result = executeWith(Configs.All + Configs.Morsel, "match (n) return n")
 
     result.planDescriptionRequested should equal(false)
     result shouldNot be(empty)
@@ -34,7 +34,7 @@ class ExplainAcceptanceTest extends ExecutionEngineFunSuite with CypherCompariso
 
   test("explain query is marked as such") {
     createNode()
-    val result = executeWith(Configs.All, "explain match (n) return n")
+    val result = executeWith(Configs.All + Configs.Morsel, "explain match (n) return n")
 
     result.planDescriptionRequested should equal(true)
     result should be(empty)
@@ -68,10 +68,10 @@ class ExplainAcceptanceTest extends ExecutionEngineFunSuite with CypherCompariso
                   |
                   |RETURN count(*), count(distinct bknEnd), avg(size(bookings)),avg(size(perDays));""".stripMargin
 
-    val result = executeWith(Configs.CommunityInterpreted, query)
+    val result = executeWith(Configs.Interpreted, query)
     val plan = result.executionPlanDescription().toString
     result.close()
 
-    plan.toString should include("NestedPlanExpression(VarExpand-SingleRow)")
+    plan.toString should include("NestedPlanExpression(VarExpand-Argument)")
   }
 }

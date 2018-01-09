@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -300,6 +300,13 @@ public class PrimitiveCollectionEqualityTest
 
     @DataPoint
     public static Factory<PrimitiveLongIntMap> longIntMapWithCapacity = () -> Primitive.longIntMap( randomCapacity() );
+
+    @DataPoint
+    public static Factory<PrimitiveLongLongMap> longLongMap = Primitive::longLongMap;
+
+    @DataPoint
+    public static Factory<PrimitiveLongLongMap> longLongMapWithCapacity =
+            () -> Primitive.longLongMap( randomCapacity() );
 
     @DataPoint
     public static Factory<PrimitiveLongLongMap> offheapLongLongMap = Primitive::offHeapLongLongMap;

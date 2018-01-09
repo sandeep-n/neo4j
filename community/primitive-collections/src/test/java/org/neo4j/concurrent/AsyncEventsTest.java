@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -55,12 +55,12 @@ public class AsyncEventsTest
         executor.shutdown();
     }
 
-    class Event extends AsyncEvent
+    static class Event extends AsyncEvent
     {
         Thread processedBy;
     }
 
-    class EventConsumer implements Consumer<Event>
+    static class EventConsumer implements Consumer<Event>
     {
         final BlockingQueue<Event> eventsProcessed = new LinkedBlockingQueue<>();
 

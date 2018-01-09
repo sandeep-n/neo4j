@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,8 +25,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import org.neo4j.cypher.internal.{CommunityCompatibilityFactory, ExecutionEngine}
 import org.neo4j.graphdb.{TransactionTerminatedException, TransientTransactionFailureException}
-import org.neo4j.kernel.api.KernelTransaction.Type
-import org.neo4j.kernel.api.security.SecurityContext.AUTH_DISABLED
+import org.neo4j.internal.kernel.api.Transaction.Type
+import org.neo4j.internal.kernel.api.security.SecurityContext.AUTH_DISABLED
 import org.neo4j.kernel.impl.coreapi.PropertyContainerLocker
 import org.neo4j.kernel.impl.query.clientconnection.ClientConnectionInfo
 import org.neo4j.kernel.impl.query.{Neo4jTransactionalContextFactory, TransactionalContext, TransactionalContextFactory}
@@ -53,7 +53,7 @@ class KillQueryTest extends ExecutionEngineFunSuite {
     }
 
     val logProvider = NullLogProvider.getInstance()
-    val compatibilityFactory = new CommunityCompatibilityFactory(graph, kernelAPI, kernelMonitors, logProvider)
+    val compatibilityFactory = new CommunityCompatibilityFactory(graph, kernelMonitors, logProvider)
     val engine = new ExecutionEngine(graph, logProvider, compatibilityFactory)
 
     val query = "MATCH (n:Label) WHERE n.x > 12 RETURN n.name"

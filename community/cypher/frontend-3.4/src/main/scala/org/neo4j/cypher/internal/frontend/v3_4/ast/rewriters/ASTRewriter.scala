@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,12 +18,13 @@ package org.neo4j.cypher.internal.frontend.v3_4.ast.rewriters
 
 import org.neo4j.cypher.internal.frontend.v3_4.ast.conditions._
 import org.neo4j.cypher.internal.frontend.v3_4.ast.{Statement, UnaliasedReturnItem}
-import org.neo4j.cypher.internal.frontend.v3_4.helpers.rewriting.{ApplyRewriter, RewriterCondition, RewriterStepSequencer}
-import org.neo4j.cypher.internal.frontend.v3_4.rewriters.{LiteralExtraction, literalReplacement}
+import org.neo4j.cypher.internal.frontend.v3_4.helpers.rewriting.{RewriterCondition, RewriterStepSequencer}
 import org.neo4j.cypher.internal.frontend.v3_4.semantics.SemanticState
 import org.neo4j.cypher.internal.v3_4.expressions.NotEquals
 
-class ASTRewriter(rewriterSequencer: (String) => RewriterStepSequencer, literalExtraction: LiteralExtraction) {
+class ASTRewriter(rewriterSequencer: (String) => RewriterStepSequencer,
+                  literalExtraction: LiteralExtraction,
+                  getDegreeRewriting: Boolean) {
 
   import org.neo4j.cypher.internal.frontend.v3_4.helpers.rewriting.RewriterStep._
 
@@ -45,7 +46,7 @@ class ASTRewriter(rewriterSequencer: (String) => RewriterStepSequencer, literalE
       enableCondition(noUnnamedPatternElementsInMatch),
       nameGraphOfPatternElements,
       enableCondition(noUnnamedPatternElementsInGraphOf),
-      normalizeMatchPredicates,
+      normalizeMatchPredicates(getDegreeRewriting),
       normalizeNotEquals,
       enableCondition(containsNoNodesOfType[NotEquals]),
       normalizeArgumentOrder,

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -44,7 +44,7 @@ case class PlanRewriter(rewriterSequencer: String => RewriterStepSequencer) exte
     simplifyPredicates,
     unnestOptional,
     predicateRemovalThroughJoins,
-    removeIdenticalPlans,
+    removeIdenticalPlans(context.logicalPlanIdGen),
     pruningVarExpander,
     useTop,
     simplifySelections
@@ -58,7 +58,6 @@ trait LogicalPlanRewriter extends Phase[CompilerContext, LogicalPlanState, Logic
 
   override def process(from: LogicalPlanState, context: CompilerContext): LogicalPlanState = {
     val rewritten = from.logicalPlan.endoRewrite(instance(context))
-    rewritten.assignIds() // This should be the only place where ids are assigned.
     from.copy(maybeLogicalPlan = Some(rewritten))
   }
 }

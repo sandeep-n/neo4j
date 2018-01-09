@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -26,6 +26,7 @@ import org.neo4j.unsafe.impl.batchimport.cache.ByteArray;
  */
 public class BigIdTracker extends AbstractTracker<ByteArray>
 {
+    static final int ID_SIZE = 6;
     static final byte[] DEFAULT_VALUE = new byte[] {-1, -1, -1, -1, -1, -1};
 
     public BigIdTracker( ByteArray array )

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -227,11 +227,11 @@ public abstract class KeyValueStoreFileFormat
     private KeyValueStoreFile open( FileSystemAbstraction fs, File path, PageCache pages ) throws IOException
     {
         ByteBuffer buffer = ByteBuffer.wrap( new byte[maxSize * 4] );
-        try ( StoreChannel file = fs.open( path, OpenMode.READ ) )
+        try ( StoreChannel channel = fs.open( path, OpenMode.READ ) )
         {
             while ( buffer.hasRemaining() )
             {
-                int bytes = file.read( buffer );
+                int bytes = channel.read( buffer );
                 if ( bytes == -1 )
                 {
                     break;
@@ -302,7 +302,7 @@ public abstract class KeyValueStoreFileFormat
 
     private static int pageSize( PageCache pages, int keySize, int valueSize )
     {
-        int pageSize = pages == null ? 8192 : pages.pageSize();
+        int pageSize = pages == null ? PageCache.PAGE_SIZE : pages.pageSize();
         pageSize -= pageSize % (keySize + valueSize);
         return pageSize;
     }

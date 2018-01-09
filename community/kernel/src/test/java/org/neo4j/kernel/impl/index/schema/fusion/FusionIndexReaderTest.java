@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,17 +22,20 @@ package org.neo4j.kernel.impl.index.schema.fusion;
 import org.junit.Before;
 import org.junit.Test;
 
-import org.neo4j.collection.primitive.Primitive;
 import org.neo4j.collection.primitive.PrimitiveLongCollections;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
+import org.neo4j.collection.primitive.PrimitiveLongResourceCollections;
+import org.neo4j.collection.primitive.PrimitiveLongResourceIterator;
 import org.neo4j.collection.primitive.PrimitiveLongSet;
+import org.neo4j.internal.kernel.api.IndexQuery;
+import org.neo4j.internal.kernel.api.IndexQuery.NumberRangePredicate;
+import org.neo4j.internal.kernel.api.IndexQuery.StringContainsPredicate;
+import org.neo4j.internal.kernel.api.IndexQuery.StringPrefixPredicate;
+import org.neo4j.internal.kernel.api.IndexQuery.StringRangePredicate;
+import org.neo4j.internal.kernel.api.IndexQuery.StringSuffixPredicate;
 import org.neo4j.kernel.api.exceptions.index.IndexNotApplicableKernelException;
-import org.neo4j.kernel.api.schema.IndexQuery;
-import org.neo4j.kernel.api.schema.IndexQuery.NumberRangePredicate;
-import org.neo4j.kernel.api.schema.IndexQuery.StringContainsPredicate;
-import org.neo4j.kernel.api.schema.IndexQuery.StringPrefixPredicate;
-import org.neo4j.kernel.api.schema.IndexQuery.StringRangePredicate;
-import org.neo4j.kernel.api.schema.IndexQuery.StringSuffixPredicate;
+import org.neo4j.kernel.api.schema.index.IndexDescriptor;
+import org.neo4j.kernel.api.schema.index.IndexDescriptorFactory;
 import org.neo4j.kernel.impl.index.schema.NativeSelector;
 import org.neo4j.storageengine.api.schema.IndexReader;
 import org.neo4j.values.storable.Value;
@@ -51,13 +54,15 @@ public class FusionIndexReaderTest
     private IndexReader luceneReader;
     private FusionIndexReader fusionIndexReader;
     private static final int PROP_KEY = 1;
+    private static final int LABEL_KEY = 11;
 
     @Before
     public void setup()
     {
         nativeReader = mock( IndexReader.class );
         luceneReader = mock( IndexReader.class );
-        fusionIndexReader = new FusionIndexReader( nativeReader, luceneReader, new NativeSelector() );
+        fusionIndexReader = new FusionIndexReader( nativeReader, luceneReader, new NativeSelector(),
+                IndexDescriptorFactory.forLabel( LABEL_KEY, PROP_KEY ) );
     }
 
     /* close */
@@ -71,6 +76,25 @@ public class FusionIndexReaderTest
         // then
         verify( nativeReader, times( 1 ) ).close();
         verify( luceneReader, times( 1 ) ).close();
+    }
+
+    // close iterator
+
+    @Test
+    public void closeIteratorMustCloseNativeAndLucene() throws Exception
+    {
+        // given
+        PrimitiveLongResourceIterator nativeIter = mock( PrimitiveLongResourceIterator.class );
+        PrimitiveLongResourceIterator luceneIter = mock( PrimitiveLongResourceIterator.class );
+        when( nativeReader.query( any( IndexQuery.class ) ) ).thenReturn( nativeIter );
+        when( luceneReader.query( any( IndexQuery.class ) ) ).thenReturn( luceneIter );
+
+        // when
+        fusionIndexReader.query( IndexQuery.exists( PROP_KEY ) ).close();
+
+        // then
+        verify( nativeIter, times( 1 ) ).close();
+        verify( luceneIter, times( 1 ) ).close();
     }
 
     /* countIndexedNodes */
@@ -200,8 +224,8 @@ public class FusionIndexReaderTest
     {
         // given
         IndexQuery.ExistsPredicate exists = IndexQuery.exists( PROP_KEY );
-        when( nativeReader.query( exists ) ).thenReturn( Primitive.iterator( 0L, 1L, 3L, 4L, 7L ) );
-        when( luceneReader.query( exists ) ).thenReturn( Primitive.iterator( 2L, 5L, 6L ) );
+        when( nativeReader.query( exists ) ).thenReturn( PrimitiveLongResourceCollections.iterator( null, 0L, 1L, 3L, 4L, 7L ) );
+        when( luceneReader.query( exists ) ).thenReturn( PrimitiveLongResourceCollections.iterator( null, 2L, 5L, 6L ) );
 
         // when
         PrimitiveLongIterator result = fusionIndexReader.query( exists );

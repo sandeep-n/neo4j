@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -27,9 +27,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.LongSupplier;
 
-import static junit.framework.TestCase.assertTrue;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 public class LinkedQueuePoolTest
 {
@@ -317,7 +317,7 @@ public class LinkedQueuePoolTest
         return acquirers;
     }
 
-    private class FlyweightHolder<R> implements Runnable
+    private static class FlyweightHolder<R> implements Runnable
     {
         private final LinkedQueuePool<R> pool;
         private R resource;
@@ -339,7 +339,7 @@ public class LinkedQueuePoolTest
         }
     }
 
-    private class StatefulMonitor implements LinkedQueuePool.Monitor<Object>
+    private static class StatefulMonitor implements LinkedQueuePool.Monitor<Object>
     {
         public AtomicInteger currentPeakSize = new AtomicInteger( -1 );
         public AtomicInteger targetSize = new AtomicInteger( -1 );

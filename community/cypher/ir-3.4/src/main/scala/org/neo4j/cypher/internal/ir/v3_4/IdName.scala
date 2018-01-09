@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,12 +19,12 @@
  */
 package org.neo4j.cypher.internal.ir.v3_4
 
-import org.neo4j.cypher.internal.v3_4.expressions.Variable
+import org.neo4j.cypher.internal.v3_4.expressions.LogicalVariable
 
 final case class IdName(name: String)
 
 object IdName {
   implicit val byName = Ordering[String].on[IdName](_.name)
 
-  def fromVariable(variable: Variable) = IdName(variable.name)
+  def fromVariable(variable: LogicalVariable) = IdName(variable.name)
 }

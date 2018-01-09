@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,6 +25,7 @@ import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -34,16 +35,20 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.neo4j.graphdb.ResourceIterator;
+import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.kernel.NeoStoreDataSource;
 import org.neo4j.kernel.api.labelscan.LabelScanStore;
 import org.neo4j.kernel.impl.api.ExplicitIndexProviderLookup;
 import org.neo4j.kernel.impl.api.index.IndexingService;
 import org.neo4j.kernel.impl.store.StoreType;
-import org.neo4j.kernel.impl.storemigration.LogFiles;
-import org.neo4j.kernel.impl.transaction.log.PhysicalLogFile;
+import org.neo4j.kernel.impl.transaction.log.files.LogFiles;
+import org.neo4j.kernel.impl.transaction.log.files.TransactionLogFiles;
+import org.neo4j.kernel.internal.GraphDatabaseAPI;
 import org.neo4j.storageengine.api.StorageEngine;
 import org.neo4j.storageengine.api.StoreFileMetadata;
+import org.neo4j.test.TestGraphDatabaseFactory;
 import org.neo4j.test.rule.EmbeddedDatabaseRule;
+import org.neo4j.test.rule.TestDirectory;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -56,7 +61,10 @@ import static org.neo4j.helpers.collection.Iterators.asResourceIterator;
 public class NeoStoreFileListingTest
 {
     @Rule
-    public EmbeddedDatabaseRule db = new EmbeddedDatabaseRule();
+    public final EmbeddedDatabaseRule db = new EmbeddedDatabaseRule();
+    @Rule
+    public final TestDirectory testDirectory = TestDirectory.testDirectory();
+
     private NeoStoreDataSource neoStoreDataSource;
     private static final String[] STANDARD_STORE_DIR_FILES = new String[]{
             "index",
@@ -95,10 +103,9 @@ public class NeoStoreFileListingTest
             "neostore.relationshiptypestore.db.names.id",
             "neostore.schemastore.db",
             "neostore.schemastore.db.id",
-            PhysicalLogFile.DEFAULT_NAME + ".active",
-            PhysicalLogFile.DEFAULT_NAME + PhysicalLogFile.DEFAULT_VERSION_SUFFIX + "0",
-            PhysicalLogFile.DEFAULT_NAME + PhysicalLogFile.DEFAULT_VERSION_SUFFIX + "1",
-            PhysicalLogFile.DEFAULT_NAME + PhysicalLogFile.DEFAULT_VERSION_SUFFIX + "2",
+            "neostore.transaction.db.0",
+            "neostore.transaction.db.1",
+            "neostore.transaction.db.2",
             "store_lock"};
 
     private static final String[] STANDARD_STORE_DIR_DIRECTORIES = new String[]{"schema", "index", "branched"};
@@ -112,16 +119,6 @@ public class NeoStoreFileListingTest
         neoStoreDataSource = db.getDependencyResolver().resolveDependency( NeoStoreDataSource.class );
     }
 
-    private void createIndexDbFile() throws IOException
-    {
-        File storeDir = db.getStoreDir();
-        final File indexFile = new File( storeDir, "index.db" );
-        if ( !indexFile.exists() )
-        {
-            assertTrue( indexFile.createNewFile() );
-        }
-    }
-
     @Test
     public void shouldCloseIndexAndLabelScanSnapshots() throws Exception
     {
@@ -131,10 +128,11 @@ public class NeoStoreFileListingTest
         ExplicitIndexProviderLookup explicitIndexes = mock( ExplicitIndexProviderLookup.class );
         when( explicitIndexes.all() ).thenReturn( Collections.emptyList() );
         File storeDir = mock( File.class );
+        LogFiles logFiles = mock( LogFiles.class );
         filesInStoreDirAre( storeDir, STANDARD_STORE_DIR_FILES, STANDARD_STORE_DIR_DIRECTORIES );
         StorageEngine storageEngine = mock( StorageEngine.class );
-        NeoStoreFileListing fileListing = new NeoStoreFileListing(
-                storeDir, labelScanStore, indexingService, explicitIndexes, storageEngine );
+        NeoStoreFileListing fileListing = new NeoStoreFileListing( storeDir, logFiles, labelScanStore,
+                indexingService, explicitIndexes, storageEngine );
 
         ResourceIterator<File> scanSnapshot = scanStoreFilesAre( labelScanStore,
                 new String[]{"blah/scan.store", "scan.more"} );
@@ -171,11 +169,25 @@ public class NeoStoreFileListingTest
     }
 
     @Test
+    public void shouldListTransactionLogsFromCustomLocationWhenConfigured() throws IOException
+    {
+        String logFilesPath = "customTxFolder";
+        verifyLogFilesWithCustomPathListing( logFilesPath );
+    }
+
+    @Test
+    public void shouldListTransactionLogsFromCustomAbsoluteLocationWhenConfigured() throws IOException
+    {
+        File customLogLocation = testDirectory.directory( "customLogLocation" );
+        verifyLogFilesWithCustomPathListing( customLogLocation.getAbsolutePath() );
+    }
+
+    @Test
     public void shouldListTxLogFiles() throws Exception
     {
         assertTrue( neoStoreDataSource.listStoreFiles( true ).stream()
                 .map( metaData -> metaData.file().getName() )
-                .anyMatch( fileName -> LogFiles.FILENAME_FILTER.accept( null, fileName ) ) );
+                .anyMatch( fileName -> TransactionLogFiles.DEFAULT_FILENAME_FILTER.accept( null, fileName ) ) );
     }
 
     @Test
@@ -183,7 +195,7 @@ public class NeoStoreFileListingTest
     {
         assertTrue( neoStoreDataSource.listStoreFiles( false ).stream()
                 .map( metaData -> metaData.file().getName() )
-                .noneMatch( fileName -> LogFiles.FILENAME_FILTER.accept( null, fileName ) ) );
+                .noneMatch( fileName -> TransactionLogFiles.DEFAULT_FILENAME_FILTER.accept( null, fileName ) ) );
     }
 
     @Test
@@ -198,6 +210,20 @@ public class NeoStoreFileListingTest
                 .map( Optional::get )
                 .collect( Collectors.toList() );
         assertEquals( Arrays.asList(values), listedStoreFiles );
+    }
+
+    private void verifyLogFilesWithCustomPathListing( String path ) throws IOException
+    {
+        GraphDatabaseAPI graphDatabase = (GraphDatabaseAPI) new TestGraphDatabaseFactory()
+                .newEmbeddedDatabaseBuilder( testDirectory.directory( "customDb" ) )
+                .setConfig( GraphDatabaseSettings.logical_logs_location, path )
+                .newGraphDatabase();
+        NeoStoreDataSource dataSource = graphDatabase.getDependencyResolver().resolveDependency( NeoStoreDataSource.class );
+        LogFiles logFiles = graphDatabase.getDependencyResolver().resolveDependency( LogFiles.class );
+        assertTrue( dataSource.listStoreFiles( true ).stream()
+                .anyMatch( metadata -> metadata.isLogFile() && logFiles.isLogFile( metadata.file() ) ) );
+        assertEquals( Paths.get( path ).getFileName().toString(), logFiles.logFilesDirectory().getName() );
+        graphDatabase.shutdown();
     }
 
     private void filesInStoreDirAre( File storeDir, String[] filenames, String[] dirs )
@@ -226,6 +252,16 @@ public class NeoStoreFileListingTest
         ResourceIterator<File> snapshot = spy( asResourceIterator( files.iterator() ) );
         when( indexingService.snapshotStoreFiles() ).thenReturn( snapshot );
         return snapshot;
+    }
+
+    private void createIndexDbFile() throws IOException
+    {
+        File storeDir = db.getStoreDir();
+        final File indexFile = new File( storeDir, "index.db" );
+        if ( !indexFile.exists() )
+        {
+            assertTrue( indexFile.createNewFile() );
+        }
     }
 
     private void mockFiles( String[] filenames, ArrayList<File> files, boolean isDirectories )

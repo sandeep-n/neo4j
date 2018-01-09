@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,6 +21,7 @@ package org.neo4j.unsafe.impl.batchimport.input.csv;
 
 import java.util.Iterator;
 import org.neo4j.csv.reader.CharSeeker;
+import org.neo4j.csv.reader.MultiReadable;
 import org.neo4j.helpers.collection.NestingIterator;
 import org.neo4j.kernel.impl.util.Validator;
 import org.neo4j.unsafe.impl.batchimport.InputIterator;
@@ -86,7 +87,7 @@ class InputGroupsDeserializer<ENTITY extends InputEntity>
             // nearly impossible to deduce where one row ends and another starts when diving into
             // an arbitrary position in the file.
 
-            CharSeeker dataStream = charSeeker( data.stream(), config, true );
+            CharSeeker dataStream = charSeeker( new MultiReadable( data.stream() ), config, true );
 
             // Read the header, given the data stream. This allows the header factory to be able to
             // parse the header from the data stream directly. Or it can decide to grab the header

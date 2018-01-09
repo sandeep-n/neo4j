@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -218,7 +218,8 @@ public class DynamicNodeLabels implements NodeLabels
     {
         long[] storedLongs = LabelIdArray.prependNodeId( nodeId, labels );
         Collection<DynamicRecord> records = new ArrayList<>();
-        DynamicArrayStore.allocateRecords( records, storedLongs, allocator );
+        // since we can't store points in long array we passing false as possibility to store points
+        DynamicArrayStore.allocateRecords( records, storedLongs, allocator, false );
         return records;
     }
 

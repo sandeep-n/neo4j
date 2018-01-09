@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,13 +22,11 @@ package org.neo4j.kernel.recovery;
 import java.io.IOException;
 
 import org.neo4j.helpers.Exceptions;
-import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.kernel.impl.store.UnderlyingStorageException;
 import org.neo4j.kernel.impl.transaction.log.LogEntryCursor;
 import org.neo4j.kernel.impl.transaction.log.LogPosition;
 import org.neo4j.kernel.impl.transaction.log.LogVersionedStoreChannel;
-import org.neo4j.kernel.impl.transaction.log.PhysicalLogFile;
-import org.neo4j.kernel.impl.transaction.log.PhysicalLogFiles;
+import org.neo4j.kernel.impl.transaction.log.PhysicalLogVersionedStoreChannel;
 import org.neo4j.kernel.impl.transaction.log.ReadAheadLogChannel;
 import org.neo4j.kernel.impl.transaction.log.ReadableClosablePositionAwareChannel;
 import org.neo4j.kernel.impl.transaction.log.entry.CheckPoint;
@@ -37,6 +35,7 @@ import org.neo4j.kernel.impl.transaction.log.entry.LogEntryCommit;
 import org.neo4j.kernel.impl.transaction.log.entry.LogEntryReader;
 import org.neo4j.kernel.impl.transaction.log.entry.LogEntryStart;
 import org.neo4j.kernel.impl.transaction.log.entry.LogEntryVersion;
+import org.neo4j.kernel.impl.transaction.log.files.LogFiles;
 import org.neo4j.kernel.monitoring.Monitors;
 
 import static org.neo4j.kernel.impl.transaction.log.LogVersionRepository.INITIAL_LOG_VERSION;
@@ -52,25 +51,23 @@ import static org.neo4j.kernel.impl.transaction.log.LogVersionRepository.INITIAL
 public class LogTailScanner
 {
     static long NO_TRANSACTION_ID = -1;
-    private final PhysicalLogFiles logFiles;
-    private final FileSystemAbstraction fileSystem;
+    private final LogFiles logFiles;
     private final LogEntryReader<ReadableClosablePositionAwareChannel> logEntryReader;
     private LogTailInformation logTailInformation;
     private final LogTailScannerMonitor monitor;
     private final boolean failOnCorruptedLogFiles;
 
-    public LogTailScanner( PhysicalLogFiles logFiles, FileSystemAbstraction fileSystem,
+    public LogTailScanner( LogFiles logFiles,
             LogEntryReader<ReadableClosablePositionAwareChannel> logEntryReader, Monitors monitors )
     {
-        this( logFiles, fileSystem, logEntryReader, monitors, false );
+        this( logFiles, logEntryReader, monitors, false );
     }
 
-    public LogTailScanner( PhysicalLogFiles logFiles, FileSystemAbstraction fileSystem,
+    public LogTailScanner( LogFiles logFiles,
             LogEntryReader<ReadableClosablePositionAwareChannel> logEntryReader, Monitors monitors,
             boolean failOnCorruptedLogFiles )
     {
         this.logFiles = logFiles;
-        this.fileSystem = fileSystem;
         this.logEntryReader = logEntryReader;
         this.monitor = monitors.newMonitor( LogTailScannerMonitor.class );
         this.failOnCorruptedLogFiles = failOnCorruptedLogFiles;
@@ -92,11 +89,12 @@ public class LogTailScanner
         {
             oldestVersionFound = version;
             CheckPoint latestCheckPoint = null;
-            try ( LogVersionedStoreChannel channel =
-                    PhysicalLogFile.openForVersion( logFiles, fileSystem, version, false );
-                    LogEntryCursor cursor = new LogEntryCursor( logEntryReader, new ReadAheadLogChannel( channel ) ) )
+            try ( LogVersionedStoreChannel channel = logFiles.openForVersion( version );
+                  ReadAheadLogChannel readAheadLogChannel = new ReadAheadLogChannel( channel );
+                  LogEntryCursor cursor = new LogEntryCursor( logEntryReader, readAheadLogChannel ) )
             {
                 LogEntry entry;
+                long maxEntryReadPosition = 0;
                 while ( cursor.next() )
                 {
                     entry = cursor.get();
@@ -128,6 +126,11 @@ public class LogTailScanner
                     {
                         latestLogEntryVersion = entry.getVersion();
                     }
+                    maxEntryReadPosition = readAheadLogChannel.position();
+                }
+                if ( hasUnreadableBytes( channel, maxEntryReadPosition ) )
+                {
+                    corruptedTransactionLogs = true;
                 }
             }
             catch ( Throwable t )
@@ -157,6 +160,11 @@ public class LogTailScanner
 
         return new LogTailInformation( corruptedTransactionLogs || startRecordAfterCheckpoint,
                 oldestStartEntryTransaction, oldestVersionFound, highestLogVersion, latestLogEntryVersion );
+    }
+
+    private boolean hasUnreadableBytes( LogVersionedStoreChannel channel, long maxEntryReadEndPosition ) throws IOException
+    {
+        return channel.position() > maxEntryReadEndPosition;
     }
 
     protected LogTailInformation checkpointTailInformation( long highestLogVersion, LogEntryStart latestStartEntry,
@@ -191,8 +199,7 @@ public class LogTailScanner
         LogPosition currentPosition = initialPosition;
         while ( currentPosition.getLogVersion() <= maxLogVersion )
         {
-            LogVersionedStoreChannel storeChannel = PhysicalLogFile.tryOpenForVersion( logFiles, fileSystem,
-                    currentPosition.getLogVersion(), false );
+            LogVersionedStoreChannel storeChannel = tryOpenStoreChannel( currentPosition );
             if ( storeChannel != null )
             {
                 try
@@ -253,6 +260,18 @@ public class LogTailScanner
         }
 
         return logTailInformation;
+    }
+
+    private PhysicalLogVersionedStoreChannel tryOpenStoreChannel( LogPosition currentPosition )
+    {
+        try
+        {
+            return logFiles.openForVersion( currentPosition.getLogVersion() );
+        }
+        catch ( IOException e )
+        {
+            return null;
+        }
     }
 
     static class ExtractedTransactionRecord

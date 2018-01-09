@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -36,7 +36,7 @@ public class DeleteDuplicateNodesStage extends Stage
     public DeleteDuplicateNodesStage( Configuration config, PrimitiveLongIterator duplicateNodeIds,
             BatchingNeoStores neoStore )
     {
-        super( "DEDUP", config );
+        super( "DEDUP", null, config, 0 );
         add( new DeleteDuplicateNodesStep( control(), config, duplicateNodeIds,
                 neoStore.getNodeStore(), neoStore.getLabelScanStore() ) );
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,7 +25,22 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-import org.neo4j.kernel.api.KernelAPI;
+import org.neo4j.internal.kernel.api.CursorFactory;
+import org.neo4j.internal.kernel.api.ExplicitIndexRead;
+import org.neo4j.internal.kernel.api.ExplicitIndexWrite;
+import org.neo4j.internal.kernel.api.Locks;
+import org.neo4j.internal.kernel.api.NodeCursor;
+import org.neo4j.internal.kernel.api.PropertyCursor;
+import org.neo4j.internal.kernel.api.Read;
+import org.neo4j.internal.kernel.api.SchemaRead;
+import org.neo4j.internal.kernel.api.SchemaWrite;
+import org.neo4j.internal.kernel.api.Session;
+import org.neo4j.internal.kernel.api.TokenRead;
+import org.neo4j.internal.kernel.api.TokenWrite;
+import org.neo4j.internal.kernel.api.Write;
+import org.neo4j.internal.kernel.api.schema.LabelSchemaDescriptor;
+import org.neo4j.internal.kernel.api.security.SecurityContext;
+import org.neo4j.kernel.api.InwardKernel;
 import org.neo4j.kernel.api.KernelTransaction;
 import org.neo4j.kernel.api.Statement;
 import org.neo4j.kernel.api.TransactionHook;
@@ -40,30 +55,32 @@ import org.neo4j.kernel.api.index.PropertyAccessor;
 import org.neo4j.kernel.api.proc.CallableProcedure;
 import org.neo4j.kernel.api.proc.CallableUserAggregationFunction;
 import org.neo4j.kernel.api.proc.CallableUserFunction;
-import org.neo4j.kernel.api.schema.LabelSchemaDescriptor;
 import org.neo4j.kernel.api.schema.SchemaDescriptorFactory;
 import org.neo4j.kernel.api.schema.index.IndexDescriptor;
 import org.neo4j.kernel.api.schema.index.IndexDescriptorFactory;
-import org.neo4j.kernel.api.security.SecurityContext;
 import org.neo4j.kernel.api.txstate.TransactionState;
 import org.neo4j.kernel.impl.api.KernelStatement;
 import org.neo4j.kernel.impl.api.StatementOperationParts;
 import org.neo4j.kernel.impl.api.index.IndexProxy;
 import org.neo4j.kernel.impl.api.index.IndexingService;
+import org.neo4j.kernel.impl.api.operations.SchemaReadOperations;
 import org.neo4j.kernel.impl.api.state.ConstraintIndexCreator;
 import org.neo4j.kernel.impl.locking.ResourceTypes;
 import org.neo4j.values.storable.Values;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
+
 import static org.neo4j.kernel.impl.api.StatementOperationsTestHelper.mockedParts;
 import static org.neo4j.kernel.impl.api.StatementOperationsTestHelper.mockedState;
 
@@ -120,22 +137,23 @@ public class ConstraintIndexCreatorTest
         IndexingService indexingService = mock( IndexingService.class );
         StubKernel kernel = new StubKernel();
 
-        when( constraintCreationContext.schemaReadOperations().indexGetCommittedId( state, index ) )
-                .thenReturn( 2468L );
+        SchemaReadOperations schemaOps = constraintCreationContext.schemaReadOperations();
+        when( schemaOps.indexGetCommittedId( state, index ) ).thenReturn( 2468L );
         IndexProxy indexProxy = mock( IndexProxy.class );
         when( indexingService.getIndexProxy( 2468L ) ).thenReturn( indexProxy );
         IndexEntryConflictException cause = new IndexEntryConflictException( 2, 1, Values.of( "a" ) );
         doThrow( new IndexPopulationFailedKernelException( descriptor, "some index", cause ) )
                 .when( indexProxy ).awaitStoreScanCompleted();
         PropertyAccessor propertyAccessor = mock( PropertyAccessor.class );
-        when( constraintCreationContext.schemaReadOperations().indexGetForSchema( state, descriptor ) )
-                .thenReturn( null );
+        when( schemaOps.indexGetForSchema( any( KernelStatement.class ), any( LabelSchemaDescriptor.class ) ) )
+                .thenReturn( null )   // first claim it doesn't exist, because it doesn't... so that it gets created
+                .thenReturn( index ); // then after it failed claim it does exist
         ConstraintIndexCreator creator = new ConstraintIndexCreator( () -> kernel, indexingService, propertyAccessor );
 
         // when
         try
         {
-            creator.createUniquenessConstraintIndex( state, constraintCreationContext.schemaReadOperations(), descriptor );
+            creator.createUniquenessConstraintIndex( state, schemaOps, descriptor );
 
             fail( "expected exception" );
         }
@@ -150,9 +168,9 @@ public class ConstraintIndexCreatorTest
         IndexDescriptor newIndex = IndexDescriptorFactory.uniqueForLabel( 123, 456 );
         verify( tx1 ).indexRuleDoAdd( newIndex );
         verifyNoMoreInteractions( tx1 );
-        verify( constraintCreationContext.schemaReadOperations() ).indexGetCommittedId( state, index );
-        verify( constraintCreationContext.schemaReadOperations() ).indexGetForSchema( state, descriptor );
-        verifyNoMoreInteractions( constraintCreationContext.schemaReadOperations() );
+        verify( schemaOps ).indexGetCommittedId( state, index );
+        verify( schemaOps, times( 2 ) ).indexGetForSchema( state, descriptor );
+        verifyNoMoreInteractions( schemaOps );
         TransactionState tx2 = kernel.statements.get( 1 ).txState();
         verify( tx2 ).indexDoDrop( newIndex );
         verifyNoMoreInteractions( tx2 );
@@ -300,7 +318,7 @@ public class ConstraintIndexCreatorTest
         verifyNoMoreInteractions( constraintCreationContext.schemaReadOperations() );
     }
 
-    private class StubKernel implements KernelAPI
+    private class StubKernel implements InwardKernel
     {
         private final List<KernelStatement> statements = new ArrayList<>();
 
@@ -324,12 +342,6 @@ public class ConstraintIndexCreatorTest
         }
 
         @Override
-        public void unregisterTransactionHook( TransactionHook hook )
-        {
-            throw new UnsupportedOperationException( "Please implement" );
-        }
-
-        @Override
         public void registerProcedure( CallableProcedure procedure )
         {
             throw new UnsupportedOperationException();
@@ -344,6 +356,18 @@ public class ConstraintIndexCreatorTest
         @Override
         public void registerUserAggregationFunction( CallableUserAggregationFunction function )
                 throws ProcedureException
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public CursorFactory cursors()
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Session beginSession( SecurityContext securityContext )
         {
             throw new UnsupportedOperationException();
         }
@@ -369,6 +393,66 @@ public class ConstraintIndexCreatorTest
             @Override
             public void failure()
             {
+            }
+
+            @Override
+            public Read dataRead()
+            {
+                throw new UnsupportedOperationException( "not implemented" );
+            }
+
+            @Override
+            public Write dataWrite()
+            {
+                throw new UnsupportedOperationException( "not implemented" );
+            }
+
+            @Override
+            public ExplicitIndexRead indexRead()
+            {
+                throw new UnsupportedOperationException( "not implemented" );
+            }
+
+            @Override
+            public ExplicitIndexWrite indexWrite()
+            {
+                throw new UnsupportedOperationException( "not implemented" );
+            }
+
+            @Override
+            public TokenRead tokenRead()
+            {
+                throw new UnsupportedOperationException( "not implemented" );
+            }
+
+            @Override
+            public TokenWrite tokenWrite()
+            {
+                throw new UnsupportedOperationException( "not implemented" );
+            }
+
+            @Override
+            public SchemaRead schemaRead()
+            {
+                throw new UnsupportedOperationException( "not implemented" );
+            }
+
+            @Override
+            public SchemaWrite schemaWrite()
+            {
+                throw new UnsupportedOperationException( "not implemented" );
+            }
+
+            @Override
+            public Locks locks()
+            {
+                throw new UnsupportedOperationException( "not implemented" );
+            }
+
+            @Override
+            public CursorFactory cursors()
+            {
+                throw new UnsupportedOperationException( "not implemented" );
             }
 
             @Override
@@ -469,6 +553,18 @@ public class ConstraintIndexCreatorTest
             public long timeout()
             {
                 return timeout;
+            }
+
+            @Override
+            public NodeCursor nodeCursor()
+            {
+                throw new UnsupportedOperationException( "not implemented" );
+            }
+
+            @Override
+            public PropertyCursor propertyCursor()
+            {
+                throw new UnsupportedOperationException( "not implemented" );
             }
         }
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -32,7 +32,7 @@ import org.neo4j.logging.NullLogProvider;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptySet;
-import static junit.framework.TestCase.assertEquals;
+import static org.junit.Assert.assertEquals;
 import static org.neo4j.ha.correctness.ClusterInstance.newClusterInstance;
 
 public class TestProver

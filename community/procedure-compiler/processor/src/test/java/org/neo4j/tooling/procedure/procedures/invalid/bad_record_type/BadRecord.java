@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,11 +22,11 @@ package org.neo4j.tooling.procedure.procedures.invalid.bad_record_type;
 public class BadRecord
 {
 
-    private static final int DEFAULT_AGE = 42;
+    private static final long DEFAULT_AGE = 42L;
     private final String label; /* nonstatic fields should be public */
-    private final int age;
+    private final long age;
 
-    public BadRecord( String label, int age )
+    public BadRecord( String label, long age )
     {
         this.label = label;
         this.age = age < 0 ? DEFAULT_AGE : age;

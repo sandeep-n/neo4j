@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,8 +20,9 @@
 package org.neo4j.cypher.internal.runtime.interpreted
 
 import org.neo4j.cypher.internal.planner.v3_4.spi.TokenContext
+import org.neo4j.internal.kernel.api.exceptions.LabelNotFoundKernelException
 import org.neo4j.kernel.api.Statement
-import org.neo4j.kernel.api.exceptions.{LabelNotFoundKernelException, PropertyKeyNotFoundException, RelationshipTypeNotFoundException}
+import org.neo4j.kernel.api.exceptions.{PropertyKeyNotFoundException, RelationshipTypeNotFoundException}
 import org.neo4j.kernel.impl.api.operations.KeyReadOperations
 
 abstract class TransactionBoundTokenContext(statement: => Statement) extends TokenContext {

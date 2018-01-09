@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -164,7 +164,7 @@ public class TestBidirectionalTraversal extends TraversalTestBase
          */
         createGraph( "a TO d", "b TO d", "c TO d", "e TO d", "e TO f", "e TO g" );
 
-        PathExpander<Void> expander = PathExpanderBuilder.<Void>empty().add( to ).build();
+        PathExpander<Void> expander = PathExpanderBuilder.empty().add( to ).build();
         TraversalDescription side = getGraphDb().traversalDescription().uniqueness( NODE_PATH ).expand( expander );
         expectPaths( getGraphDb().bidirectionalTraversalDescription().mirroredSides( side ).traverse(
                     asList( getNodeWithName( "a" ), getNodeWithName( "b" ), getNodeWithName( "c" ) ),

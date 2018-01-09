@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -112,5 +112,11 @@ public class ThreadAheadReadable extends ThreadAhead implements CharReadable
     public static CharReadable threadAhead( CharReadable actual, int bufferSize )
     {
         return new ThreadAheadReadable( actual, bufferSize );
+    }
+
+    @Override
+    public long length()
+    {
+        return actual.length();
     }
 }

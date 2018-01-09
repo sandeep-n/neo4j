@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,6 +23,10 @@ import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.time.Duration;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+
 import org.neo4j.bolt.v1.runtime.BoltConnectionAuthFatality;
 import org.neo4j.bolt.v1.runtime.BoltProtocolBreachFatality;
 import org.neo4j.bolt.v1.runtime.BoltStateMachine;
@@ -33,6 +37,7 @@ import org.neo4j.logging.AssertableLogProvider;
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.fail;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -265,4 +270,19 @@ public class RunnableBoltWorkerTest
         assertFalse( jobWasExecuted.booleanValue() );
         verify( machine ).close();
     }
+
+    @Test
+    public void shouldValidateTransaction() throws Exception
+    {
+        RunnableBoltWorker worker = new RunnableBoltWorker( machine, logService );
+        Future workerFuture = Executors.newSingleThreadExecutor().submit( worker );
+
+        Thread.sleep( Duration.ofSeconds( RunnableBoltWorker.workQueuePollDuration ).toMillis() );
+
+        worker.halt();
+        workerFuture.get();
+
+        verify( machine, atLeastOnce() ).validateTransaction();
+    }
+
 }

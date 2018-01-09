@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,6 +19,7 @@
  */
 package org.neo4j.internal.cypher.acceptance
 
+import org.neo4j.cypher.SyntaxException
 import org.neo4j.graphdb.{Label, Node, Relationship}
 import org.neo4j.internal.cypher.acceptance.CypherComparisonSupport.Configs
 
@@ -26,7 +27,7 @@ import scala.collection.JavaConversions._
 
 class BuiltInProcedureAcceptanceTest extends ProcedureCallAcceptanceTest with CypherComparisonSupport {
 
-  private val combinedCallconfiguration = Configs.CommunityInterpreted - Configs.AllRulePlanners - Configs.Version2_3
+  private val combinedCallconfiguration = Configs.Interpreted - Configs.AllRulePlanners - Configs.Version2_3
 
   test("should be able to filter as part of call") {
     // Given
@@ -276,5 +277,14 @@ class BuiltInProcedureAcceptanceTest extends ProcedureCallAcceptanceTest with Cy
         "state" -> "ONLINE",
         "type" -> "node_label_property",
         "provider" -> Map("version" -> "1.0", "key" -> "lucene+native"))))
+  }
+
+  test("yield from void procedure should return correct error msg") {
+
+    val thrown = intercept[SyntaxException]{
+      executeWith(Configs.Procs, "CALL db.createLabel('Label') yield node")
+    }
+
+    thrown.getMessage should include("Cannot yield value from void procedure.")
   }
 }

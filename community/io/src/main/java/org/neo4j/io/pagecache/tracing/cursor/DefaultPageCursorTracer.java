@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -35,7 +35,9 @@ public class DefaultPageCursorTracer implements PageCursorTracer
     private long pins;
     private long unpins;
     private long hits;
+    private long historicalHits;
     private long faults;
+    private long historicalFaults;
     private long bytesRead;
     private long bytesWritten;
     private long evictions;
@@ -65,10 +67,12 @@ public class DefaultPageCursorTracer implements PageCursorTracer
         if ( hits > 0 )
         {
             pageCacheTracer.hits( hits );
+            historicalHits = historicalHits + hits;
         }
         if ( faults > 0 )
         {
             pageCacheTracer.faults( faults );
+            historicalFaults = historicalFaults + faults;
         }
         if ( bytesRead > 0 )
         {
@@ -91,6 +95,18 @@ public class DefaultPageCursorTracer implements PageCursorTracer
             pageCacheTracer.flushes( flushes );
         }
         reset();
+    }
+
+    @Override
+    public long accumulatedHits()
+    {
+        return historicalHits + hits;
+    }
+
+    @Override
+    public long accumulatedFaults()
+    {
+        return historicalFaults + faults;
     }
 
     private void reset()

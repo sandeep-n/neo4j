@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,6 +25,7 @@ import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.ByteToMessageDecoder;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
+import io.netty.handler.codec.http.websocketx.WebSocketFrameAggregator;
 import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslHandler;
@@ -43,6 +44,7 @@ public class TransportSelectionHandler extends ByteToMessageDecoder
 {
     private static final String WEBSOCKET_MAGIC = "GET ";
     private static final int MAX_WEBSOCKET_HANDSHAKE_SIZE = 65536;
+    private static final int MAX_WEBSOCKET_FRAME_SIZE = 65536;
 
     private final SslContext sslCtx;
     private final boolean encryptionRequired;
@@ -136,7 +138,8 @@ public class TransportSelectionHandler extends ByteToMessageDecoder
         p.addLast(
                 new HttpServerCodec(),
                 new HttpObjectAggregator( MAX_WEBSOCKET_HANDSHAKE_SIZE ),
-                new WebSocketServerProtocolHandler( "/" ),
+                new WebSocketServerProtocolHandler( "/", null, false, MAX_WEBSOCKET_FRAME_SIZE ),
+                new WebSocketFrameAggregator( MAX_WEBSOCKET_FRAME_SIZE ),
                 new WebSocketFrameTranslator(),
                 newSocketTransportHandler() );
         p.remove( this );

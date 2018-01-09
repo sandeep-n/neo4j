@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -36,8 +36,8 @@ public class Mark
     private boolean quoted;
 
     /**
-     * @param startPosition
-     * @param position
+     * @param startPosition position of first character in value (inclusive).
+     * @param position position of last character in value (exclusive).
      * @param character use {@code -1} to denote that the matching character was an end-of-line or end-of-file
      * @param quoted whether or not the original data was quoted.
      */

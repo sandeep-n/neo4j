@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -171,9 +171,9 @@ public class Predicates
         return composed.lastInput();
     }
 
-    public static void await( Supplier<Boolean> condition, long timeout, TimeUnit unit ) throws TimeoutException
+    public static void await( BooleanSupplier condition, long timeout, TimeUnit unit ) throws TimeoutException
     {
-        awaitEx( condition::get, timeout, unit );
+        awaitEx( condition::getAsBoolean, timeout, unit );
     }
 
     public static <EXCEPTION extends Exception> void awaitEx( ThrowingSupplier<Boolean,EXCEPTION> condition,
@@ -182,10 +182,10 @@ public class Predicates
         awaitEx( condition, timeout, unit, DEFAULT_POLL_INTERVAL, TimeUnit.MILLISECONDS );
     }
 
-    public static void await( Supplier<Boolean> condition, long timeout, TimeUnit timeoutUnit, long pollInterval,
+    public static void await( BooleanSupplier condition, long timeout, TimeUnit timeoutUnit, long pollInterval,
             TimeUnit pollUnit ) throws TimeoutException
     {
-        awaitEx( condition::get, timeout, timeoutUnit, pollInterval, pollUnit );
+        awaitEx( condition::getAsBoolean, timeout, timeoutUnit, pollInterval, pollUnit );
     }
 
     public static <EXCEPTION extends Exception> void awaitEx( ThrowingSupplier<Boolean,EXCEPTION> condition,

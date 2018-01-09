@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -30,9 +30,11 @@ import org.neo4j.storageengine.api.lock.ResourceType;
 @Service.Implementation( Locks.Factory.class )
 public class ForsetiLocksFactory extends Locks.Factory
 {
+    public static final String KEY = "forseti";
+
     public ForsetiLocksFactory()
     {
-        super( "forseti" );
+        super( KEY );
     }
 
     @Override

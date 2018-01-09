@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2002-2017 "Neo Technology,"
+# Copyright (c) 2002-2018 "Neo Technology,"
 # Network Engine for Objects in Lund AB [http://neotechnology.com]
 #
 # This file is part of Neo4j.
@@ -207,5 +207,24 @@ Feature: UnwindAcceptance
       | [1] |
       | [2] |
       | [3] |
+    And no side effects
+
+  Scenario: Unwind on array property
+    Given an empty graph
+    And having executed:
+      """
+      CREATE (:L {array:['a', 'b', 'c']})
+      """
+    When executing query:
+      """
+      MATCH (n:L)
+      UNWIND n.array AS array
+      RETURN array
+      """
+    Then the result should be:
+      | array |
+      | 'a'   |
+      | 'b'   |
+      | 'c'   |
     And no side effects
 

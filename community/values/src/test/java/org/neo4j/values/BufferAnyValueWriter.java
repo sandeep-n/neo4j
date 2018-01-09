@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,7 +24,6 @@ import java.util.Arrays;
 import org.neo4j.values.storable.BufferValueWriter;
 import org.neo4j.values.storable.TextArray;
 import org.neo4j.values.storable.TextValue;
-import org.neo4j.values.virtual.CoordinateReferenceSystem;
 import org.neo4j.values.virtual.EdgeValue;
 import org.neo4j.values.virtual.MapValue;
 import org.neo4j.values.virtual.NodeValue;
@@ -50,8 +49,6 @@ public class BufferAnyValueWriter extends BufferValueWriter implements AnyValueW
         EndMap,
         BeginList,
         EndList,
-        BeginPoint,
-        EndPoint
     }
 
     public static class Special
@@ -151,18 +148,6 @@ public class BufferAnyValueWriter extends BufferValueWriter implements AnyValueW
         buffer.add( Specials.writePath( nodes, edges ) );
     }
 
-    @Override
-    public void beginPoint( CoordinateReferenceSystem coordinateReferenceSystem )
-    {
-        buffer.add( Specials.beginPoint( coordinateReferenceSystem ) );
-    }
-
-    @Override
-    public void endPoint()
-    {
-        buffer.add( Specials.endPoint() );
-    }
-
     @SuppressWarnings( "WeakerAccess" )
     public static class Specials
     {
@@ -213,16 +198,6 @@ public class BufferAnyValueWriter extends BufferValueWriter implements AnyValueW
         public static Special endList()
         {
             return new Special( SpecialKind.EndList, 0 );
-        }
-
-        public static Special beginPoint( CoordinateReferenceSystem crs )
-        {
-            return new Special( SpecialKind.BeginPoint, crs.code );
-        }
-
-        public static Special endPoint()
-        {
-            return new Special( SpecialKind.EndPoint, 0 );
         }
     }
 }

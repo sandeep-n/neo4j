@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -40,14 +40,14 @@ class Heart
             return;
         }
 
-        outcome.renewElectionTimeout();
+        outcome.setPreElection( false );
         outcome.setNextTerm( request.leaderTerm() );
         outcome.setLeader( request.from() );
         outcome.setLeaderCommit( request.commitIndex() );
         outcome.addOutgoingMessage( new RaftMessages.Directed( request.from(),
                 new RaftMessages.HeartbeatResponse( state.myself() ) ) );
 
-        if ( !Follower.logHistoryMatches( state, request.commitIndex(), request.commitIndexTerm(), log ) )
+        if ( !Follower.logHistoryMatches( state, request.commitIndex(), request.commitIndexTerm() ) )
         {
             return;
         }

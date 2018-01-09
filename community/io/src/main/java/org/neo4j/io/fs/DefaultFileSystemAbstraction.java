@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -176,6 +176,12 @@ public class DefaultFileSystemAbstraction implements FileSystemAbstraction
     public void moveToDirectory( File file, File toDirectory ) throws IOException
     {
         FileUtils.moveFileToDirectory( file, toDirectory );
+    }
+
+    @Override
+    public void copyToDirectory( File file, File toDirectory ) throws IOException
+    {
+        FileUtils.copyFileToDirectory( file, toDirectory );
     }
 
     @Override

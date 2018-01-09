@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -18,6 +18,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.neo4j.values.storable;
+
+import org.neo4j.graphdb.spatial.Point;
 
 /**
  * Static methods for writing primitive arrays to a ValueWriter.
@@ -110,6 +112,17 @@ public final class PrimitiveArrayWriting
         for ( String x : values )
         {
             writer.writeString( x );
+        }
+        writer.endArray();
+    }
+
+    public static <E extends Exception> void writeTo( ValueWriter<E> writer, Point[] values ) throws E
+    {
+        writer.beginArray( values.length, ValueWriter.ArrayType.POINT );
+        for ( Point x : values )
+        {
+            PointValue value = Values.point( x );
+            writer.writePoint( value.getCoordinateReferenceSystem(), value.coordinate() );
         }
         writer.endArray();
     }

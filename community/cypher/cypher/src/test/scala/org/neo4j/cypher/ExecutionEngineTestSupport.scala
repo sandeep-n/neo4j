@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -30,7 +30,6 @@ import org.neo4j.cypher.internal.javacompat.GraphDatabaseCypherService
 import org.neo4j.cypher.internal.runtime.{InternalExecutionResult, RuntimeScalaValueConverter}
 import org.neo4j.graphdb.{GraphDatabaseService, Result}
 import org.neo4j.kernel.GraphDatabaseQueryService
-import org.neo4j.kernel.api.KernelAPI
 import org.neo4j.kernel.monitoring.{Monitors => KernelMonitors}
 import org.neo4j.logging.{LogProvider, NullLogProvider}
 
@@ -84,7 +83,6 @@ object ExecutionEngineHelper {
 
   def createEngine(graphDatabaseCypherService: GraphDatabaseQueryService, logProvider: LogProvider = NullLogProvider.getInstance()): ExecutionEngine = {
     val resolver = graphDatabaseCypherService.getDependencyResolver
-    val kernel = resolver.resolveDependency(classOf[KernelAPI])
     val kernelMonitors: KernelMonitors = resolver.resolveDependency(classOf[KernelMonitors])
     val compatibilityFactory = resolver.resolveDependency( classOf[CompatibilityFactory] )
 

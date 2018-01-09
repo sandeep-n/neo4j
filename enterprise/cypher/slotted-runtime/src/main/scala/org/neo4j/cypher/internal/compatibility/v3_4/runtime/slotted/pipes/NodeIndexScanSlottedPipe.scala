@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,31 +19,40 @@
  */
 package org.neo4j.cypher.internal.compatibility.v3_4.runtime.slotted.pipes
 
-import org.neo4j.cypher.internal.compatibility.v3_4.runtime.PipelineInformation
+import org.neo4j.cypher.internal.compatibility.v3_4.runtime.SlotConfiguration
 import org.neo4j.cypher.internal.compatibility.v3_4.runtime.helpers.PrimitiveLongHelper
-import org.neo4j.cypher.internal.compatibility.v3_4.runtime.slotted.PrimitiveExecutionContext
-import org.neo4j.cypher.internal.planner.v3_4.spi.IndexDescriptor
-import org.neo4j.cypher.internal.runtime.interpreted.pipes._
+import org.neo4j.cypher.internal.compatibility.v3_4.runtime.slotted.SlottedExecutionContext
+import org.neo4j.cypher.internal.runtime.QueryContext
 import org.neo4j.cypher.internal.runtime.interpreted.ExecutionContext
+import org.neo4j.cypher.internal.util.v3_4.attribution.Id
+import org.neo4j.cypher.internal.runtime.interpreted.pipes._
 import org.neo4j.cypher.internal.v3_4.expressions.{LabelToken, PropertyKeyToken}
-import org.neo4j.cypher.internal.v3_4.logical.plans.LogicalPlanId
+import org.neo4j.internal.kernel.api.{CapableIndexReference, IndexReference}
 
 case class NodeIndexScanSlottedPipe(ident: String,
                                     label: LabelToken,
                                     propertyKey: PropertyKeyToken,
-                                    pipelineInformation: PipelineInformation)
-                                   (val id: LogicalPlanId = LogicalPlanId.DEFAULT)
+                                    slots: SlotConfiguration,
+                                    argumentSize: SlotConfiguration.Size)
+                                   (val id: Id = Id.INVALID_ID)
   extends Pipe {
 
-  private val offset = pipelineInformation.getLongOffsetFor(ident)
+  private val offset = slots.getLongOffsetFor(ident)
 
-  private val descriptor = IndexDescriptor(label.nameId.id, propertyKey.nameId.id)
+  private var reference: IndexReference = CapableIndexReference.NO_INDEX
+
+  private def reference(context: QueryContext): IndexReference = {
+    if (reference == CapableIndexReference.NO_INDEX) {
+      reference = context.indexReference(label.nameId.id,propertyKey.nameId.id)
+    }
+    reference
+  }
 
   protected def internalCreateResults(state: QueryState): Iterator[ExecutionContext] = {
-    val nodes = state.query.indexScanPrimitive(descriptor)
+    val nodes = state.query.indexScanPrimitive(reference(state.query))
     PrimitiveLongHelper.map(nodes, { node =>
-      val context = PrimitiveExecutionContext(pipelineInformation)
-      state.copyArgumentStateTo(context, pipelineInformation.numberOfLongs, pipelineInformation.numberOfReferences)
+      val context = SlottedExecutionContext(slots)
+      state.copyArgumentStateTo(context, argumentSize.nLongs, argumentSize.nReferences)
       context.setLongAt(offset, node)
       context
     })

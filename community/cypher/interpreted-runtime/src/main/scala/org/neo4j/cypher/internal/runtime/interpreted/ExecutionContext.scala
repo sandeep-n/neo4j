@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -28,13 +28,13 @@ import scala.collection.{Iterator, immutable}
 object ExecutionContext {
   def empty: ExecutionContext = apply()
 
-  def from(x: (String, AnyValue)*): ExecutionContext = apply().newWith(x)
+  def from(x: (String, AnyValue)*): ExecutionContext = apply().set(x)
 
   def apply(m: MutableMap[String, AnyValue] = MutableMaps.empty) = MapExecutionContext(m)
 }
 
 trait ExecutionContext extends MutableMap[String, AnyValue] {
-  def copyTo(target: ExecutionContext, longOffset: Int = 0, refOffset: Int = 0): Unit
+  def copyTo(target: ExecutionContext, fromLongOffset: Int = 0, fromRefOffset: Int = 0, toLongOffset: Int = 0, toRefOffset: Int = 0): Unit
   def copyFrom(input: ExecutionContext, nLongs: Int, nRefs: Int): Unit
   def setLongAt(offset: Int, value: Long): Unit
   def getLongAt(offset: Int): Long
@@ -44,18 +44,23 @@ trait ExecutionContext extends MutableMap[String, AnyValue] {
   def getRefAt(offset: Int): AnyValue
   def refs(): Array[AnyValue]
 
-  def newWith(newEntries: Seq[(String, AnyValue)]): ExecutionContext
-  def newWith1(key1: String, value1: AnyValue): ExecutionContext
-  def newWith2(key1: String, value1: AnyValue, key2: String, value2: AnyValue): ExecutionContext
-  def newWith3(key1: String, value1: AnyValue, key2: String, value2: AnyValue, key3: String, value3: AnyValue): ExecutionContext
+  def set(newEntries: Seq[(String, AnyValue)]): ExecutionContext
+  def set(key: String, value: AnyValue): ExecutionContext
+  def set(key1: String, value1: AnyValue, key2: String, value2: AnyValue): ExecutionContext
+  def set(key1: String, value1: AnyValue, key2: String, value2: AnyValue, key3: String, value3: AnyValue): ExecutionContext
   def mergeWith(other: ExecutionContext): ExecutionContext
   def createClone(): ExecutionContext
+
+  def copyWith(key: String, value: AnyValue): ExecutionContext
+  def copyWith(key1: String, value1: AnyValue, key2: String, value2: AnyValue): ExecutionContext
+  def copyWith(key1: String, value1: AnyValue, key2: String, value2: AnyValue, key3: String, value3: AnyValue): ExecutionContext
+  def copyWith(newEntries: Seq[(String, AnyValue)]): ExecutionContext
 }
 
 case class MapExecutionContext(m: MutableMap[String, AnyValue])
   extends ExecutionContext {
 
-  override def copyTo(target: ExecutionContext, longOffset: Int = 0, refOffset: Int = 0): Unit = fail()
+  override def copyTo(target: ExecutionContext, fromLongOffset: Int = 0, fromRefOffset: Int = 0, toLongOffset: Int = 0, toRefOffset: Int = 0): Unit = fail()
 
   override def copyFrom(input: ExecutionContext, nLongs: Int, nRefs: Int): Unit = fail()
 
@@ -91,31 +96,45 @@ case class MapExecutionContext(m: MutableMap[String, AnyValue])
 
   override def toMap[T, U](implicit ev: (String, AnyValue) <:< (T, U)): immutable.Map[T, U] = m.toMap(ev)
 
-  override def newWith(newEntries: Seq[(String, AnyValue)]): MapExecutionContext.this.type =
+  override def set(newEntries: Seq[(String, AnyValue)]): MapExecutionContext.this.type =
     createWithNewMap(m.clone() ++= newEntries)
 
   // This may seem silly but it has measurable impact in tight loops
 
-  override def newWith1(key1: String, value1: AnyValue): MapExecutionContext.this.type = {
+  override def set(key: String, value: AnyValue): MapExecutionContext.this.type = {
     val newMap = m.clone()
-    newMap.put(key1, value1)
+    newMap.put(key, value)
     createWithNewMap(newMap)
   }
 
-  override def newWith2(key1: String, value1: AnyValue, key2: String, value2: AnyValue): MapExecutionContext.this.type = {
+  override def set(key1: String, value1: AnyValue, key2: String, value2: AnyValue): MapExecutionContext.this.type = {
     val newMap = m.clone()
     newMap.put(key1, value1)
     newMap.put(key2, value2)
     createWithNewMap(newMap)
   }
 
-  override def newWith3(key1: String, value1: AnyValue, key2: String, value2: AnyValue, key3: String, value3: AnyValue): MapExecutionContext.this.type = {
+  override def set(key1: String, value1: AnyValue, key2: String, value2: AnyValue, key3: String, value3: AnyValue): MapExecutionContext.this.type = {
     val newMap = m.clone()
     newMap.put(key1, value1)
     newMap.put(key2, value2)
     newMap.put(key3, value3)
     createWithNewMap(newMap)
   }
+
+  override def copyWith(key: String, value: AnyValue): MapExecutionContext.this.type =
+    set(key, value)
+
+  override def copyWith(key1: String, value1: AnyValue, key2: String, value2: AnyValue): MapExecutionContext.this.type = {
+    set(key1, value1, key2, value2)
+  }
+
+  override def copyWith(key1: String, value1: AnyValue,
+                        key2: String, value2: AnyValue,
+                        key3: String, value3: AnyValue): ExecutionContext =
+    set(key1, value1, key2, value2, key3, value3)
+
+  override def copyWith(newEntries: Seq[(String, AnyValue)]): ExecutionContext = set(newEntries)
 
   override def createClone(): ExecutionContext = createWithNewMap(m.clone())
 

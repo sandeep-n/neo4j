@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -75,7 +75,7 @@ class AddedHistory(val parent: History, val pair: MatchingPair) extends History 
   def add(pair: MatchingPair) = if (contains(pair)) this else new AddedHistory(this, pair)
 
   lazy val toMap = {
-    parent.toMap.newWith(toIndexedSeq(pair))
+    parent.toMap.set(toIndexedSeq(pair))
   }
 
   def toIndexedSeq(p: MatchingPair): Seq[(String, AnyValue)] = {

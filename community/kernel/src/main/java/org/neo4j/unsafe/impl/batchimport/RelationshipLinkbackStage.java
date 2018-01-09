@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -27,8 +27,12 @@ import org.neo4j.unsafe.impl.batchimport.cache.NodeRelationshipCache;
 import org.neo4j.unsafe.impl.batchimport.staging.BatchFeedStep;
 import org.neo4j.unsafe.impl.batchimport.staging.ReadRecordsStep;
 import org.neo4j.unsafe.impl.batchimport.staging.Stage;
+import org.neo4j.unsafe.impl.batchimport.stats.StatsProvider;
+import org.neo4j.unsafe.impl.batchimport.store.BatchingNeoStores;
+import org.neo4j.unsafe.impl.batchimport.store.PrepareIdSequence;
 
 import static org.neo4j.unsafe.impl.batchimport.RecordIdIterator.backwards;
+import static org.neo4j.unsafe.impl.batchimport.staging.Step.ORDER_SEND_DOWNSTREAM;
 
 /**
  * Sets {@link RelationshipRecord#setFirstPrevRel(long)} and {@link RelationshipRecord#setSecondPrevRel(long)}
@@ -48,14 +52,17 @@ import static org.neo4j.unsafe.impl.batchimport.RecordIdIterator.backwards;
  */
 public class RelationshipLinkbackStage extends Stage
 {
-    public RelationshipLinkbackStage( String topic, Configuration config, RelationshipStore store,
+    public static final String NAME = "Relationship <-- Relationship";
+
+    public RelationshipLinkbackStage( String topic, Configuration config, BatchingNeoStores stores,
             NodeRelationshipCache cache, Predicate<RelationshipRecord> readFilter,
-            Predicate<RelationshipRecord> changeFilter, int nodeTypes )
+            Predicate<RelationshipRecord> changeFilter, int nodeTypes, StatsProvider... additionalStatsProvider )
     {
-        super( "Relationship --> Relationship" + topic, config );
+        super( NAME, topic, config, ORDER_SEND_DOWNSTREAM );
+        RelationshipStore store = stores.getRelationshipStore();
         add( new BatchFeedStep( control(), config, backwards( 0, store.getHighId(), config ), store.getRecordSize() ) );
         add( new ReadRecordsStep<>( control(), config, true, store, readFilter ) );
-        add( new RelationshipLinkbackStep( control(), config, cache, changeFilter, nodeTypes ) );
-        add( new UpdateRecordsStep<>( control(), config, store ) );
+        add( new RelationshipLinkbackStep( control(), config, cache, changeFilter, nodeTypes, additionalStatsProvider ) );
+        add( new UpdateRecordsStep<>( control(), config, store, PrepareIdSequence.of( stores.usesDoubleRelationshipRecordUnits() ) ) );
     }
 }

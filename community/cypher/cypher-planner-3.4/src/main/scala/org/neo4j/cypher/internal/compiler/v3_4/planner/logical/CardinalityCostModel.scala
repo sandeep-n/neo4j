@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,10 +20,10 @@
 package org.neo4j.cypher.internal.compiler.v3_4.planner.logical
 
 import org.neo4j.cypher.internal.compiler.v3_4.planner.logical.Metrics._
-import org.neo4j.cypher.internal.v3_4.logical.plans._
 import org.neo4j.cypher.internal.ir.v3_4._
 import org.neo4j.cypher.internal.util.v3_4.{Cardinality, Cost, CostPerRow, Multiplier}
 import org.neo4j.cypher.internal.v3_4.expressions.{HasLabels, Property}
+import org.neo4j.cypher.internal.v3_4.logical.plans._
 
 object CardinalityCostModel extends CostModel {
   def VERBOSE = java.lang.Boolean.getBoolean("CardinalityCostModel.VERBOSE")
@@ -78,7 +78,7 @@ object CardinalityCostModel extends CostModel {
          _: AbstractLetSemiApply |
          _: Limit |
          _: Optional |
-         _: SingleRow |
+         _: Argument |
          _: OuterHashJoin |
          _: AbstractSemiApply |
          _: Skip |

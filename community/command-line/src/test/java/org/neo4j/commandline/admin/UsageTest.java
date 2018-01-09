@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,15 +19,15 @@
  */
 package org.neo4j.commandline.admin;
 
-import java.util.Collections;
-import java.util.function.Consumer;
-import javax.annotation.Nonnull;
-
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+
+import java.util.Collections;
+import java.util.function.Consumer;
+import javax.annotation.Nonnull;
 
 import org.neo4j.commandline.arguments.Arguments;
 
@@ -130,7 +130,7 @@ public class UsageTest
         ordered.verifyNoMoreInteractions();
     }
 
-    private class TestGeneralSection extends AdminCommandSection
+    private static class TestGeneralSection extends AdminCommandSection
     {
 
         @Override

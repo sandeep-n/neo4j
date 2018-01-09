@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,13 +20,17 @@
 package org.neo4j.tooling;
 
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.function.Function;
 
@@ -47,6 +51,7 @@ import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.configuration.Settings;
 import org.neo4j.kernel.impl.logging.LogService;
 import org.neo4j.kernel.impl.logging.StoreLogService;
+import org.neo4j.kernel.impl.store.format.RecordFormatSelector;
 import org.neo4j.kernel.impl.util.Converters;
 import org.neo4j.kernel.impl.util.OsBeanUtil;
 import org.neo4j.kernel.impl.util.Validator;
@@ -71,14 +76,20 @@ import org.neo4j.unsafe.impl.batchimport.input.csv.IdType;
 import org.neo4j.unsafe.impl.batchimport.staging.ExecutionMonitors;
 
 import static java.nio.charset.Charset.defaultCharset;
+import static java.util.Arrays.asList;
+
 import static org.neo4j.graphdb.factory.GraphDatabaseSettings.logs_directory;
 import static org.neo4j.graphdb.factory.GraphDatabaseSettings.store_internal_log_path;
 import static org.neo4j.helpers.Exceptions.launderedException;
 import static org.neo4j.helpers.Format.bytes;
 import static org.neo4j.helpers.Strings.TAB;
+import static org.neo4j.helpers.TextUtil.tokenizeStringWithQuotes;
 import static org.neo4j.io.ByteUnit.mebiBytes;
+import static org.neo4j.io.fs.FileUtils.readTextFile;
 import static org.neo4j.kernel.configuration.Settings.parseLongWithUnit;
+import static org.neo4j.kernel.impl.store.PropertyType.EMPTY_BYTE_ARRAY;
 import static org.neo4j.kernel.impl.util.Converters.withDefault;
+import static org.neo4j.unsafe.impl.batchimport.AdditionalInitialIds.EMPTY;
 import static org.neo4j.unsafe.impl.batchimport.Configuration.BAD_FILE_NAME;
 import static org.neo4j.unsafe.impl.batchimport.Configuration.DEFAULT;
 import static org.neo4j.unsafe.impl.batchimport.Configuration.DEFAULT_MAX_MEMORY_PERCENT;
@@ -115,6 +126,12 @@ public class ImportTool
 
     enum Options
     {
+        FILE( "f", null,
+                "<file name>",
+                "File containing all arguments, used as an alternative to supplying all arguments on the command line directly."
+                        + "Each argument can be on a separate line or multiple arguments per line separated by space."
+                        + "Arguments containing spaces needs to be quoted."
+                        + "Supplying other arguments in addition to this file argument is not supported." ),
         STORE_DIR( "into", null,
                 "<store-dir>",
                 "Database directory to import into. " + "Must not contain existing database." ),
@@ -263,9 +280,7 @@ public class ImportTool
             this( key, defaultValue, usage, description, supported, false );
         }
 
-        Options( String key, Object defaultValue, String usage, String description, boolean supported, boolean
-                keyAndUsageGoTogether
-                )
+        Options( String key, Object defaultValue, String usage, String description, boolean supported, boolean keyAndUsageGoTogether )
         {
             this.key = key;
             this.defaultValue = defaultValue;
@@ -401,10 +416,13 @@ public class ImportTool
         File badFile = null;
         Long maxMemory;
         Boolean defaultHighIO;
+        InputStream in;
 
         boolean success = false;
         try ( FileSystemAbstraction fs = new DefaultFileSystemAbstraction() )
         {
+            args = useArgumentsFromFileArgumentIfPresent( args );
+
             storeDir = args.interpretOption( Options.STORE_DIR.key(), Converters.mandatory(),
                     Converters.toFile(), Validators.DIRECTORY_IS_WRITABLE, Validators.CONTAINS_NO_EXISTING_DATABASE );
             Config config = Config.defaults( GraphDatabaseSettings.neo4j_home, storeDir.getAbsolutePath() );
@@ -456,8 +474,9 @@ public class ImportTool
                     relationshipData( inputEncoding, relationshipsFiles ), defaultFormatRelationshipFileHeader(),
                     idType, csvConfiguration( args, defaultSettingsSuitableForTests ), badCollector,
                     configuration.maxNumberOfProcessors(), !skipBadRelationships );
+            in = defaultSettingsSuitableForTests ? new ByteArrayInputStream( EMPTY_BYTE_ARRAY ) : System.in;
 
-            doImport( out, err, storeDir, logsDir, badFile, fs, nodesFiles, relationshipsFiles,
+            doImport( out, err, in, storeDir, logsDir, badFile, fs, nodesFiles, relationshipsFiles,
                     enableStacktrace, input, dbConfig, badOutput, configuration );
 
             success = true;
@@ -479,7 +498,32 @@ public class ImportTool
         }
     }
 
-    private static Long parseMaxMemory( String maxMemoryString )
+    public static Args useArgumentsFromFileArgumentIfPresent( Args args ) throws IOException
+    {
+        String fileArgument = args.get( Options.FILE.key(), null );
+        if ( fileArgument != null )
+        {
+            // Are there any other arguments supplied, in addition to this -f argument?
+            if ( args.asMap().size() > 1 )
+            {
+                throw new IllegalArgumentException(
+                        "Supplying arguments in addition to " + Options.FILE.argument() + " isn't supported." );
+            }
+
+            // Read the arguments from the -f file and use those instead
+            args = Args.parse( parseFileArgumentList( new File( fileArgument ) ) );
+        }
+        return args;
+    }
+
+    public static String[] parseFileArgumentList( File file ) throws IOException
+    {
+        List<String> arguments = new ArrayList<>();
+        readTextFile( file, line -> arguments.addAll( asList( tokenizeStringWithQuotes( line, true, true ) ) ) );
+        return arguments.toArray( new String[arguments.size()] );
+    }
+
+    static Long parseMaxMemory( String maxMemoryString )
     {
         if ( maxMemoryString != null )
         {
@@ -501,7 +545,7 @@ public class ImportTool
         return null;
     }
 
-    public static void doImport( PrintStream out, PrintStream err, File storeDir, File logsDir, File badFile,
+    public static void doImport( PrintStream out, PrintStream err, InputStream in, File storeDir, File logsDir, File badFile,
                                  FileSystemAbstraction fs, Collection<Option<File[]>> nodesFiles,
                                  Collection<Option<File[]>> relationshipsFiles, boolean enableStacktrace, Input input,
                                  Config dbConfig, OutputStream badOutput,
@@ -517,10 +561,13 @@ public class ImportTool
         life.start();
         BatchImporter importer = new ParallelBatchImporter( storeDir,
                 fs,
+                null, // no external page cache
                 configuration,
                 logService,
-                ExecutionMonitors.defaultVisible(),
-                dbConfig );
+                ExecutionMonitors.defaultVisible( in ),
+                EMPTY,
+                dbConfig,
+                RecordFormatSelector.selectForConfig( dbConfig, logService.getInternalLogProvider() ) );
         printOverview( storeDir, nodesFiles, relationshipsFiles, configuration, out );
         success = false;
         try
@@ -605,7 +652,7 @@ public class ImportTool
         return file != null && file.exists() ? Config.defaults( MapUtil.load( file ) ) : Config.defaults();
     }
 
-    private static void printOverview( File storeDir, Collection<Option<File[]>> nodesFiles,
+    static void printOverview( File storeDir, Collection<Option<File[]>> nodesFiles,
             Collection<Option<File[]>> relationshipsFiles,
             org.neo4j.unsafe.impl.batchimport.Configuration configuration, PrintStream out )
     {

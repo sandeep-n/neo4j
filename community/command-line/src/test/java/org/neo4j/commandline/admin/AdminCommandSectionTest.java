@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -94,7 +94,7 @@ public class AdminCommandSectionTest
         assertEquals( "General-AnotherTest", map.get( testAnotherGeneralSection ) );
     }
 
-    private class TestGeneralSection extends AdminCommandSection
+    private static class TestGeneralSection extends AdminCommandSection
     {
 
         @Override
@@ -105,7 +105,7 @@ public class AdminCommandSectionTest
         }
     }
 
-    private class TestAnotherGeneralSection extends AdminCommandSection
+    private static class TestAnotherGeneralSection extends AdminCommandSection
     {
 
         @Override

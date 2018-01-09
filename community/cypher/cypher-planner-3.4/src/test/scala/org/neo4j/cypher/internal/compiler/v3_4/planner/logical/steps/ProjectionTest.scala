@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -40,10 +40,10 @@ class ProjectionTest extends CypherFunSuite with LogicalPlanningTestSupport {
     // given
     val projections: Map[String, Expression] = Map("42" -> SignedDecimalIntegerLiteral("42") _)
 
-    implicit val (context, startPlan) = queryGraphWith(projectionsMap = projections)
+    val (context, startPlan) = queryGraphWith(projectionsMap = projections)
 
     // when
-    val result = projection(startPlan, projections)
+    val result = projection(startPlan, projections, context)
 
     // then
     result should equal(Projection(startPlan, projections)(solved))
@@ -53,10 +53,10 @@ class ProjectionTest extends CypherFunSuite with LogicalPlanningTestSupport {
   test("does not add projection when not needed") {
     // given
     val projections: Map[String, Expression] = Map("n" -> Variable("n") _)
-    implicit val (context, startPlan) = queryGraphWith(projectionsMap = projections)
+    val (context, startPlan) = queryGraphWith(projectionsMap = projections)
 
     // when
-    val result = projection(startPlan, projections)
+    val result = projection(startPlan, projections, context)
 
     // then
     result should equal(startPlan)
@@ -66,10 +66,10 @@ class ProjectionTest extends CypherFunSuite with LogicalPlanningTestSupport {
   test("does projection when renaming columns") {
     // given
     val projections: Map[String, Expression] = Map("  n@34" -> Variable("n") _)
-    implicit val (context, startPlan) = queryGraphWith(projectionsMap = projections)
+    val (context, startPlan) = queryGraphWith(projectionsMap = projections)
 
     // when
-    val result = projection(startPlan, projections)
+    val result = projection(startPlan, projections, context)
 
     // then
     result should equal(Projection(startPlan, projections)(solved))

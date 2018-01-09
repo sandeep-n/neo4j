@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -73,6 +73,40 @@ public class DefaultPageCursorTracerTest
 
         assertEquals( 1, pageCursorTracer.pins() );
         assertEquals( 1, pageCursorTracer.hits() );
+    }
+
+    @Test
+    public void accumulateHitsReporting()
+    {
+        pinAndHit();
+        pinAndHit();
+
+        assertEquals( 2, pageCursorTracer.hits() );
+        assertEquals( 2, pageCursorTracer.accumulatedHits() );
+
+        pageCursorTracer.reportEvents();
+        pinAndHit();
+
+        assertEquals( 1, pageCursorTracer.hits() );
+        assertEquals( 3, pageCursorTracer.accumulatedHits() );
+    }
+
+    @Test
+    public void accumulatedFaultsReporting()
+    {
+        pinFaultAndHit();
+        pinFaultAndHit();
+
+        assertEquals( 2, pageCursorTracer.faults() );
+        assertEquals( 2, pageCursorTracer.accumulatedFaults() );
+
+        pageCursorTracer.reportEvents();
+        pinFaultAndHit();
+        pinFaultAndHit();
+
+        assertEquals( 2,  pageCursorTracer.faults() );
+        assertEquals( 4, pageCursorTracer.accumulatedFaults() );
+        assertEquals( 0, pageCursorTracer.accumulatedHits() );
     }
 
     @Test

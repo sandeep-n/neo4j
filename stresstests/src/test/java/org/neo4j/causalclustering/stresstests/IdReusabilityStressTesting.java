@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -79,7 +79,7 @@ public class IdReusabilityStressTesting
     private static final RelationshipType RELATIONSHIP_TYPE = RelationshipType.withName( "testType" );
 
     @Rule
-    public final ClusterRule clusterRule = new ClusterRule( getClass() );
+    public final ClusterRule clusterRule = new ClusterRule();
 
     private final DefaultFileSystemRule defaultFileSystemRule = new DefaultFileSystemRule();
     private DefaultFileSystemAbstraction fs;

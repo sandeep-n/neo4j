@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,6 +22,7 @@ package org.neo4j.backup.stresstests;
 import org.junit.Test;
 
 import java.io.File;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -81,7 +82,7 @@ public class BackupServiceStressTesting
         FileUtils.deleteRecursively( store );
         FileUtils.deleteRecursively( work );
         File storeDirectory = ensureExistsAndEmpty( store );
-        File workDirectory = ensureExistsAndEmpty( work );
+        Path workDirectory = ensureExistsAndEmpty( work ).toPath();
 
         final Map<String,String> config =
                 configureBackup( configureTxLogRotationAndPruning( new HashMap<>(), txPrune ), backupHostname,
@@ -133,6 +134,6 @@ public class BackupServiceStressTesting
 
         // let's cleanup disk space when everything went well
         FileUtils.deleteRecursively( storeDirectory );
-        FileUtils.deleteRecursively( workDirectory );
+        FileUtils.deletePathRecursively( workDirectory );
     }
 }

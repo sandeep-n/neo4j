@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -152,7 +152,7 @@ public class JumpingFileSystemAbstraction extends DelegatingFileSystemAbstractio
     {
         private final int recordSize;
 
-        public JumpingFileChannel( StoreFileChannel actual, int recordSize )
+        JumpingFileChannel( StoreFileChannel actual, int recordSize )
         {
             super( actual );
             this.recordSize = recordSize;
@@ -249,12 +249,6 @@ public class JumpingFileSystemAbstraction extends DelegatingFileSystemAbstractio
         public int read( ByteBuffer dst, long position ) throws IOException
         {
             return super.read( dst, translateIncoming( position ) );
-        }
-
-        @Override
-        public int write( ByteBuffer src, long position ) throws IOException
-        {
-            return super.write( src, translateIncoming( position ) );
         }
     }
 }

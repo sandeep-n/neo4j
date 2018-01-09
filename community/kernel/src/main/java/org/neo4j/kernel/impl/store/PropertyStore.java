@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,19 +20,25 @@
 package org.neo4j.kernel.impl.store;
 
 import java.io.File;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.file.OpenOption;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.function.ToIntFunction;
 
 import org.neo4j.collection.primitive.PrimitiveLongObjectMap;
 import org.neo4j.cursor.Cursor;
 import org.neo4j.helpers.collection.Iterables;
 import org.neo4j.helpers.collection.Pair;
 import org.neo4j.io.pagecache.PageCache;
+import org.neo4j.io.pagecache.PageCursor;
 import org.neo4j.kernel.configuration.Config;
+import org.neo4j.kernel.impl.store.format.Capability;
 import org.neo4j.kernel.impl.store.format.RecordFormats;
+import org.neo4j.kernel.impl.store.format.UnsupportedFormatCapabilityException;
 import org.neo4j.kernel.impl.store.format.standard.StandardFormatSettings;
 import org.neo4j.kernel.impl.store.id.IdGeneratorFactory;
 import org.neo4j.kernel.impl.store.id.IdType;
@@ -42,28 +48,92 @@ import org.neo4j.kernel.impl.store.record.PropertyRecord;
 import org.neo4j.kernel.impl.store.record.Record;
 import org.neo4j.kernel.impl.store.record.RecordLoad;
 import org.neo4j.logging.LogProvider;
+import org.neo4j.storageengine.api.StorageStatement;
 import org.neo4j.string.UTF8;
+import org.neo4j.values.storable.ArrayValue;
+import org.neo4j.values.storable.CoordinateReferenceSystem;
 import org.neo4j.values.storable.Value;
+import org.neo4j.values.storable.ValueWriter;
 
 import static org.neo4j.kernel.impl.store.DynamicArrayStore.getRightArray;
 import static org.neo4j.kernel.impl.store.NoStoreHeaderFormat.NO_STORE_HEADER_FORMAT;
+import static org.neo4j.kernel.impl.store.record.AbstractBaseRecord.NO_ID;
 import static org.neo4j.kernel.impl.store.record.RecordLoad.NORMAL;
 
 /**
  * Implementation of the property store. This implementation has two dynamic
  * stores. One used to store keys and another for string property values.
+ * Primitives are directly stored in the PropertyStore using this format:
+ * <pre>
+ *  0: high bits  ( 1 byte)
+ *  1: next       ( 4 bytes)    where new property records are added
+ *  5: prev       ( 4 bytes)    points to more PropertyRecords in this chain
+ *  9: payload    (32 bytes - 4 x 8 byte blocks)
+ * </pre>
+ * <h2>high bits</h2>
+ * <pre>
+ * [    ,xxxx] high(next)
+ * [xxxx,    ] high(prev)
+ * </pre>
+ * <h2>block structure</h2>
+ * <pre>
+ * [][][][] [    ,xxxx] [    ,    ] [    ,    ] [    ,    ] type (0x0000_0000_0F00_0000)
+ * [][][][] [    ,    ] [xxxx,xxxx] [xxxx,xxxx] [xxxx,xxxx] key  (0x0000_0000_00FF_FFFF)
+ * </pre>
+ * <h2>property types</h2>
+ * <pre>
+ *  1: BOOL
+ *  2: BYTE
+ *  3: SHORT
+ *  4: CHAR
+ *  5: INT
+ *  6: LONG
+ *  7: FLOAT
+ *  8: DOUBLE
+ *  9: STRING REFERENCE
+ * 10: ARRAY  REFERENCE
+ * 11: SHORT STRING
+ * 12: SHORT ARRAY
+ * 13: GEOMETRY
+ * </pre>
+ * <h2>value formats</h2>
+ * <pre>
+ * BOOL:      [    ,    ] [    ,    ] [    ,    ] [    ,    ] [   x,type][K][K][K]           (0x0000_0000_1000_0000)
+ * BYTE:      [    ,    ] [    ,    ] [    ,    ] [    ,xxxx] [xxxx,type][K][K][K]    (>>28) (0x0000_000F_F000_0000)
+ * SHORT:     [    ,    ] [    ,    ] [    ,xxxx] [xxxx,xxxx] [xxxx,type][K][K][K]    (>>28) (0x0000_0FFF_F000_0000)
+ * CHAR:      [    ,    ] [    ,    ] [    ,xxxx] [xxxx,xxxx] [xxxx,type][K][K][K]    (>>28) (0x0000_0FFF_F000_0000)
+ * INT:       [    ,xxxx] [xxxx,xxxx] [xxxx,xxxx] [xxxx,xxxx] [xxxx,type][K][K][K]    (>>28) (0x0FFF_FFFF_F000_0000)
+ * LONG:      [xxxx,xxxx] [xxxx,xxxx] [xxxx,xxxx] [xxxx,xxxx] [xxx1,type][K][K][K] inline>>29(0xFFFF_FFFF_E000_0000)
+ * LONG:      [    ,    ] [    ,    ] [    ,    ] [    ,    ] [   0,type][K][K][K] value in next long block
+ * FLOAT:     [    ,xxxx] [xxxx,xxxx] [xxxx,xxxx] [xxxx,xxxx] [xxxx,type][K][K][K]    (>>28) (0x0FFF_FFFF_F000_0000)
+ * DOUBLE:    [    ,    ] [    ,    ] [    ,    ] [    ,    ] [    ,type][K][K][K] value in next long block
+ * REFERENCE: [xxxx,xxxx] [xxxx,xxxx] [xxxx,xxxx] [xxxx,xxxx] [xxxx,type][K][K][K]    (>>28) (0xFFFF_FFFF_F000_0000)
+ * SHORT STR: [    ,    ] [    ,    ] [    ,    ] [    ,   x] [xxxx,type][K][K][K] encoding  (0x0000_0001_F000_0000)
+ *            [    ,    ] [    ,    ] [    ,    ] [ xxx,xxx ] [    ,type][K][K][K] length    (0x0000_007E_0000_0000)
+ *            [xxxx,xxxx] [xxxx,xxxx] [xxxx,xxxx] [x   ,    ] payload(+ maybe in next block) (0xFFFF_FF80_0000_0000)
+ *                                                            bits are densely packed, bytes torn across blocks
+ * SHORT ARR: [    ,    ] [    ,    ] [    ,    ] [    ,    ] [xxxx,type][K][K][K] data type (0x0000_0000_F000_0000)
+ *            [    ,    ] [    ,    ] [    ,    ] [  xx,xxxx] [    ,type][K][K][K] length    (0x0000_003F_0000_0000)
+ *            [    ,    ] [    ,    ] [    ,xxxx] [xx  ,    ] [    ,type][K][K][K] bits/item (0x0000_003F_0000_0000)
+ *                                                                                 0 means 64, other values "normal"
+ *            [xxxx,xxxx] [xxxx,xxxx] [xxxx,    ] [    ,    ] payload(+ maybe in next block) (0xFFFF_FF00_0000_0000)
+ *                                                            bits are densely packed, bytes torn across blocks
+ * POINT:     [    ,    ] [    ,    ] [    ,    ] [    ,    ] [xxxx,type][K][K][K] geometry subtype
+ *            [    ,    ] [    ,    ] [    ,    ] [    ,xxxx] [    ,type][K][K][K] dimension
+ *            [    ,    ] [    ,    ] [    ,    ] [xxxx,    ] [    ,type][K][K][K] CRSTable
+ *            [    ,    ] [xxxx,xxxx] [xxxx,xxxx] [    ,    ] [    ,type][K][K][K] CRS code
+ *            [    ,   x] [    ,    ] [    ,    ] [    ,    ] [    ,type][K][K][K] Precision flag: 0=double, 1=float
+ *            values in next dimension long blocks
+ * </pre>
  */
-public class PropertyStore extends CommonAbstractStore<PropertyRecord,NoStoreHeader>
+public class PropertyStore extends CommonAbstractStore<PropertyRecord,NoStoreHeader> implements StorageStatement.Properties
 {
-    public abstract static class Configuration extends CommonAbstractStore.Configuration
-    {
-    }
-
     public static final String TYPE_DESCRIPTOR = "PropertyStore";
 
     private final DynamicStringStore stringStore;
     private final PropertyKeyTokenStore propertyKeyTokenStore;
     private final DynamicArrayStore arrayStore;
+    private final boolean allowStorePoints;
 
     public PropertyStore(
             File fileName,
@@ -82,6 +152,7 @@ public class PropertyStore extends CommonAbstractStore<PropertyRecord,NoStoreHea
         this.stringStore = stringPropertyStore;
         this.propertyKeyTokenStore = propertyKeyTokenStore;
         this.arrayStore = arrayPropertyStore;
+        allowStorePoints = recordFormats.hasCapability( Capability.POINT_PROPERTIES );
     }
 
     @Override
@@ -213,86 +284,24 @@ public class PropertyStore extends CommonAbstractStore<PropertyRecord,NoStoreHea
     }
 
     public static void allocateArrayRecords( Collection<DynamicRecord> target, Object array,
-            DynamicRecordAllocator allocator )
+            DynamicRecordAllocator allocator, boolean allowStorePoints )
     {
-        DynamicArrayStore.allocateRecords( target, array, allocator );
+        DynamicArrayStore.allocateRecords( target, array, allocator, allowStorePoints );
     }
 
     public void encodeValue( PropertyBlock block, int keyId, Value value )
     {
-        encodeValue( block, keyId, value, stringStore, arrayStore );
+        encodeValue( block, keyId, value, stringStore, arrayStore, allowStorePoints );
     }
 
-    public static void encodeValue( PropertyBlock block, int keyId, Value value,
-            DynamicRecordAllocator stringAllocator, DynamicRecordAllocator arrayAllocator )
+    public static void encodeValue( PropertyBlock block, int keyId, Value value, DynamicRecordAllocator stringAllocator, DynamicRecordAllocator arrayAllocator,
+            boolean allowStorePoints )
     {
-        // TODO: use ValueWriter
-        Object asObject = value.asObject();
-        if ( asObject instanceof String )
-        {   // Try short string first, i.e. inlined in the property block
-            String string = (String) asObject;
-            if ( LongerShortString.encode( keyId, string, block, PropertyType.getPayloadSize() ) )
-            {
-                return;
-            }
+        if ( value instanceof ArrayValue )
+        {
+            Object asObject = value.asObject();
 
-            // Fall back to dynamic string store
-            byte[] encodedString = encodeString( string );
-            List<DynamicRecord> valueRecords = new ArrayList<>();
-            allocateStringRecords( valueRecords, encodedString, stringAllocator );
-            setSingleBlockValue( block, keyId, PropertyType.STRING, Iterables.first( valueRecords ).getId() );
-            for ( DynamicRecord valueRecord : valueRecords )
-            {
-                valueRecord.setType( PropertyType.STRING.intValue() );
-            }
-            block.setValueRecords( valueRecords );
-        }
-        else if ( asObject instanceof Integer )
-        {
-            setSingleBlockValue( block, keyId, PropertyType.INT, ((Integer) asObject).longValue() );
-        }
-        else if ( asObject instanceof Boolean )
-        {
-            setSingleBlockValue( block, keyId, PropertyType.BOOL, (Boolean) asObject ? 1L : 0L );
-        }
-        else if ( asObject instanceof Float )
-        {
-            setSingleBlockValue( block, keyId, PropertyType.FLOAT, Float.floatToRawIntBits( (Float) asObject ) );
-        }
-        else if ( asObject instanceof Long )
-        {
-
-            long keyAndType = keyId | (((long) PropertyType.LONG.intValue()) <<
-                                       StandardFormatSettings.PROPERTY_TOKEN_MAXIMUM_ID_BITS);
-            if ( ShortArray.LONG.getRequiredBits( (Long) asObject ) <= 35 )
-            {   // We only need one block for this value, special layout compared to, say, an integer
-                block.setSingleBlock( keyAndType | (1L << 28) | ((Long) asObject << 29) );
-            }
-            else
-            {   // We need two blocks for this value
-                block.setValueBlocks( new long[]{keyAndType, (Long) asObject} );
-            }
-        }
-        else if ( asObject instanceof Double )
-        {
-            block.setValueBlocks( new long[]{ keyId |
-                    (((long) PropertyType.DOUBLE.intValue()) << StandardFormatSettings.PROPERTY_TOKEN_MAXIMUM_ID_BITS),
-                    Double.doubleToRawLongBits( (Double) asObject )} );
-        }
-        else if ( asObject instanceof Byte )
-        {
-            setSingleBlockValue( block, keyId, PropertyType.BYTE, ((Byte) asObject).longValue() );
-        }
-        else if ( asObject instanceof Character )
-        {
-            setSingleBlockValue( block, keyId, PropertyType.CHAR, (Character) asObject );
-        }
-        else if ( asObject instanceof Short )
-        {
-            setSingleBlockValue( block, keyId, PropertyType.SHORT, ((Short) asObject).longValue() );
-        }
-        else if ( asObject.getClass().isArray() )
-        {   // Try short array first, i.e. inlined in the property block
+            // Try short array first, i.e. inlined in the property block
             if ( ShortArray.encode( keyId, asObject, block, PropertyType.getPayloadSize() ) )
             {
                 return;
@@ -300,7 +309,7 @@ public class PropertyStore extends CommonAbstractStore<PropertyRecord,NoStoreHea
 
             // Fall back to dynamic array store
             List<DynamicRecord> arrayRecords = new ArrayList<>();
-            allocateArrayRecords( arrayRecords, asObject, arrayAllocator );
+            allocateArrayRecords( arrayRecords, asObject, arrayAllocator, allowStorePoints );
             setSingleBlockValue( block, keyId, PropertyType.ARRAY, Iterables.first( arrayRecords ).getId() );
             for ( DynamicRecord valueRecord : arrayRecords )
             {
@@ -310,7 +319,207 @@ public class PropertyStore extends CommonAbstractStore<PropertyRecord,NoStoreHea
         }
         else
         {
-            throw new IllegalArgumentException( "Unknown property type on: " + asObject + ", " + asObject.getClass() );
+            value.writeTo( new PropertyBlockValueWriter( block, keyId, stringAllocator, allowStorePoints ) );
+        }
+    }
+
+    @Override
+    public PageCursor openStringPageCursor( long reference )
+    {
+        return stringStore.openPageCursorForReading( reference );
+    }
+
+    @Override
+    public PageCursor openArrayPageCursor( long reference )
+    {
+        return arrayStore.openPageCursorForReading( reference );
+    }
+
+    @Override
+    public ByteBuffer loadString( long reference, ByteBuffer buffer, PageCursor page )
+    {
+        return readDynamic( stringStore, reference, buffer, page );
+    }
+
+    @Override
+    public ByteBuffer loadArray( long reference, ByteBuffer buffer, PageCursor page )
+    {
+        return readDynamic( arrayStore, reference, buffer, page );
+    }
+
+    private static ByteBuffer readDynamic( AbstractDynamicStore store, long reference, ByteBuffer buffer,
+            PageCursor page )
+    {
+        if ( buffer == null )
+        {
+            buffer = ByteBuffer.allocate( 512 );
+        }
+        else
+        {
+            buffer.clear();
+        }
+        DynamicRecord record = store.newRecord();
+        do
+        {
+            //We need to load forcefully here since otherwise we can have inconsistent reads
+            //for properties across blocks, see org.neo4j.graphdb.ConsistentPropertyReadsIT
+            store.getRecordByCursor( reference, record, RecordLoad.FORCE, page );
+            reference = record.getNextBlock();
+            byte[] data = record.getData();
+            if ( buffer.remaining() < data.length )
+            {
+                buffer = grow( buffer, data.length );
+            }
+            buffer.put( data, 0, data.length );
+        }
+        while ( reference != NO_ID );
+        return buffer;
+    }
+
+    private static ByteBuffer grow( ByteBuffer buffer, int required )
+    {
+        buffer.flip();
+        int capacity = buffer.capacity();
+        do
+        {
+            capacity *= 2;
+        }
+        while ( capacity - buffer.limit() < required );
+        return ByteBuffer.allocate( capacity ).order( ByteOrder.LITTLE_ENDIAN ).put( buffer );
+    }
+
+    private static class PropertyBlockValueWriter implements ValueWriter<IllegalArgumentException>
+    {
+        private final PropertyBlock block;
+        private final int keyId;
+        private final DynamicRecordAllocator stringAllocator;
+        private final boolean allowStorePoints;
+
+        PropertyBlockValueWriter( PropertyBlock block, int keyId, DynamicRecordAllocator stringAllocator, boolean allowStorePoints )
+        {
+            this.block = block;
+            this.keyId = keyId;
+            this.stringAllocator = stringAllocator;
+            this.allowStorePoints = allowStorePoints;
+        }
+
+        @Override
+        public void writeNull() throws IllegalArgumentException
+        {
+            throw new IllegalArgumentException( "Cannot write null values to the property store" );
+        }
+
+        @Override
+        public void writeBoolean( boolean value ) throws IllegalArgumentException
+        {
+            setSingleBlockValue( block, keyId, PropertyType.BOOL, value ? 1L : 0L );
+        }
+
+        @Override
+        public void writeInteger( byte value ) throws IllegalArgumentException
+        {
+            setSingleBlockValue( block, keyId, PropertyType.BYTE, value );
+        }
+
+        @Override
+        public void writeInteger( short value ) throws IllegalArgumentException
+        {
+            setSingleBlockValue( block, keyId, PropertyType.SHORT, value );
+        }
+
+        @Override
+        public void writeInteger( int value ) throws IllegalArgumentException
+        {
+            setSingleBlockValue( block, keyId, PropertyType.INT, value );
+        }
+
+        @Override
+        public void writeInteger( long value ) throws IllegalArgumentException
+        {
+            long keyAndType = keyId | (((long) PropertyType.LONG.intValue()) <<
+                                       StandardFormatSettings.PROPERTY_TOKEN_MAXIMUM_ID_BITS);
+            if ( ShortArray.LONG.getRequiredBits( value ) <= 35 )
+            {   // We only need one block for this value, special layout compared to, say, an integer
+                block.setSingleBlock( keyAndType | (1L << 28) | (value << 29) );
+            }
+            else
+            {   // We need two blocks for this value
+                block.setValueBlocks( new long[]{keyAndType, value} );
+            }
+        }
+
+        @Override
+        public void writeFloatingPoint( float value ) throws IllegalArgumentException
+        {
+            setSingleBlockValue( block, keyId, PropertyType.FLOAT, Float.floatToRawIntBits( value ) );
+        }
+
+        @Override
+        public void writeFloatingPoint( double value ) throws IllegalArgumentException
+        {
+            block.setValueBlocks( new long[]{
+                    keyId | (((long) PropertyType.DOUBLE.intValue())
+                             << StandardFormatSettings.PROPERTY_TOKEN_MAXIMUM_ID_BITS),
+                    Double.doubleToRawLongBits( value )
+            } );
+        }
+
+        @Override
+        public void writeString( String value ) throws IllegalArgumentException
+        {
+            // Try short string first, i.e. inlined in the property block
+            if ( LongerShortString.encode( keyId, value, block, PropertyType.getPayloadSize() ) )
+            {
+                return;
+            }
+
+            // Fall back to dynamic string store
+            byte[] encodedString = encodeString( value );
+            List<DynamicRecord> valueRecords = new ArrayList<>();
+            allocateStringRecords( valueRecords, encodedString, stringAllocator );
+            setSingleBlockValue( block, keyId, PropertyType.STRING, Iterables.first( valueRecords ).getId() );
+            for ( DynamicRecord valueRecord : valueRecords )
+            {
+                valueRecord.setType( PropertyType.STRING.intValue() );
+            }
+            block.setValueRecords( valueRecords );
+        }
+
+        @Override
+        public void writeString( char value ) throws IllegalArgumentException
+        {
+            setSingleBlockValue( block, keyId, PropertyType.CHAR, value );
+        }
+
+        @Override
+        public void beginArray( int size, ArrayType arrayType ) throws IllegalArgumentException
+        {
+            throw new IllegalArgumentException( "Cannot persist arrays to property store using ValueWriter" );
+        }
+
+        @Override
+        public void endArray() throws IllegalArgumentException
+        {
+            throw new IllegalArgumentException( "Cannot persist arrays to property store using ValueWriter" );
+        }
+
+        @Override
+        public void writeByteArray( byte[] value ) throws IllegalArgumentException
+        {
+            throw new IllegalArgumentException( "Cannot persist arrays to property store using ValueWriter" );
+        }
+
+        @Override
+        public void writePoint( CoordinateReferenceSystem crs, double[] coordinate ) throws IllegalArgumentException
+        {
+            if ( allowStorePoints )
+            {
+                block.setValueBlocks( GeometryType.encodePoint( keyId, crs, coordinate ) );
+            }
+            else
+            {
+                throw new UnsupportedFormatCapabilityException( Capability.POINT_PROPERTIES );
+            }
         }
     }
 
@@ -401,5 +610,18 @@ public class PropertyStore extends CommonAbstractStore<PropertyRecord,NoStoreHea
     public PropertyRecord newRecord()
     {
         return new PropertyRecord( -1 );
+    }
+
+    public boolean allowStorePoints()
+    {
+        return allowStorePoints;
+    }
+
+    /**
+     * @return a calculator of property value sizes. The returned instance is designed to be used multiple times by a single thread only.
+     */
+    public ToIntFunction<Value[]> newValueEncodedSizeCalculator()
+    {
+        return new PropertyValueRecordSizeCalculator( this );
     }
 }

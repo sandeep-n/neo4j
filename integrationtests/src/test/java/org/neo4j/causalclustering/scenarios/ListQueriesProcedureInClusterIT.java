@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -54,7 +54,7 @@ public class ListQueriesProcedureInClusterIT
 {
     private static final int THIRTY_SECONDS_TIMEOUT = 30;
     private final ClusterRule clusterRule =
-            new ClusterRule( getClass() ).withNumberOfCoreMembers( 3 ).withNumberOfReadReplicas( 1 );
+            new ClusterRule().withNumberOfCoreMembers( 3 ).withNumberOfReadReplicas( 1 );
     private final VerboseTimeout timeout = VerboseTimeout.builder().withTimeout( 1000, SECONDS ).build();
     @Rule
     public RuleChain ruleChain = RuleChain.outerRule( clusterRule ).around( timeout );

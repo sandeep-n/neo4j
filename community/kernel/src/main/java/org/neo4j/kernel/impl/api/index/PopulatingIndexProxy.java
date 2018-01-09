@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,15 +24,16 @@ import java.io.IOException;
 import java.util.concurrent.Future;
 
 import org.neo4j.graphdb.ResourceIterator;
+import org.neo4j.internal.kernel.api.IndexCapability;
+import org.neo4j.internal.kernel.api.InternalIndexState;
+import org.neo4j.internal.kernel.api.schema.LabelSchemaDescriptor;
 import org.neo4j.kernel.api.exceptions.index.IndexActivationFailedKernelException;
 import org.neo4j.kernel.api.exceptions.index.IndexEntryConflictException;
 import org.neo4j.kernel.api.exceptions.index.IndexNotFoundKernelException;
 import org.neo4j.kernel.api.exceptions.index.IndexPopulationFailedKernelException;
 import org.neo4j.kernel.api.index.IndexEntryUpdate;
 import org.neo4j.kernel.api.index.IndexUpdater;
-import org.neo4j.kernel.api.index.InternalIndexState;
 import org.neo4j.kernel.api.index.SchemaIndexProvider;
-import org.neo4j.kernel.api.schema.LabelSchemaDescriptor;
 import org.neo4j.kernel.api.schema.index.IndexDescriptor;
 import org.neo4j.storageengine.api.schema.IndexReader;
 import org.neo4j.storageengine.api.schema.PopulationProgress;
@@ -41,16 +42,12 @@ import static org.neo4j.helpers.collection.Iterators.emptyResourceIterator;
 
 public class PopulatingIndexProxy implements IndexProxy
 {
-    private final IndexDescriptor descriptor;
-    private final SchemaIndexProvider.Descriptor providerDescriptor;
+    private final IndexMeta indexMeta;
     private final IndexPopulationJob job;
 
-    public PopulatingIndexProxy( IndexDescriptor descriptor,
-                                 SchemaIndexProvider.Descriptor providerDescriptor,
-                                 IndexPopulationJob job )
+    PopulatingIndexProxy( IndexMeta indexMeta, IndexPopulationJob job )
     {
-        this.descriptor = descriptor;
-        this.providerDescriptor = providerDescriptor;
+        this.indexMeta = indexMeta;
         this.job = job;
     }
 
@@ -95,19 +92,19 @@ public class PopulatingIndexProxy implements IndexProxy
     @Override
     public IndexDescriptor getDescriptor()
     {
-        return descriptor;
+        return indexMeta.indexDescriptor();
     }
 
     @Override
     public LabelSchemaDescriptor schema()
     {
-        return descriptor.schema();
+        return indexMeta.indexDescriptor().schema();
     }
 
     @Override
     public SchemaIndexProvider.Descriptor getProviderDescriptor()
     {
-        return providerDescriptor;
+        return indexMeta.providerDescriptor();
     }
 
     @Override
@@ -117,9 +114,21 @@ public class PopulatingIndexProxy implements IndexProxy
     }
 
     @Override
+    public IndexCapability getIndexCapability()
+    {
+        return indexMeta.indexCapability();
+    }
+
+    @Override
     public void force()
     {
-        // Ignored... this isn't controlled from the outside while we're populating the index.
+        // Ignored... this isn't called from the outside while we're populating the index.
+    }
+
+    @Override
+    public void refresh()
+    {
+        // Ignored... this isn't called from the outside while we're populating the index.
     }
 
     @Override

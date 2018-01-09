@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -34,7 +34,7 @@ import org.neo4j.kernel.impl.locking.StatementLocks;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.neo4j.kernel.api.security.SecurityContext.AUTH_DISABLED;
+import static org.neo4j.internal.kernel.api.security.SecurityContext.AUTH_DISABLED;
 
 public class TerminationGuardTest extends KernelTransactionTestBase
 {
@@ -86,10 +86,10 @@ public class TerminationGuardTest extends KernelTransactionTestBase
     private KernelTransactionImplementation getKernelTransaction()
     {
         KernelTransactionImplementation transaction = newNotInitializedTransaction();
-        StatementLocks statementLocks = mock( StatementLocks.class, Answers.RETURNS_DEEP_STUBS.get() );
+        StatementLocks statementLocks = mock( StatementLocks.class, Answers.RETURNS_DEEP_STUBS );
         when( statementLocks.pessimistic().getLockSessionId() ).thenReturn( 1 );
         transaction.initialize( 1L, 2L, statementLocks, KernelTransaction.Type.implicit,
-                AUTH_DISABLED, 1L );
+                AUTH_DISABLED, 1L, 1L );
         return transaction;
     }
 

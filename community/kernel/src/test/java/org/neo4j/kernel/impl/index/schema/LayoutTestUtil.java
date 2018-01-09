@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -117,6 +117,20 @@ abstract class LayoutTestUtil<KEY extends SchemaNumberKey, VALUE extends SchemaN
                 return uniqueValues.get( randomRule.nextInt( uniqueValues.size() ) );
             }
         };
+    }
+
+    Value[] extractValuesFromUpdates( IndexEntryUpdate<IndexDescriptor>[] updates )
+    {
+        Value[] values = new Value[updates.length];
+        for ( int i = 0; i < updates.length; i++ )
+        {
+            if ( updates[i].values().length > 1 )
+            {
+                throw new UnsupportedOperationException( "This method does not support composite entries" );
+            }
+            values[i] = updates[i].values()[0];
+        }
+        return values;
     }
 
     IndexEntryUpdate<IndexDescriptor>[] someUpdatesNoDuplicateValues()

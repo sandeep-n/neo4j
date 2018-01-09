@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,16 +20,16 @@
 package org.neo4j.cypher.internal.runtime.interpreted.pipes
 
 import org.neo4j.cypher.internal.runtime.interpreted.ExecutionContext
-import org.neo4j.cypher.internal.v3_4.logical.plans.LogicalPlanId
+import org.neo4j.cypher.internal.util.v3_4.attribution.Id
 import org.neo4j.values.AnyValue
 import org.neo4j.values.storable.Values
-import org.neo4j.values.virtual.NodeValue
+import org.neo4j.values.virtual.VirtualNodeValue
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
 case class NodeOuterHashJoinPipe(nodeVariables: Set[String], source: Pipe, inner: Pipe, nullableVariables: Set[String])
-                                (val id: LogicalPlanId = LogicalPlanId.DEFAULT)
+                                (val id: Id = Id.INVALID_ID)
   extends PipeWithSource(source) {
   val nullColumns: Seq[(String, AnyValue)] = nullableVariables.map(_ -> Values.NO_VALUE).toSeq
 
@@ -59,7 +59,7 @@ case class NodeOuterHashJoinPipe(nodeVariables: Set[String], source: Pipe, inner
     rowsWithNullAsJoinKey ++ joinedRows ++ rowsWithoutRhsMatch
   }
 
-  private def addNulls(in: ExecutionContext): ExecutionContext = in.newWith(nullColumns)
+  private def addNulls(in: ExecutionContext): ExecutionContext = in.set(nullColumns)
 
   private def buildProbeTableAndFindNullRows(input: Iterator[ExecutionContext]): ProbeTable = {
     val probeTable = new ProbeTable()
@@ -83,7 +83,7 @@ case class NodeOuterHashJoinPipe(nodeVariables: Set[String], source: Pipe, inner
 
     for (idx <- myVariables.indices) {
       key(idx) = context(myVariables(idx)) match {
-        case n: NodeValue => n.id
+        case n: VirtualNodeValue => n.id
         case _ => return None
       }
     }

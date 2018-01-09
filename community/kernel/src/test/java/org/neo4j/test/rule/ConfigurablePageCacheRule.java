@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,7 +22,6 @@ package org.neo4j.test.rule;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.io.pagecache.PageCache;
-import org.neo4j.io.pagecache.PageSwapperFactory;
 import org.neo4j.io.pagecache.tracing.PageCacheTracer;
 import org.neo4j.io.pagecache.tracing.cursor.DefaultPageCursorTracerSupplier;
 import org.neo4j.io.pagecache.tracing.cursor.PageCursorTracerSupplier;
@@ -53,18 +52,7 @@ public class ConfigurablePageCacheRule extends PageCacheRule
         config.augmentDefaults( GraphDatabaseSettings.pagecache_memory, "8M" );
         FormattedLogProvider logProvider = FormattedLogProvider.toOutputStream( System.err );
         ConfiguringPageCacheFactory pageCacheFactory = new ConfiguringPageCacheFactory(
-                fs, config, tracer, cursorTracerSupplier, logProvider.getLog( PageCache.class ) )
-        {
-            @Override
-            public int calculatePageSize( Config config, PageSwapperFactory swapperFactory )
-            {
-                if ( pageCacheConfig.pageSize != null )
-                {
-                    return pageCacheConfig.pageSize;
-                }
-                return super.calculatePageSize( config, swapperFactory );
-            }
-        };
+                fs, config, tracer, cursorTracerSupplier, logProvider.getLog( PageCache.class ) );
         return pageCacheFactory.getOrCreatePageCache();
     }
 }

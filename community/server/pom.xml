@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Copyright (c) 2002-2017 "Neo Technology,"
+  Copyright (c) 2002-2018 "Neo Technology,"
    Network Engine for Objects in Lund AB [http://neotechnology.com]
   
    This file is part of Neo4j.
@@ -42,7 +42,7 @@
     <licensing.prepend.text>notice-gpl-prefix.txt</licensing.prepend.text>
 
     <neo4j.version>${project.version}</neo4j.version>
-    <neo4j-browser.version>3.1.2</neo4j-browser.version>
+    <neo4j-browser.version>3.1.4</neo4j-browser.version>
 
     <neo4j-server.mainClass>org.neo4j.server.CommunityEntryPoint</neo4j-server.mainClass>
 
@@ -79,9 +79,13 @@
 
   <build>
     <plugins>
-      <!-- This module contains public API, generate javadoc -->
+      <!-- This module contains public API, run javadoc and revapi -->
       <plugin>
         <artifactId>maven-javadoc-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.revapi</groupId>
+        <artifactId>revapi-maven-plugin</artifactId>
       </plugin>
 
       <plugin>

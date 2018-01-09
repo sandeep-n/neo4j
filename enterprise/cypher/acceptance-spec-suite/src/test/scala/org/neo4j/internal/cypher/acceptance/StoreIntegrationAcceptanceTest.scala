@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -29,7 +29,7 @@ class StoreIntegrationAcceptanceTest extends ExecutionEngineFunSuite with QueryS
   test("should not create labels id when trying to delete non-existing labels") {
     createNode()
 
-    val result = executeWith(Configs.CommunityInterpreted - Configs.Cost2_3, "MATCH (n) REMOVE n:BAR RETURN id(n) AS id")
+    val result = executeWith(Configs.Interpreted - Configs.Cost2_3, "MATCH (n) REMOVE n:BAR RETURN id(n) AS id")
 
     assertStats(result, labelsRemoved = 0)
     result.toList should equal(List(Map("id" -> 0)))

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -90,6 +90,7 @@ import static org.neo4j.unsafe.impl.batchimport.cache.idmapping.IdGenerators.sta
 import static org.neo4j.unsafe.impl.batchimport.cache.idmapping.IdMappers.longs;
 import static org.neo4j.unsafe.impl.batchimport.cache.idmapping.IdMappers.strings;
 import static org.neo4j.unsafe.impl.batchimport.input.Collectors.silentBadCollector;
+import static org.neo4j.unsafe.impl.batchimport.input.Inputs.knownEstimates;
 import static org.neo4j.unsafe.impl.batchimport.staging.ProcessorAssignmentStrategies.eagerRandomSaturation;
 
 @RunWith( Parameterized.class )
@@ -194,7 +195,14 @@ public class ParallelBatchImporterTest
                     relationships( relationshipRandomSeed, RELATIONSHIP_COUNT, inputIdGenerator, groups ),
                     idMapper, idGenerator,
                     /*insanely high bad tolerance, but it will actually never be that many*/
-                    silentBadCollector( RELATIONSHIP_COUNT ) ) );
+                    silentBadCollector( RELATIONSHIP_COUNT ),
+                    knownEstimates(
+                            NODE_COUNT, RELATIONSHIP_COUNT,
+                            NODE_COUNT * TOKENS.length / 2,
+                            RELATIONSHIP_COUNT * TOKENS.length / 2,
+                            NODE_COUNT * TOKENS.length / 2 * Long.BYTES,
+                            RELATIONSHIP_COUNT * TOKENS.length / 2 * Long.BYTES,
+                            NODE_COUNT * TOKENS.length / 2 ) ) );
 
             // THEN
             GraphDatabaseService db = new TestGraphDatabaseFactory()

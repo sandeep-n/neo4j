@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,7 +24,7 @@ import java.util.Iterator;
 import java.util.function.Predicate;
 
 import org.neo4j.helpers.collection.Iterators;
-import org.neo4j.kernel.api.exceptions.schema.ConstraintValidationException;
+import org.neo4j.internal.kernel.api.exceptions.schema.ConstraintValidationException;
 import org.neo4j.kernel.api.properties.PropertyKeyValue;
 import org.neo4j.kernel.impl.util.VersionedHashMap;
 import org.neo4j.storageengine.api.StorageProperty;
@@ -78,7 +78,7 @@ public class PropertyContainerStateImpl implements PropertyContainerState
         }
     }
 
-    public void changeProperty( int propertyKeyId, Value value )
+    void changeProperty( int propertyKeyId, Value value )
     {
         if ( addedProperties != null )
         {
@@ -101,7 +101,7 @@ public class PropertyContainerStateImpl implements PropertyContainerState
         }
     }
 
-    public void addProperty( int propertyKeyId, Value value )
+    void addProperty( int propertyKeyId, Value value )
     {
         if ( removedProperties != null )
         {
@@ -203,7 +203,7 @@ public class PropertyContainerStateImpl implements PropertyContainerState
     }
 
     @Override
-    public boolean hasChanges()
+    public boolean hasPropertyChanges()
     {
         return addedProperties != null || removedProperties != null || changedProperties != null;
     }
@@ -218,6 +218,13 @@ public class PropertyContainerStateImpl implements PropertyContainerState
     public StorageProperty getAddedProperty( int propertyKeyId )
     {
         return addedProperties == null ? null : getPropertyOrNull( addedProperties, propertyKeyId );
+    }
+
+    @Override
+    public boolean isPropertyChangedOrRemoved( int propertyKey )
+    {
+        return (removedProperties != null && removedProperties.containsKey( propertyKey ))
+               || (changedProperties != null && changedProperties.containsKey( propertyKey ));
     }
 
     @Override

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -59,7 +59,7 @@ public class HighLimitV3_1_0 extends BaseRecordFormats
     public HighLimitV3_1_0()
     {
         super( STORE_VERSION, StoreVersion.HIGH_LIMIT_V3_1_0.introductionVersion(), 3, Capability.DENSE_NODES,
-                Capability.RELATIONSHIP_TYPE_3BYTES, Capability.SCHEMA, Capability.LUCENE_5 );
+                Capability.RELATIONSHIP_TYPE_3BYTES, Capability.SCHEMA, Capability.LUCENE_5, Capability.SECONDARY_RECORD_UNITS );
     }
 
     @Override
@@ -114,5 +114,11 @@ public class HighLimitV3_1_0 extends BaseRecordFormats
     public FormatFamily getFormatFamily()
     {
         return HighLimitFormatFamily.INSTANCE;
+    }
+
+    @Override
+    public String name()
+    {
+        return NAME;
     }
 }

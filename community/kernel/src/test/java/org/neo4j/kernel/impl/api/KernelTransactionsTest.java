@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,7 +24,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
-import java.time.Clock;
 import java.util.Collection;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
@@ -35,20 +34,23 @@ import java.util.concurrent.atomic.AtomicReferenceArray;
 
 import org.neo4j.graphdb.DatabaseShutdownException;
 import org.neo4j.graphdb.security.AuthorizationExpiredException;
+import org.neo4j.internal.kernel.api.security.SecurityContext;
 import org.neo4j.kernel.AvailabilityGuard;
 import org.neo4j.kernel.api.KernelTransaction;
 import org.neo4j.kernel.api.KernelTransactionHandle;
 import org.neo4j.kernel.api.exceptions.Status;
 import org.neo4j.kernel.api.exceptions.TransactionFailureException;
+import org.neo4j.kernel.api.explicitindex.AutoIndexing;
 import org.neo4j.kernel.api.security.AnonymousContext;
-import org.neo4j.kernel.api.security.SecurityContext;
 import org.neo4j.kernel.impl.api.state.ConstraintIndexCreator;
 import org.neo4j.kernel.impl.factory.AccessCapability;
 import org.neo4j.kernel.impl.factory.CanWrite;
+import org.neo4j.kernel.impl.index.ExplicitIndexStore;
 import org.neo4j.kernel.impl.index.IndexConfigStore;
 import org.neo4j.kernel.impl.locking.Locks;
 import org.neo4j.kernel.impl.locking.SimpleStatementLocksFactory;
 import org.neo4j.kernel.impl.locking.StatementLocksFactory;
+import org.neo4j.kernel.impl.newapi.Cursors;
 import org.neo4j.kernel.impl.proc.Procedures;
 import org.neo4j.kernel.impl.store.TransactionId;
 import org.neo4j.kernel.impl.transaction.TransactionHeaderInformationFactory;
@@ -60,6 +62,8 @@ import org.neo4j.kernel.lifecycle.LifeSupport;
 import org.neo4j.kernel.monitoring.Monitors;
 import org.neo4j.kernel.monitoring.tracing.Tracers;
 import org.neo4j.logging.NullLog;
+import org.neo4j.resources.CpuClock;
+import org.neo4j.resources.HeapAllocation;
 import org.neo4j.scheduler.JobScheduler;
 import org.neo4j.storageengine.api.StorageCommand;
 import org.neo4j.storageengine.api.StorageEngine;
@@ -71,6 +75,8 @@ import org.neo4j.storageengine.api.txstate.ReadableTransactionState;
 import org.neo4j.test.OtherThreadExecutor;
 import org.neo4j.test.Race;
 import org.neo4j.test.rule.concurrent.OtherThreadRule;
+import org.neo4j.time.Clocks;
+import org.neo4j.time.SystemNanoClock;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.locks.LockSupport.parkNanos;
@@ -94,8 +100,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.neo4j.helpers.collection.Iterators.asSet;
-import static org.neo4j.kernel.api.KernelTransaction.Type.explicit;
-import static org.neo4j.kernel.api.security.SecurityContext.AUTH_DISABLED;
+import static org.neo4j.internal.kernel.api.Transaction.Type.explicit;
+import static org.neo4j.internal.kernel.api.security.SecurityContext.AUTH_DISABLED;
 import static org.neo4j.kernel.impl.transaction.TransactionHeaderInformationFactory.DEFAULT;
 import static org.neo4j.test.assertion.Assert.assertException;
 
@@ -107,7 +113,7 @@ public class KernelTransactionsTest
     public final ExpectedException expectedException = ExpectedException.none();
 
     private static final long TEST_TIMEOUT = 10_000;
-    private static final Clock clock = Clock.systemUTC();
+    private static final SystemNanoClock clock = Clocks.nanoClock();
     private static AvailabilityGuard availabilityGuard;
 
     @Before
@@ -449,6 +455,29 @@ public class KernelTransactionsTest
                 kernelTransactions.newInstance( KernelTransaction.Type.explicit, securityContext, 0L ) );
     }
 
+    @Test
+    public void incrementalUserTransactionId() throws Throwable
+    {
+        KernelTransactions kernelTransactions = newKernelTransactions();
+        try ( KernelTransaction kernelTransaction = kernelTransactions
+                .newInstance( KernelTransaction.Type.explicit, AnonymousContext.none(), 0L ) )
+        {
+            assertEquals( 1, kernelTransactions.activeTransactions().iterator().next().getUserTransactionId() );
+        }
+
+        try ( KernelTransaction kernelTransaction = kernelTransactions
+                .newInstance( KernelTransaction.Type.explicit, AnonymousContext.none(), 0L ) )
+        {
+            assertEquals( 2, kernelTransactions.activeTransactions().iterator().next().getUserTransactionId() );
+        }
+
+        try ( KernelTransaction kernelTransaction = kernelTransactions
+                .newInstance( KernelTransaction.Type.explicit, AnonymousContext.none(), 0L ) )
+        {
+            assertEquals( 3, kernelTransactions.activeTransactions().iterator().next().getUserTransactionId() );
+        }
+    }
+
     private void stopKernelTransactions( KernelTransactions kernelTransactions )
     {
         try
@@ -530,7 +559,8 @@ public class KernelTransactionsTest
         TransactionIdStore transactionIdStore = mock( TransactionIdStore.class );
         when( transactionIdStore.getLastCommittedTransaction() ).thenReturn( new TransactionId( 0, 0, 0 ) );
 
-        Tracers tracers = new Tracers( "null", NullLog.getInstance(), new Monitors(), mock( JobScheduler.class ) );
+        Tracers tracers = new Tracers( "null", NullLog.getInstance(), new Monitors(), mock( JobScheduler.class ),
+                clock );
         StatementLocksFactory statementLocksFactory = new SimpleStatementLocksFactory( locks );
 
         StatementOperationParts statementOperations = mock( StatementOperationParts.class );
@@ -552,25 +582,27 @@ public class KernelTransactionsTest
     private static KernelTransactions createTransactions( StorageEngine storageEngine,
             TransactionCommitProcess commitProcess, TransactionIdStore transactionIdStore, Tracers tracers,
             StatementLocksFactory statementLocksFactory, StatementOperationParts statementOperations,
-            Clock clock, AvailabilityGuard availabilityGuard )
+            SystemNanoClock clock, AvailabilityGuard availabilityGuard )
     {
         return new KernelTransactions( statementLocksFactory,
                 null, statementOperations, null, DEFAULT,
                 commitProcess, null, null, new TransactionHooks(), mock( TransactionMonitor.class ),
                 availabilityGuard,
-                tracers, storageEngine, new Procedures(), transactionIdStore, clock, new CanWrite() );
+                tracers, storageEngine, new Procedures(), transactionIdStore, clock, CpuClock.NOT_AVAILABLE,
+                HeapAllocation.NOT_AVAILABLE, new CanWrite(), new Cursors(), AutoIndexing.UNSUPPORTED, mock(
+                ExplicitIndexStore.class) );
     }
 
     private static TestKernelTransactions createTestTransactions( StorageEngine storageEngine,
             TransactionCommitProcess commitProcess, TransactionIdStore transactionIdStore, Tracers tracers,
             StatementLocksFactory statementLocksFactory, StatementOperationParts statementOperations,
-            Clock clock, AvailabilityGuard availabilityGuard )
+            SystemNanoClock clock, AvailabilityGuard availabilityGuard )
     {
         return new TestKernelTransactions( statementLocksFactory, null, statementOperations,
                 null, DEFAULT,
                 commitProcess, null, null, new TransactionHooks(), mock( TransactionMonitor.class ),
                 availabilityGuard, tracers, storageEngine, new Procedures(), transactionIdStore, clock,
-                new CanWrite() );
+                new CanWrite(), new Cursors(), AutoIndexing.UNSUPPORTED );
     }
 
     private static TransactionCommitProcess newRememberingCommitProcess( final TransactionRepresentation[] slot )
@@ -618,14 +650,14 @@ public class KernelTransactionsTest
                 TransactionCommitProcess transactionCommitProcess, IndexConfigStore indexConfigStore,
                 ExplicitIndexProviderLookup explicitIndexProviderLookup, TransactionHooks hooks,
                 TransactionMonitor transactionMonitor, AvailabilityGuard availabilityGuard, Tracers tracers,
-                StorageEngine storageEngine, Procedures procedures, TransactionIdStore transactionIdStore, Clock clock,
-                AccessCapability accessCapability )
+                StorageEngine storageEngine, Procedures procedures, TransactionIdStore transactionIdStore, SystemNanoClock clock,
+                AccessCapability accessCapability, Cursors cursors, AutoIndexing autoIndexing )
         {
             super( statementLocksFactory, constraintIndexCreator, statementOperations, schemaWriteGuard,
                     txHeaderFactory, transactionCommitProcess, indexConfigStore, explicitIndexProviderLookup, hooks,
                     transactionMonitor, availabilityGuard, tracers, storageEngine, procedures, transactionIdStore,
-                    clock,
-                    accessCapability );
+                    clock, CpuClock.NOT_AVAILABLE, HeapAllocation.NOT_AVAILABLE, accessCapability, cursors,
+                    autoIndexing, mock( ExplicitIndexStore.class) );
         }
 
         @Override

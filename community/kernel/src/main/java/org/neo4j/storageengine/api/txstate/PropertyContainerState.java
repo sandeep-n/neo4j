@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,7 +21,7 @@ package org.neo4j.storageengine.api.txstate;
 
 import java.util.Iterator;
 
-import org.neo4j.kernel.api.exceptions.schema.ConstraintValidationException;
+import org.neo4j.internal.kernel.api.exceptions.schema.ConstraintValidationException;
 import org.neo4j.storageengine.api.StorageProperty;
 
 import static java.util.Collections.emptyIterator;
@@ -55,11 +55,13 @@ public interface PropertyContainerState
                 Iterator<Integer> removed ) throws ConstraintValidationException;
     }
 
-    boolean hasChanges();
+    boolean hasPropertyChanges();
 
     StorageProperty getChangedProperty( int propertyKeyId );
 
     StorageProperty getAddedProperty( int propertyKeyId );
+
+    boolean isPropertyChangedOrRemoved( int propertyKey );
 
     boolean isPropertyRemoved( int propertyKeyId );
 
@@ -103,7 +105,7 @@ public interface PropertyContainerState
         }
 
         @Override
-        public boolean hasChanges()
+        public boolean hasPropertyChanges()
         {
             return false;
         }
@@ -118,6 +120,12 @@ public interface PropertyContainerState
         public StorageProperty getAddedProperty( int propertyKeyId )
         {
             return null;
+        }
+
+        @Override
+        public boolean isPropertyChangedOrRemoved( int propertyKey )
+        {
+            return false;
         }
 
         @Override

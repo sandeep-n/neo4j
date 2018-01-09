@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -340,8 +340,15 @@ public class SslPolicyLoader
             {
                 while ( input.available() > 0 )
                 {
-                    X509Certificate cert = (X509Certificate) certificateFactory.generateCertificate( input );
-                    trustStore.setCertificateEntry( Integer.toString( i++ ), cert );
+                    try
+                    {
+                        X509Certificate cert = (X509Certificate) certificateFactory.generateCertificate( input );
+                        trustStore.setCertificateEntry( Integer.toString( i++ ), cert );
+                    }
+                    catch ( Exception e )
+                    {
+                        throw new CertificateException( "Error loading certificate file: " + trustedCertFile, e );
+                    }
                 }
             }
         }

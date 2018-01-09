@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -156,6 +156,12 @@ public class PrepareTrackingRecordFormats implements RecordFormats
     public boolean hasSameCapabilities( RecordFormats other, CapabilityType type )
     {
         return actual.hasSameCapabilities( other, type );
+    }
+
+    @Override
+    public String name()
+    {
+        return getClass().getName();
     }
 
     public class PrepareTrackingRecordFormat<RECORD extends AbstractBaseRecord> implements RecordFormat<RECORD>

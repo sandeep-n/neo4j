@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,12 +25,16 @@ import org.neo4j.collection.primitive.PrimitiveLongIterator
 import org.neo4j.cypher.internal.planner.v3_4.spi.{IdempotentResult, IndexDescriptor, KernelStatisticProvider, TokenContext}
 import org.neo4j.cypher.internal.v3_4.expressions.SemanticDirection
 import org.neo4j.cypher.internal.v3_4.logical.plans.QualifiedName
-import org.neo4j.graphdb.{Node, Path, PropertyContainer, Relationship}
+import org.neo4j.graphdb.{Node, Path, PropertyContainer}
+import org.neo4j.internal.kernel.api.{CursorFactory, IndexReference, Read, Write}
+import org.neo4j.kernel.api.ReadOperations
+import org.neo4j.kernel.api.dbms.DbmsOperations
 import org.neo4j.kernel.impl.api.store.RelationshipIterator
+import org.neo4j.kernel.impl.core.NodeManager
 import org.neo4j.kernel.impl.factory.DatabaseInfo
 import org.neo4j.values.AnyValue
 import org.neo4j.values.storable.Value
-import org.neo4j.values.virtual.{EdgeValue, NodeValue}
+import org.neo4j.values.virtual.{EdgeValue, ListValue, NodeValue}
 
 import scala.collection.Iterator
 
@@ -50,43 +54,39 @@ trait QueryContext extends TokenContext {
 
   // See QueryContextAdaptation if you need a dummy that overrides all methods as ??? for writing a test
 
-  type EntityAccessor
-
-  def entityAccessor: EntityAccessor
+  def entityAccessor: NodeManager
 
   def transactionalContext: QueryTransactionalContext
 
-  def nodeOps: Operations[Node]
+  def resources: CloseableResource
 
-  def relationshipOps: Operations[Relationship]
+  def nodeOps: Operations[NodeValue]
+
+  def relationshipOps: Operations[EdgeValue]
 
   def createNode(): Node
 
   def createNodeId(): Long
 
-  def createRelationship(start: Node, end: Node, relType: String): Relationship
-
-  def createRelationship(start: Long, end: Long, relType: Int): Relationship
+  def createRelationship(start: Long, end: Long, relType: Int): EdgeValue
 
   def getOrCreateRelTypeId(relTypeName: String): Int
 
-  def getRelationshipsForIds(node: Long, dir: SemanticDirection, types: Option[Array[Int]]): Iterator[Relationship]
+  def getRelationshipsForIds(node: Long, dir: SemanticDirection, types: Option[Array[Int]]): Iterator[EdgeValue]
 
   def getRelationshipsForIdsPrimitive(node: Long, dir: SemanticDirection, types: Option[Array[Int]]): RelationshipIterator
 
-  def getRelationshipFor(relationshipId: Long, typeId: Int, startNodeId: Long, endNodeId: Long): Relationship
+  def getRelationshipFor(relationshipId: Long, typeId: Int, startNodeId: Long, endNodeId: Long): EdgeValue
 
   def getOrCreateLabelId(labelName: String): Int
 
-  def getLabelsForNode(node: Long): Iterator[Int]
+  def getLabelsForNode(node: Long): ListValue
 
   def isLabelSetOnNode(label: Int, node: Long): Boolean
 
   def setLabelsOnNode(node: Long, labelIds: Iterator[Int]): Int
 
   def removeLabelsFromNode(node: Long, labelIds: Iterator[Int]): Int
-
-  def getPropertiesForNode(node: Long): Iterator[Int]
 
   def getPropertiesForRelationship(relId: Long): Iterator[Int]
 
@@ -96,22 +96,24 @@ trait QueryContext extends TokenContext {
 
   def dropIndexRule(descriptor: IndexDescriptor)
 
+  def indexReference(label: Int, properties: Int*): IndexReference
+
   //TODO this should be `Seq[AnyValue]`
-  def indexSeek(index: IndexDescriptor, values: Seq[Any]): Iterator[Node]
+  def indexSeek(index: IndexReference, values: Seq[Any]): Iterator[NodeValue]
 
-  def indexSeekByRange(index: IndexDescriptor, value: Any): Iterator[Node]
+  def indexSeekByRange(index: IndexReference, value: Any): Iterator[NodeValue]
 
-  def indexScanByContains(index: IndexDescriptor, value: String): Iterator[Node]
+  def indexScanByContains(index: IndexReference, value: String): Iterator[NodeValue]
 
-  def indexScanByEndsWith(index: IndexDescriptor, value: String): Iterator[Node]
+  def indexScanByEndsWith(index: IndexReference, value: String): Iterator[NodeValue]
 
-  def indexScan(index: IndexDescriptor): Iterator[Node]
+  def indexScan(index: IndexReference): Iterator[NodeValue]
 
-  def indexScanPrimitive(index: IndexDescriptor): PrimitiveLongIterator
+  def indexScanPrimitive(index: IndexReference): PrimitiveLongIterator
 
-  def lockingUniqueIndexSeek(index: IndexDescriptor, values: Seq[Any]): Option[Node]
+  def lockingUniqueIndexSeek(index: IndexReference, values: Seq[Any]): Option[NodeValue]
 
-  def getNodesByLabel(id: Int): Iterator[Node]
+  def getNodesByLabel(id: Int): Iterator[NodeValue]
 
   def getNodesByLabelPrimitive(id: Int): PrimitiveLongIterator
 
@@ -145,6 +147,11 @@ trait QueryContext extends TokenContext {
    * This should not be used. We'll remove sooner (or later). Don't do it.
    */
   def withAnyOpenQueryContext[T](work: (QueryContext) => T): T
+
+  /*
+  This is an ugly hack to get multi threading to work
+   */
+  def createNewQueryContext(): QueryContext
 
   def edgeGetStartNode(edge: EdgeValue): NodeValue
 
@@ -197,7 +204,7 @@ trait QueryContext extends TokenContext {
 
 }
 
-trait Operations[T <: PropertyContainer] {
+trait Operations[T] {
   def delete(id: Long)
 
   def setProperty(obj: Long, propertyKeyId: Int, value: Value)
@@ -231,14 +238,17 @@ trait Operations[T <: PropertyContainer] {
   def getByIdIfExists(id: Long): Option[T]
 }
 
-trait QueryTransactionalContext {
+trait QueryTransactionalContext extends CloseableResource {
 
-  type ReadOps
-  type DbmsOps
+  def cursors : CursorFactory
 
-  def readOperations: ReadOps
+  def dataRead: Read
 
-  def dbmsOperations: DbmsOps
+  def dataWrite: Write
+
+  def readOperations: ReadOperations
+
+  def dbmsOperations: DbmsOperations
 
   def isTopLevelTx: Boolean
 
@@ -265,5 +275,9 @@ trait Expander {
 trait UserDefinedAggregator {
   def update(args: IndexedSeq[Any]): Unit
   def result: Any
+}
+
+trait CloseableResource {
+  def close(success: Boolean)
 }
 

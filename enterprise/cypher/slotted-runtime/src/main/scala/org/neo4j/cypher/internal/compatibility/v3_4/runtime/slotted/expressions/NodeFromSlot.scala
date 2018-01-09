@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,15 +19,14 @@
  */
 package org.neo4j.cypher.internal.compatibility.v3_4.runtime.slotted.expressions
 
-import org.neo4j.kernel.impl.util.ValueUtils.fromNodeProxy
+import org.neo4j.cypher.internal.runtime.interpreted.ExecutionContext
 import org.neo4j.cypher.internal.runtime.interpreted.commands.expressions.Expression
 import org.neo4j.cypher.internal.runtime.interpreted.pipes.QueryState
-import org.neo4j.cypher.internal.runtime.interpreted.ExecutionContext
 import org.neo4j.values.virtual.NodeValue
 
 case class NodeFromSlot(offset: Int) extends Expression with SlottedExpression {
 
   override def apply(ctx: ExecutionContext, state: QueryState): NodeValue =
-    fromNodeProxy(state.query.nodeOps.getById(ctx.getLongAt(offset)))
+    state.query.nodeOps.getById(ctx.getLongAt(offset))
 
 }

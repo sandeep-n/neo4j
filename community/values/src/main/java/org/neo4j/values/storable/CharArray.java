@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,6 +21,7 @@ package org.neo4j.values.storable;
 
 import java.util.Arrays;
 
+import org.neo4j.graphdb.spatial.Geometry;
 import org.neo4j.values.AnyValue;
 import org.neo4j.values.SequenceValue;
 
@@ -53,6 +54,12 @@ public abstract class CharArray extends TextArray
     public boolean equals( String[] x )
     {
         return PrimitiveArrayValues.equals( value(), x );
+    }
+
+    @Override
+    public boolean equals( Geometry[] x )
+    {
+        return false;
     }
 
     @Override

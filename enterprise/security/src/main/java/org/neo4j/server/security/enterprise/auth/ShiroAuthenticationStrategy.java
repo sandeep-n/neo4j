@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -34,5 +34,18 @@ public class ShiroAuthenticationStrategy extends AbstractAuthenticationStrategy
             throws AuthenticationException
     {
         return new ShiroAuthenticationInfo();
+    }
+
+    @Override
+    public AuthenticationInfo afterAttempt( Realm realm, AuthenticationToken token, AuthenticationInfo singleRealmInfo,
+            AuthenticationInfo aggregateInfo, Throwable t ) throws AuthenticationException
+    {
+        AuthenticationInfo info = super.afterAttempt( realm, token, singleRealmInfo, aggregateInfo, t );
+        if ( t != null && info instanceof ShiroAuthenticationInfo )
+        {
+            // Save the throwable so we can use it for correct log messages later
+            ((ShiroAuthenticationInfo) info).addThrowable( t );
+        }
+        return info;
     }
 }

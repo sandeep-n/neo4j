@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -32,21 +32,21 @@ object indexSeekLeafPlanner extends AbstractIndexSeekLeafPlanner {
                               propertyKeys: Seq[PropertyKeyToken],
                               valueExpr: QueryExpression[Expression],
                               hint: Option[UsingIndexHint],
-                              argumentIds: Set[IdName])
-                             (implicit context: LogicalPlanningContext): (Seq[Expression]) => LogicalPlan =
+                              argumentIds: Set[IdName],
+                              context: LogicalPlanningContext): (Seq[Expression]) => LogicalPlan =
     (predicates: Seq[Expression]) =>
-      context.logicalPlanProducer.planNodeIndexSeek(idName, label, propertyKeys, valueExpr, predicates, hint, argumentIds)
+      context.logicalPlanProducer.planNodeIndexSeek(idName, label, propertyKeys, valueExpr, predicates, hint, argumentIds, context)
 
-  protected def findIndexesForLabel(labelId: Int)(implicit context: LogicalPlanningContext): Iterator[IndexDescriptor] =
+  protected def findIndexesForLabel(labelId: Int, context: LogicalPlanningContext): Iterator[IndexDescriptor] =
     context.planContext.indexesGetForLabel(labelId)
 
-  protected def findIndexesFor(label: String, properties: Seq[String])(implicit context: LogicalPlanningContext): Option[IndexDescriptor] = {
-    if (uniqueIndexDefinedFor(label, properties).isDefined) None else anyIndex(label, properties)
+  protected def findIndexesFor(label: String, properties: Seq[String], context: LogicalPlanningContext): Option[IndexDescriptor] = {
+    if (uniqueIndexDefinedFor(label, properties, context).isDefined) None else anyIndex(label, properties, context)
   }
 
-  private def anyIndex(label: String, properties: Seq[String])(implicit context: LogicalPlanningContext) =
+  private def anyIndex(label: String, properties: Seq[String], context: LogicalPlanningContext) =
     context.planContext.indexGet(label, properties)
 
-  private def uniqueIndexDefinedFor(label: String, properties: Seq[String])(implicit context: LogicalPlanningContext) =
+  private def uniqueIndexDefinedFor(label: String, properties: Seq[String], context: LogicalPlanningContext) =
     context.planContext.uniqueIndexGet(label, properties)
 }

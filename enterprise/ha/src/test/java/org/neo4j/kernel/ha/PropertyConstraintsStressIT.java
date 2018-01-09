@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -46,7 +46,7 @@ import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.TransactionFailureException;
 import org.neo4j.graphdb.TransientTransactionFailureException;
 import org.neo4j.helpers.Exceptions;
-import org.neo4j.kernel.api.exceptions.schema.ConstraintValidationException;
+import org.neo4j.internal.kernel.api.exceptions.schema.ConstraintValidationException;
 import org.neo4j.kernel.impl.ha.ClusterManager;
 import org.neo4j.test.GraphDatabaseServiceCleaner;
 import org.neo4j.test.OtherThreadExecutor.WorkerCommand;
@@ -75,7 +75,7 @@ public class PropertyConstraintsStressIT
     @Rule
     public final SuppressOutput suppressOutput = SuppressOutput.suppressAll();
     @ClassRule
-    public static final ClusterRule clusterRule = new ClusterRule( PropertyConstraintsStressIT.class );
+    public static final ClusterRule clusterRule = new ClusterRule();
 
     @Rule
     public OtherThreadRule<Object> slaveWork = new OtherThreadRule<>();

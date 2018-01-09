@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -29,7 +29,7 @@ sealed trait PathStep extends Product with Foldable with Rewritable {
     if (children.iterator eqElements this.children)
       this
     else {
-      val constructor = this.copyConstructor
+      val constructor = Rewritable.copyConstructor(this)
       val params = constructor.getParameterTypes
       val args = children.toVector
       val ctorArgs = args

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -31,6 +31,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -89,6 +90,7 @@ import static org.neo4j.helpers.collection.Iterators.asSet;
 import static org.neo4j.helpers.collection.Iterators.count;
 import static org.neo4j.helpers.collection.MapUtil.store;
 import static org.neo4j.helpers.collection.MapUtil.stringMap;
+import static org.neo4j.io.fs.FileUtils.writeToFile;
 import static org.neo4j.kernel.impl.store.MetaDataStore.DEFAULT_NAME;
 import static org.neo4j.tooling.ImportTool.MULTI_FILE_DELIMITER;
 import static org.neo4j.unsafe.impl.batchimport.Configuration.BAD_FILE_NAME;
@@ -967,6 +969,7 @@ public class ImportToolTest
                     "--bad-tolerance", "1",
                     "--relationships", relationshipData1.getAbsolutePath() + MULTI_FILE_DELIMITER +
                                        relationshipData2.getAbsolutePath() );
+            fail();
         }
         catch ( Exception e )
         {
@@ -1003,6 +1006,7 @@ public class ImportToolTest
                     "--skip-bad-relationships", "false",
                     "--relationships", relationshipData1.getAbsolutePath() + MULTI_FILE_DELIMITER +
                                        relationshipData2.getAbsolutePath() );
+            fail();
         }
         catch ( Exception e )
         {
@@ -1127,6 +1131,7 @@ public class ImportToolTest
             importTool(
                     "--into", dbRule.getStoreDirAbsolutePath(),
                     "--nodes", data.getAbsolutePath() );
+            fail();
         }
         catch ( Exception e )
         {
@@ -1166,7 +1171,10 @@ public class ImportToolTest
     {
         // GIVEN
         String name = "  This is a line with leading and trailing whitespaces   ";
-        File data = data( ":ID,name", "1,\"" + name + "\"");
+        File data = data(
+                ":ID,name",
+                "1,\"" + name + "\"",
+                "2," + name );
 
         // WHEN
         importTool(
@@ -1176,13 +1184,18 @@ public class ImportToolTest
 
         // THEN
         GraphDatabaseService db = dbRule.getGraphDatabaseAPI();
-        try ( Transaction tx = db.beginTx() )
+        try ( Transaction tx = db.beginTx();
+              ResourceIterator<Node> allNodes = db.getAllNodes().iterator() )
         {
-            ResourceIterator<Node> allNodes = db.getAllNodes().iterator();
-            Node node = Iterators.single( allNodes );
-            allNodes.close();
+            Set<String> names = new HashSet<>();
+            while ( allNodes.hasNext() )
+            {
+                names.add( allNodes.next().getProperty( "name" ).toString() );
+            }
 
-            assertEquals( name.trim(), node.getProperty( "name" ) );
+            assertTrue( names.remove( name ) );
+            assertTrue( names.remove( name.trim() ) );
+            assertTrue( names.isEmpty() );
 
             tx.success();
         }
@@ -1903,6 +1916,57 @@ public class ImportToolTest
 
             List<String> errorLines = suppressOutput.getErrorVoice().lines();
             assertContains( errorLines, "Starting a database on these store files will likely fail or observe inconsistent records" );
+        }
+    }
+
+    @Test
+    public void shouldSupplyArgumentsAsFile() throws Exception
+    {
+        // given
+        List<String> nodeIds = nodeIds();
+        Configuration config = Configuration.COMMAS;
+        File argumentFile = file( "args" );
+        String arguments = format(
+                "--into %s%n" +
+                "--nodes %s --relationships %s",
+                dbRule.getStoreDirAbsolutePath(),
+                nodeData( true, config, nodeIds, TRUE ).getAbsolutePath(),
+                relationshipData( true, config, nodeIds, TRUE, true ).getAbsolutePath() );
+        writeToFile( argumentFile, arguments, false );
+
+        // when
+        importTool( "-f", argumentFile.getAbsolutePath() );
+
+        // then
+        verifyData();
+    }
+
+    @Test
+    public void shouldFailIfSupplyingBothFileArgumentAndAnyOtherArgument() throws Exception
+    {
+        // given
+        List<String> nodeIds = nodeIds();
+        Configuration config = Configuration.COMMAS;
+        File argumentFile = file( "args" );
+        String arguments = format(
+                "--into %s%n" +
+                "--nodes %s --relationships %s",
+                dbRule.getStoreDirAbsolutePath(),
+                nodeData( true, config, nodeIds, TRUE ).getAbsolutePath(),
+                relationshipData( true, config, nodeIds, TRUE, true ).getAbsolutePath() );
+        writeToFile( argumentFile, arguments, false );
+
+        try
+        {
+            // when
+            importTool( "-f", argumentFile.getAbsolutePath(), "--into", dbRule.getStoreDirAbsolutePath() );
+            fail( "Should have failed" );
+        }
+        catch ( IllegalArgumentException e )
+        {
+            // then good
+            assertThat( e.getMessage(), containsString( "in addition to" ) );
+            assertThat( e.getMessage(), containsString( ImportTool.Options.FILE.argument() ) );
         }
     }
 

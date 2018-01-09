@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -31,7 +31,8 @@ public enum Keys implements Key
     downstream_idle_time( "v", "Time spent waiting for downstream to catch up" ),
     avg_processing_time( "avg", "Average processing time per done batch" ),
     io_throughput( null, "I/O throughput per second" ),
-    memory_usage( null, "Memory usage" );
+    memory_usage( null, "Memory usage" ),
+    progress( null, "Progress" ); // overrides progress calculation using done_batches, if this stat exists
 
     private final String shortName;
     private final String description;

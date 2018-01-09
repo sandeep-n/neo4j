@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,14 +24,15 @@ import java.io.IOException;
 import java.util.concurrent.Future;
 
 import org.neo4j.graphdb.ResourceIterator;
+import org.neo4j.internal.kernel.api.IndexCapability;
+import org.neo4j.internal.kernel.api.InternalIndexState;
+import org.neo4j.internal.kernel.api.schema.LabelSchemaDescriptor;
 import org.neo4j.kernel.api.exceptions.index.IndexEntryConflictException;
 import org.neo4j.kernel.api.exceptions.index.IndexPopulationFailedKernelException;
 import org.neo4j.kernel.api.index.IndexAccessor;
 import org.neo4j.kernel.api.index.IndexUpdater;
-import org.neo4j.kernel.api.index.InternalIndexState;
 import org.neo4j.kernel.api.index.PropertyAccessor;
 import org.neo4j.kernel.api.index.SchemaIndexProvider;
-import org.neo4j.kernel.api.schema.LabelSchemaDescriptor;
 import org.neo4j.kernel.api.schema.index.IndexDescriptor;
 import org.neo4j.kernel.impl.api.index.updater.UpdateCountingIndexUpdater;
 import org.neo4j.storageengine.api.schema.IndexReader;
@@ -42,10 +43,9 @@ import static org.neo4j.helpers.FutureAdapter.VOID;
 public class OnlineIndexProxy implements IndexProxy
 {
     private final long indexId;
-    private final IndexDescriptor descriptor;
+    private final IndexMeta indexMeta;
     final IndexAccessor accessor;
     private final IndexStoreView storeView;
-    private final SchemaIndexProvider.Descriptor providerDescriptor;
     private final IndexCountsRemover indexCountsRemover;
     private boolean started;
 
@@ -75,15 +75,17 @@ public class OnlineIndexProxy implements IndexProxy
     //   slightly more costly, but shouldn't make that big of a difference hopefully.
     private final boolean forcedIdempotentMode;
 
-    public OnlineIndexProxy( long indexId, IndexDescriptor descriptor,
-            IndexAccessor accessor, IndexStoreView storeView, SchemaIndexProvider.Descriptor providerDescriptor,
+    OnlineIndexProxy( long indexId,
+            IndexMeta indexMeta,
+            IndexAccessor accessor,
+            IndexStoreView storeView,
             boolean forcedIdempotentMode )
     {
+        assert accessor != null;
         this.indexId = indexId;
-        this.descriptor = descriptor;
-        this.storeView = storeView;
-        this.providerDescriptor = providerDescriptor;
+        this.indexMeta = indexMeta;
         this.accessor = accessor;
+        this.storeView = storeView;
         this.forcedIdempotentMode = forcedIdempotentMode;
         this.indexCountsRemover = new IndexCountsRemover( storeView, indexId );
     }
@@ -97,8 +99,23 @@ public class OnlineIndexProxy implements IndexProxy
     @Override
     public IndexUpdater newUpdater( final IndexUpdateMode mode )
     {
-        IndexUpdater actual = accessor.newUpdater( forcedIdempotentMode ? IndexUpdateMode.RECOVERY : mode );
+        IndexUpdater actual = accessor.newUpdater( escalateModeIfNecessary( mode ) );
         return started ? updateCountingUpdater( actual ) : actual;
+    }
+
+    private IndexUpdateMode escalateModeIfNecessary( IndexUpdateMode mode )
+    {
+        if ( forcedIdempotentMode )
+        {
+            // If this proxy is flagged with taking extra care about idempotency then escalate ONLINE to ONLINE_IDEMPOTENT.
+            if ( mode != IndexUpdateMode.ONLINE )
+            {
+                throw new IllegalArgumentException( "Unexpected mode " + mode + " given that " + this +
+                        " has been marked with forced idempotent mode. Expected mode " + IndexUpdateMode.ONLINE );
+            }
+            return IndexUpdateMode.ONLINE_IDEMPOTENT;
+        }
+        return mode;
     }
 
     private IndexUpdater updateCountingUpdater( final IndexUpdater indexUpdater )
@@ -117,19 +134,19 @@ public class OnlineIndexProxy implements IndexProxy
     @Override
     public IndexDescriptor getDescriptor()
     {
-        return descriptor;
+        return indexMeta.indexDescriptor();
     }
 
     @Override
     public LabelSchemaDescriptor schema()
     {
-        return descriptor.schema();
+        return indexMeta.indexDescriptor().schema();
     }
 
     @Override
     public SchemaIndexProvider.Descriptor getProviderDescriptor()
     {
-        return providerDescriptor;
+        return indexMeta.providerDescriptor();
     }
 
     @Override
@@ -139,9 +156,21 @@ public class OnlineIndexProxy implements IndexProxy
     }
 
     @Override
+    public IndexCapability getIndexCapability()
+    {
+        return indexMeta.indexCapability();
+    }
+
+    @Override
     public void force() throws IOException
     {
         accessor.force();
+    }
+
+    @Override
+    public void refresh() throws IOException
+    {
+        accessor.refresh();
     }
 
     @Override
@@ -196,7 +225,7 @@ public class OnlineIndexProxy implements IndexProxy
     @Override
     public String toString()
     {
-        return getClass().getSimpleName() + "[accessor:" + accessor + ", descriptor:" + descriptor + "]";
+        return getClass().getSimpleName() + "[accessor:" + accessor + ", descriptor:" + indexMeta.indexDescriptor() + "]";
     }
 
     @Override

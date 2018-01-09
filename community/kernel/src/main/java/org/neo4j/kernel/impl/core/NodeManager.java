@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,6 +24,7 @@ import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.NotFoundException;
 import org.neo4j.graphdb.Relationship;
 import org.neo4j.graphdb.RelationshipType;
+import org.neo4j.kernel.api.KernelTransaction;
 import org.neo4j.kernel.api.Statement;
 import org.neo4j.kernel.lifecycle.LifecycleAdapter;
 
@@ -80,6 +81,12 @@ public class NodeManager extends LifecycleAdapter implements EntityFactory
         public Statement statement()
         {
             return threadToTransactionBridge.get();
+        }
+
+        @Override
+        public KernelTransaction kernelTransaction()
+        {
+            return threadToTransactionBridge.getKernelTransactionBoundToThisThread( true );
         }
 
         @Override

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -207,6 +207,8 @@ trait CardinalityTestHelper extends QueryGraphProducer with CardinalityCustomMat
         private def getPropertyName(propertyId: PropertyKeyId) = propertyIds.collectFirst {
           case (name, id) if id == propertyId.id => name
         }
+
+        override def nodesAllCardinality(): Cardinality = nodesCardinality
       }
 
       val semanticTable: SemanticTable = {

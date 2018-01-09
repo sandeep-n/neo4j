@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -27,11 +27,11 @@ import java.util.Map;
 
 import org.neo4j.causalclustering.core.consensus.LeaderContext;
 import org.neo4j.causalclustering.core.consensus.RaftMessages;
-import org.neo4j.causalclustering.core.consensus.log.RaftLogEntry;
 import org.neo4j.causalclustering.core.consensus.log.ReadableRaftLog;
-import org.neo4j.causalclustering.core.consensus.log.segmented.InFlightMap;
+import org.neo4j.causalclustering.core.consensus.log.cache.InFlightCache;
 import org.neo4j.causalclustering.core.consensus.membership.RaftMembership;
 import org.neo4j.causalclustering.core.consensus.outcome.ShipCommand;
+import org.neo4j.causalclustering.core.consensus.schedule.TimerService;
 import org.neo4j.causalclustering.identity.MemberId;
 import org.neo4j.causalclustering.messaging.Outbound;
 import org.neo4j.kernel.lifecycle.LifecycleAdapter;
@@ -51,30 +51,32 @@ public class RaftLogShippingManager extends LifecycleAdapter implements RaftMemb
     private final long retryTimeMillis;
     private final int catchupBatchSize;
     private final int maxAllowedShippingLag;
-    private final InFlightMap<RaftLogEntry> inFlightMap;
+    private final InFlightCache inFlightCache;
 
     private Map<MemberId,RaftLogShipper> logShippers = new HashMap<>();
     private LeaderContext lastLeaderContext;
 
     private boolean running;
     private boolean stopped;
+    private TimerService timerService;
 
     public RaftLogShippingManager( Outbound<MemberId,RaftMessages.RaftMessage> outbound, LogProvider logProvider,
-                                   ReadableRaftLog raftLog,
+                                   ReadableRaftLog raftLog, TimerService timerService,
                                    Clock clock, MemberId myself, RaftMembership membership, long retryTimeMillis,
                                    int catchupBatchSize, int maxAllowedShippingLag,
-                                   InFlightMap<RaftLogEntry> inFlightMap )
+                                   InFlightCache inFlightCache )
     {
         this.outbound = outbound;
         this.logProvider = logProvider;
         this.raftLog = raftLog;
+        this.timerService = timerService;
         this.clock = clock;
         this.myself = myself;
         this.membership = membership;
         this.retryTimeMillis = retryTimeMillis;
         this.catchupBatchSize = catchupBatchSize;
         this.maxAllowedShippingLag = maxAllowedShippingLag;
-        this.inFlightMap = inFlightMap;
+        this.inFlightCache = inFlightCache;
         membership.registerListener( this );
     }
 
@@ -116,20 +118,19 @@ public class RaftLogShippingManager extends LifecycleAdapter implements RaftMemb
         stopped = true;
     }
 
-    private RaftLogShipper ensureLogShipperRunning( MemberId member, LeaderContext leaderContext )
+    private void ensureLogShipperRunning( MemberId member, LeaderContext leaderContext )
     {
         RaftLogShipper logShipper = logShippers.get( member );
         if ( logShipper == null && !member.equals( myself ) )
         {
-            logShipper = new RaftLogShipper( outbound, logProvider, raftLog, clock, myself, member,
+            logShipper = new RaftLogShipper( outbound, logProvider, raftLog, clock, timerService, myself, member,
                     leaderContext.term, leaderContext.commitIndex, retryTimeMillis, catchupBatchSize,
-                    maxAllowedShippingLag, inFlightMap );
+                    maxAllowedShippingLag, inFlightCache );
 
             logShippers.put( member, logShipper );
 
             logShipper.start();
         }
-        return logShipper;
     }
 
     public synchronized void handleCommands( Iterable<ShipCommand> shipCommands, LeaderContext leaderContext ) throws IOException

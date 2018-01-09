@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,5 +16,5 @@
  */
 package org.neo4j.cypher.internal.frontend.v3_4.ast.rewriters
 
-case object normalizeMatchPredicates
-  extends MatchPredicateNormalization(MatchPredicateNormalizerChain(PropertyPredicateNormalizer, LabelPredicateNormalizer))
+case class normalizeMatchPredicates(getDegreeRewriting: Boolean)
+  extends MatchPredicateNormalization(MatchPredicateNormalizerChain(PropertyPredicateNormalizer, LabelPredicateNormalizer), getDegreeRewriting)

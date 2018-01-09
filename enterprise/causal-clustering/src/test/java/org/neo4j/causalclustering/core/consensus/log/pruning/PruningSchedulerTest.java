@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,6 +22,7 @@ package org.neo4j.causalclustering.core.consensus.log.pruning;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.time.Clock;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -131,7 +132,7 @@ public class PruningSchedulerTest
         // given
         final AtomicReference<Throwable> ex = new AtomicReference<>();
         final DoubleLatch checkPointerLatch = new DoubleLatch( 1 );
-        RaftLogPruner logPruner = new RaftLogPruner( null, null )
+        RaftLogPruner logPruner = new RaftLogPruner( null, null, Clock.systemUTC() )
         {
             @Override
             public void prune() throws IOException

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -81,6 +81,8 @@ public interface FileSystemAbstraction extends Closeable
     boolean isDirectory( File file );
 
     void moveToDirectory( File file, File toDirectory ) throws IOException;
+
+    void copyToDirectory( File file, File toDirectory ) throws IOException;
 
     void copyFile( File from, File to ) throws IOException;
 

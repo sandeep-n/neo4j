@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -158,12 +158,6 @@ public class FileSystemAbstractionInterruptionTest
     public void ch_writeAll_ByteBuffer_position() throws IOException
     {
         chan( true ).writeAll( ByteBuffer.allocate( 1 ), 1 );
-    }
-
-    @Test( expected = ClosedByInterruptException.class )
-    public void ch_write_ByteBuffer_position() throws IOException
-    {
-        chan( true ).write( ByteBuffer.allocate( 1 ), 1 );
     }
 
     @Test( expected = ClosedByInterruptException.class )

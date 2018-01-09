@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,6 +21,7 @@ package org.neo4j.causalclustering.core.consensus.shipping;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -34,14 +35,18 @@ import org.neo4j.causalclustering.core.consensus.RaftMessages;
 import org.neo4j.causalclustering.core.consensus.RaftMessages.AppendEntries;
 import org.neo4j.causalclustering.core.consensus.ReplicatedInteger;
 import org.neo4j.causalclustering.core.consensus.ReplicatedString;
+import org.neo4j.causalclustering.core.consensus.log.cache.ConsecutiveInFlightCache;
 import org.neo4j.causalclustering.core.consensus.log.InMemoryRaftLog;
 import org.neo4j.causalclustering.core.consensus.log.RaftLog;
 import org.neo4j.causalclustering.core.consensus.log.RaftLogEntry;
-import org.neo4j.causalclustering.core.consensus.log.segmented.InFlightMap;
+import org.neo4j.causalclustering.core.consensus.schedule.TimerService;
 import org.neo4j.causalclustering.identity.MemberId;
 import org.neo4j.helpers.collection.Iterables;
+import org.neo4j.kernel.impl.util.Neo4jJobScheduler;
+import org.neo4j.kernel.lifecycle.LifeRule;
 import org.neo4j.logging.Log;
 import org.neo4j.logging.LogProvider;
+import org.neo4j.scheduler.JobScheduler;
 import org.neo4j.test.matchers.Matchers;
 import org.neo4j.time.Clocks;
 
@@ -57,9 +62,14 @@ import static org.neo4j.test.matchers.Matchers.hasMessage;
 
 public class RaftLogShipperTest
 {
+    @Rule
+    public LifeRule life = new LifeRule( true );
+    private JobScheduler scheduler = life.add( new Neo4jJobScheduler() );
+
     private OutboundMessageCollector outbound;
     private RaftLog raftLog;
     private Clock clock;
+    private TimerService timerService;
     private MemberId leader;
     private MemberId follower;
     private long leaderTerm;
@@ -90,6 +100,7 @@ public class RaftLogShipperTest
         leaderCommit = 0;
         retryTimeMillis = 100000;
         logProvider = mock( LogProvider.class );
+        timerService = new TimerService( scheduler, logProvider );
         log = mock( Log.class );
         when( logProvider.getLog( RaftLogShipper.class ) ).thenReturn( log );
     }
@@ -106,8 +117,8 @@ public class RaftLogShipperTest
 
     private void startLogShipper()
     {
-        logShipper = new RaftLogShipper( outbound, logProvider, raftLog, clock, leader, follower, leaderTerm, leaderCommit,
-                        retryTimeMillis, catchupBatchSize, maxAllowedShippingLag, new InFlightMap<>() );
+        logShipper = new RaftLogShipper( outbound, logProvider, raftLog, clock, timerService, leader, follower, leaderTerm, leaderCommit,
+                        retryTimeMillis, catchupBatchSize, maxAllowedShippingLag, new ConsecutiveInFlightCache() );
         logShipper.start();
     }
 

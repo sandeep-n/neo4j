@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -158,7 +158,7 @@ class ByteCodeExpressionVisitor implements ExpressionVisitor
         }
         methodVisitor.visitMethodInsn( INVOKESTATIC,
                 byteCodeName( method.owner() ),
-                method.name(), desc( method ), false );
+                method.name(), desc( method ), Modifier.isInterface( method.owner().modifiers() ) );
     }
 
     @Override

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -41,15 +41,15 @@ case object OptionalMatchRemover extends PlannerQueryRewriter {
   override def instance(ignored: CompilerContext): Rewriter = topDown(Rewriter.lift {
     case RegularPlannerQuery(graph, proj@AggregatingQueryProjection(distinctExpressions, aggregations, _), tail)
       if validAggregations(aggregations) =>
-      val projectionDeps: Iterable[Variable] = (distinctExpressions.values ++ aggregations.values).flatMap(_.dependencies)
+      val projectionDeps: Iterable[LogicalVariable] = (distinctExpressions.values ++ aggregations.values).flatMap(_.dependencies)
       rewrite(projectionDeps, graph, proj, tail)
 
     case RegularPlannerQuery(graph, proj@DistinctQueryProjection(distinctExpressions, _), tail) =>
-      val projectionDeps: Iterable[Variable] = distinctExpressions.values.flatMap(_.dependencies)
+      val projectionDeps: Iterable[LogicalVariable] = distinctExpressions.values.flatMap(_.dependencies)
       rewrite(projectionDeps, graph, proj, tail)
   })
 
-  private def rewrite(projectionDeps: Iterable[Variable], graph: QueryGraph, proj: QueryProjection, tail: Option[PlannerQuery]): RegularPlannerQuery = {
+  private def rewrite(projectionDeps: Iterable[LogicalVariable], graph: QueryGraph, proj: QueryProjection, tail: Option[PlannerQuery]): RegularPlannerQuery = {
     val updateDeps = graph.mutatingPatterns.flatMap(_.dependencies)
     val dependencies: Set[IdName] = projectionDeps.map(IdName.fromVariable).toSet ++ updateDeps
 
@@ -63,10 +63,10 @@ case object OptionalMatchRemover extends PlannerQueryRewriter {
             // any dependencies from the next horizon
             dependencies --
             // But we don't need to solve variables already present by the non-optional part of the QG
-            graph.coveredIds
+            graph.idsWithoutOptionalMatchesOrUpdates
 
         val mustInclude = allDeps -- original.argumentIds
-        val mustKeep = original.smallestGraphIncluding(mustInclude)
+        val mustKeep = smallestGraphIncluding(original, mustInclude)
 
         if (mustKeep.isEmpty)
         // We did not find anything in this OPTIONAL MATCH. Since there are no variable deps from this clause,
@@ -74,14 +74,14 @@ case object OptionalMatchRemover extends PlannerQueryRewriter {
           None
         else {
           val (predicatesForPatterns, remaining) = {
-            val elementsToKeep1 = original.smallestGraphIncluding(mustInclude ++ original.argumentIds)
+            val elementsToKeep1 = smallestGraphIncluding(original, mustInclude ++ original.argumentIds)
             partitionPredicates(original.selections.predicates, elementsToKeep1)
           }
 
           val elementsToKeep = {
             val variablesNeededForPredicates =
               remaining.flatMap(expression => expression.dependencies.map(IdName.fromVariable))
-            original.smallestGraphIncluding(mustInclude ++ original.argumentIds ++ variablesNeededForPredicates)
+            smallestGraphIncluding(original, mustInclude ++ original.argumentIds ++ variablesNeededForPredicates)
           }
 
           val (patternsToKeep, patternsToFilter) = original.patternRelationships.partition(r => elementsToKeep(r.name))
@@ -194,6 +194,68 @@ case object OptionalMatchRemover extends PlannerQueryRewriter {
       }
     }
   }
+
+  def smallestGraphIncluding(qg: QueryGraph, mustInclude: Set[IdName]): Set[IdName] = {
+    if (mustInclude.size < 2)
+      mustInclude intersect qg.allCoveredIds
+    else {
+      var accumulatedElements = mustInclude
+      for {
+        lhs <- mustInclude
+        rhs <- mustInclude
+        if lhs.name < rhs.name
+      } {
+        accumulatedElements ++= findPathBetween(qg, lhs, rhs)
+      }
+      accumulatedElements
+    }
+  }
+
+  private case class PathSoFar(end: IdName, alreadyVisited: Set[PatternRelationship]) {
+    def coveredIds: Set[IdName] = alreadyVisited.flatMap(_.coveredIds) + end
+  }
+
+  private def hasExpandedInto(from: Seq[PathSoFar], into: Seq[PathSoFar]): Seq[Set[IdName]] =
+    for {lhs <- from
+         rhs <- into
+         if rhs.alreadyVisited.exists(p => p.coveredIds.contains(lhs.end))}
+      yield {
+        (lhs.alreadyVisited ++ rhs.alreadyVisited).flatMap(_.coveredIds)
+      }
+
+
+  private def expand(queryGraph: QueryGraph, from: Seq[PathSoFar]): Seq[PathSoFar] = {
+    from.flatMap {
+      case PathSoFar(end, alreadyVisited) =>
+        queryGraph.patternRelationships.collect {
+          case pr if !alreadyVisited(pr) && pr.coveredIds(end) =>
+            PathSoFar(pr.otherSide(end), alreadyVisited + pr)
+        }
+    }
+  }
+
+  private def findPathBetween(qg: QueryGraph, startFromL: IdName, startFromR: IdName): Set[IdName] = {
+    var l = Seq(PathSoFar(startFromL, Set.empty))
+    var r = Seq(PathSoFar(startFromR, Set.empty))
+    (0 to qg.patternRelationships.size) foreach { i =>
+      if (i % 2 == 0) {
+        l = expand(qg, l)
+        val matches = hasExpandedInto(l, r)
+        if (matches.nonEmpty)
+          return matches.head
+      }
+      else {
+        r = expand(qg, r)
+        val matches = hasExpandedInto(r, l)
+        if (matches.nonEmpty)
+          return matches.head
+      }
+    }
+
+    // Did not find any path. Let's do the safe thing and return everything
+    qg.patternRelationships.flatMap(_.coveredIds)
+  }
+
 
 }
 

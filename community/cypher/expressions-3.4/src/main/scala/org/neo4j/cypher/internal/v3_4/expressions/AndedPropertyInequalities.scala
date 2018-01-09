@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,8 +19,8 @@ package org.neo4j.cypher.internal.v3_4.expressions
 import org.neo4j.cypher.internal.util.v3_4.NonEmptyList
 
 case class AndedPropertyInequalities(
-                                      variable: Variable,
-                                      property: Property,
+                                      variable: LogicalVariable,
+                                      property: LogicalProperty,
                                       inequalities: NonEmptyList[InequalityExpression]
                                     ) extends Expression {
   def position = variable.position

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,7 +22,7 @@ package org.neo4j.cypher.internal
 import java.util.{Map => JavaMap}
 
 import org.neo4j.cypher._
-import org.neo4j.cypher.internal.compatibility.v3_4._
+import org.neo4j.cypher.internal.compatibility._
 import org.neo4j.cypher.internal.compiler.v3_4.prettifier.Prettifier
 import org.neo4j.cypher.internal.frontend.v3_4.phases.CompilationPhaseTracer
 import org.neo4j.cypher.internal.runtime.interpreted.{LastCommittedTxIdProvider, TransactionalContextWrapper, ValueConversion}
@@ -31,9 +31,9 @@ import org.neo4j.cypher.internal.tracing.{CompilationTracer, TimingCompilationTr
 import org.neo4j.graphdb.Result
 import org.neo4j.graphdb.config.Setting
 import org.neo4j.graphdb.factory.GraphDatabaseSettings
+import org.neo4j.internal.kernel.api.security.AccessMode
 import org.neo4j.kernel.api.query.SchemaIndexUsage
-import org.neo4j.kernel.api.security.AccessMode
-import org.neo4j.kernel.api.{KernelAPI, ReadOperations}
+import org.neo4j.kernel.api.ReadOperations
 import org.neo4j.kernel.configuration.Config
 import org.neo4j.kernel.impl.locking.ResourceTypes
 import org.neo4j.kernel.impl.query.{QueryExecutionMonitor, TransactionalContext}
@@ -57,7 +57,6 @@ class ExecutionEngine(val queryService: GraphDatabaseQueryService,
   // true means we run inside REST server
   protected val isServer = false
   private val resolver = queryService.getDependencyResolver
-  private val kernel = resolver.resolveDependency(classOf[KernelAPI])
   private val lastCommittedTxId = LastCommittedTxIdProvider(queryService)
   private val kernelMonitors: KernelMonitors = resolver.resolveDependency(classOf[KernelMonitors])
   private val compilationTracer: CompilationTracer =
@@ -67,14 +66,14 @@ class ExecutionEngine(val queryService: GraphDatabaseQueryService,
   private val log = logProvider.getLog( getClass )
   private val cacheMonitor = kernelMonitors.newMonitor(classOf[StringCacheMonitor])
   kernelMonitors.addMonitorListener( new StringCacheMonitor {
-    override def cacheDiscard(ignored: String, query: String) {
-      log.info(s"Discarded stale query from the query cache: $query")
+    override def cacheDiscard(ignored: String, query: String, secondsSinceReplan: Int) {
+      log.info(s"Discarded stale query from the query cache after ${secondsSinceReplan} seconds: $query")
     }
   })
 
   private val executionMonitor = kernelMonitors.newMonitor(classOf[QueryExecutionMonitor])
 
-  private val cacheAccessor = new MonitoringCacheAccessor[String, (ExecutionPlan, Map[String, Any])](cacheMonitor)
+  private val cacheAccessor = new MonitoringCacheAccessor[String, (ExecutionPlan, Map[String, Any], Seq[String])](cacheMonitor)
 
   private val preParsedQueries = new LFUCache[String, PreParsedQuery](getPlanCacheSize)
   private val parsedQueries = new LFUCache[String, ParsedQuery](getPlanCacheSize)
@@ -94,10 +93,10 @@ class ExecutionEngine(val queryService: GraphDatabaseQueryService,
     profile(query, ValueConversion.asValues(scalaParams), context)
   }
 
-  def profile(query: String, mapValue: MapValue, context: TransactionalContext): Result = {
-    // we got deep java parameters => convert to shallow scala parameters for passing into the engine
-    val (preparedPlanExecution, wrappedContext) = planQuery(context)
-    preparedPlanExecution.profile(wrappedContext, mapValue)
+  def profile(query: String, mapParams: MapValue, context: TransactionalContext): Result = {
+    val (preparedPlanExecution, wrappedContext, queryParamNames) = planQuery(context)
+    checkParameters(queryParamNames, mapParams, preparedPlanExecution.extractedParams)
+    preparedPlanExecution.profile(wrappedContext, mapParams)
   }
 
   def execute(query: String, scalaParams: Map[String, Any], context: TransactionalContext): Result = {
@@ -113,7 +112,10 @@ class ExecutionEngine(val queryService: GraphDatabaseQueryService,
   }
 
   def execute(query: String, mapParams: MapValue, context: TransactionalContext): Result = {
-    val (preparedPlanExecution, wrappedContext) = planQuery(context)
+    val (preparedPlanExecution, wrappedContext, queryParamNames) = planQuery(context)
+    if (preparedPlanExecution.executionMode.name != "explain") {
+      checkParameters(queryParamNames, mapParams, preparedPlanExecution.extractedParams)
+    }
     preparedPlanExecution.execute(wrappedContext, mapParams)
   }
 
@@ -140,7 +142,7 @@ class ExecutionEngine(val queryService: GraphDatabaseQueryService,
   }
 
   @throws(classOf[SyntaxException])
-  protected def planQuery(transactionalContext: TransactionalContext): (PreparedPlanExecution, TransactionalContextWrapper) = {
+  protected def planQuery(transactionalContext: TransactionalContext): (PreparedPlanExecution, TransactionalContextWrapper, Seq[String]) = {
     val executingQuery = transactionalContext.executingQuery()
     val queryText = executingQuery.queryText()
     executionMonitor.startQueryExecution(executingQuery)
@@ -167,22 +169,25 @@ class ExecutionEngine(val queryService: GraphDatabaseQueryService,
         // NOTE: This will force read access mode if the current transaction did not have it
         val revertable = tc.restrictCurrentTransaction(tc.securityContext.withMode(AccessMode.Static.READ))
 
-        val ((plan: ExecutionPlan, extractedParameters), touched) = try {
+        val ((plan: ExecutionPlan, extractedParameters, queryParamNames), touched) = try {
           // fetch plan cache
-          val cache: QueryCache[String, (ExecutionPlan, Map[String, Any])] = getOrCreateFromSchemaState(tc.readOperations, {
+          val cache: QueryCache[String, (ExecutionPlan, Map[String, Any], Seq[String])] = getOrCreateFromSchemaState(tc.readOperations, {
             cacheMonitor.cacheFlushDetected(tc.statement)
-            val lruCache = new LFUCache[String, (ExecutionPlan, Map[String, Any])](getPlanCacheSize)
+            val lruCache = new LFUCache[String, (ExecutionPlan, Map[String, Any], Seq[String])](getPlanCacheSize)
             new QueryCache(cacheAccessor, lruCache)
           })
 
-          def isStale(plan: ExecutionPlan, ignored: Map[String, Any]) = plan.isStale(lastCommittedTxId, tc)
-          def producePlan() = {
-            val parsedQuery = parsePreParsedQuery(preParsedQuery, phaseTracer)
-            parsedQuery.plan(tc, phaseTracer)
+          def isStale(plan: ExecutionPlan, ignored1: Map[String, Any], ignored2: Seq[String]) = plan.isStale(lastCommittedTxId, tc)
+
+          val producePlan = new PlanProducer[(ExecutionPlan, Map[String, Any], Seq[String])] {
+            override def produceWithExistingTX: (ExecutionPlan, Map[String, Any], Seq[String]) = {
+              val parsedQuery = parsePreParsedQuery(preParsedQuery, phaseTracer)
+              parsedQuery.plan(tc, phaseTracer)
+            }
           }
 
           val stateBefore = schemaState(tc)
-          var (plan: (ExecutionPlan, Map[String, Any]), touched: Boolean) = cache.getOrElseUpdate(cacheKey, queryText, (isStale _).tupled, producePlan())
+          var (plan: (ExecutionPlan, Map[String, Any], Seq[String]), touched: Boolean) = cache.getOrElseUpdate(cacheKey, queryText, (isStale _).tupled, producePlan)
           if (!touched) {
             val labelIds: Seq[Long] = extractPlanLabels(plan, preParsedQuery.version, tc)
             if (labelIds.nonEmpty) {
@@ -211,7 +216,7 @@ class ExecutionEngine(val queryService: GraphDatabaseQueryService,
         } else {
           tc.cleanForReuse()
           tc.notifyPlanningCompleted(plan.plannerInfo)
-          return (PreparedPlanExecution(plan, executionMode, extractedParameters), tc)
+          return (PreparedPlanExecution(plan, executionMode, extractedParameters), tc, queryParamNames)
         }
 
         n += 1
@@ -219,6 +224,16 @@ class ExecutionEngine(val queryService: GraphDatabaseQueryService,
     } finally phaseTracer.close()
 
     throw new IllegalStateException("Could not execute query due to insanely frequent schema changes")
+  }
+
+  @throws(classOf[ParameterNotFoundException])
+  private def checkParameters(queryParams: Seq[String], givenParams: MapValue, extractedParams: Map[String, Any]) {
+    exceptionHandler.runSafely {
+      val missingKeys = queryParams.filter(key => !(givenParams.containsKey(key) || extractedParams.contains(key)))
+      if (missingKeys.nonEmpty) {
+        throw new ParameterNotFoundException("Expected parameter(s): " + missingKeys.mkString(", "))
+      }
+    }
   }
 
   private def releasePlanLabels(tc: TransactionalContextWrapper, labelIds: Seq[Long]) = {
@@ -229,7 +244,7 @@ class ExecutionEngine(val queryService: GraphDatabaseQueryService,
     tc.readOperations.acquireShared(ResourceTypes.LABEL, labelIds.toArray[Long]:_*)
   }
 
-  private def extractPlanLabels(plan: (ExecutionPlan, Map[String, Any]), version: CypherVersion, tc:
+  private def extractPlanLabels(plan: (ExecutionPlan, Map[String, Any], Seq[String]), version: CypherVersion, tc:
   TransactionalContextWrapper): Seq[Long] = {
     import scala.collection.JavaConverters._
 
@@ -251,7 +266,7 @@ class ExecutionEngine(val queryService: GraphDatabaseQueryService,
   }
 
   private def schemaState(tc: TransactionalContextWrapper): QueryCache[MonitoringCacheAccessor[String,
-    (ExecutionPlan, Map[String, Any])], LFUCache[String, (ExecutionPlan, Map[String, Any])]] = {
+    (ExecutionPlan, Map[String, Any], Seq[String])], LFUCache[String, (ExecutionPlan, Map[String, Any], Seq[String])]] = {
     tc.readOperations.schemaStateGet(this)
   }
 
@@ -305,7 +320,7 @@ class ExecutionEngine(val queryService: GraphDatabaseQueryService,
     }
 
     val compatibilityCache = new CompatibilityCache(compatibilityFactory)
-    new CompilerEngineDelegator(queryService, kernel, kernelMonitors, version, planner, runtime,
+    new CompilerEngineDelegator(queryService, kernelMonitors, version, planner, runtime,
       useErrorsOverWarnings, idpMaxTableSize, idpIterationDuration, errorIfShortestPathFallbackUsedAtRuntime,
       errorIfShortestPathHasCommonNodesAtRuntime, legacyCsvQuoteEscaping, logProvider, compatibilityCache)
   }

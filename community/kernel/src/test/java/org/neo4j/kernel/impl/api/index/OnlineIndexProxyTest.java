@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -31,6 +31,7 @@ import org.neo4j.kernel.api.schema.index.IndexDescriptorFactory;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.neo4j.internal.kernel.api.IndexCapability.NO_CAPABILITY;
 
 public class OnlineIndexProxyTest
 {
@@ -44,8 +45,8 @@ public class OnlineIndexProxyTest
     public void shouldRemoveIndexCountsWhenTheIndexItselfIsDropped() throws IOException
     {
         // given
-        OnlineIndexProxy index = new OnlineIndexProxy( indexId, descriptor, accessor,
-                storeView, providerDescriptor, false );
+        OnlineIndexProxy index = new OnlineIndexProxy( indexId, new IndexMeta( descriptor, providerDescriptor, NO_CAPABILITY ),
+                accessor, storeView, false );
 
         // when
         index.drop();

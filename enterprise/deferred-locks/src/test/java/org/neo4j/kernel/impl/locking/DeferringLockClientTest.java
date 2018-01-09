@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -134,6 +134,20 @@ public class DeferringLockClientTest
 
         // THEN
         verify( actualClient ).stop();
+    }
+
+    @Test
+    public void shouldPrepareUnderlyingClient() throws Exception
+    {
+        // GIVEN
+        Locks.Client actualClient = mock( Locks.Client.class );
+        DeferringLockClient client = new DeferringLockClient( actualClient );
+
+        // WHEN
+        client.prepare();
+
+        // THEN
+        verify( actualClient ).prepare();
     }
 
     @Test
@@ -463,6 +477,11 @@ public class DeferringLockClientTest
 
         @Override
         public void releaseExclusive( ResourceType resourceType, long... resourceIds )
+        {
+        }
+
+        @Override
+        public void prepare()
         {
         }
 

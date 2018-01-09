@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,15 +16,15 @@
  */
 package org.neo4j.cypher.internal.frontend.v3_4.ast
 
-import org.neo4j.cypher.internal.util.v3_4.{ASTNode, InputPosition}
 import org.neo4j.cypher.internal.frontend.v3_4.semantics.{SemanticCheckable, SemanticExpressionCheck}
-import org.neo4j.cypher.internal.v3_4.expressions.{Expression, Variable}
+import org.neo4j.cypher.internal.util.v3_4.{ASTNode, InputPosition}
+import org.neo4j.cypher.internal.v3_4.expressions.{Expression, LogicalVariable}
 
 case class OrderBy(sortItems: Seq[SortItem])(val position: InputPosition) extends ASTNode with SemanticCheckable {
   def semanticCheck = sortItems.semanticCheck
 
-  def dependencies: Set[Variable] =
-    sortItems.foldLeft(Set.empty[Variable]) { case (acc, item) => acc ++ item.expression.dependencies }
+  def dependencies: Set[LogicalVariable] =
+    sortItems.foldLeft(Set.empty[LogicalVariable]) { case (acc, item) => acc ++ item.expression.dependencies }
 }
 
 sealed trait SortItem extends ASTNode with SemanticCheckable {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -29,8 +29,6 @@ import org.neo4j.shell.Session;
 import org.neo4j.shell.ShellException;
 import org.neo4j.shell.impl.AbstractApp;
 import org.neo4j.shell.util.json.JSONParser;
-
-import static org.neo4j.shell.TextUtil.stripFromQuotes;
 
 /**
  * Mimics the Bash application "export" and uses the client session
@@ -90,5 +88,17 @@ public class Export extends AbstractApp
     private Object stripFromQuotesIfString( Object value )
     {
         return value instanceof String ? stripFromQuotes( value.toString() ) : value;
+    }
+
+    private static String stripFromQuotes( String string )
+    {
+        if ( string != null )
+        {
+            if ( string.startsWith( "\"" ) && string.endsWith( "\"" ) )
+            {
+                return string.substring( 1, string.length() - 1 );
+            }
+        }
+        return string;
     }
 }

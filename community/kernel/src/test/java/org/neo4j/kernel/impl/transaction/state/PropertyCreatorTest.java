@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,6 +24,7 @@ import org.junit.Test;
 import org.neo4j.kernel.impl.store.PropertyStore;
 import org.neo4j.kernel.impl.store.PropertyType;
 import org.neo4j.kernel.impl.store.RecordStore;
+import org.neo4j.kernel.impl.store.id.BatchingIdSequence;
 import org.neo4j.kernel.impl.store.id.IdSequence;
 import org.neo4j.kernel.impl.store.record.NodeRecord;
 import org.neo4j.kernel.impl.store.record.PrimitiveRecord;
@@ -33,7 +34,6 @@ import org.neo4j.kernel.impl.store.record.Record;
 import org.neo4j.kernel.impl.transaction.state.RecordAccess.Loader;
 import org.neo4j.kernel.impl.transaction.state.RecordAccess.RecordProxy;
 import org.neo4j.unsafe.batchinsert.internal.DirectRecordAccess;
-import org.neo4j.unsafe.impl.batchimport.store.BatchingIdSequence;
 import org.neo4j.values.storable.Value;
 import org.neo4j.values.storable.Values;
 
@@ -45,7 +45,7 @@ import static org.mockito.Mockito.mock;
 public class PropertyCreatorTest
 {
     private final IdSequence idGenerator = new BatchingIdSequence();
-    private final PropertyCreator creator = new PropertyCreator( null, null, idGenerator, new PropertyTraverser() );
+    private final PropertyCreator creator = new PropertyCreator( null, null, idGenerator, new PropertyTraverser(), false );
 
     // The RecordAccess will take on the role of both store and tx state and the PropertyCreator
     // will know no difference
@@ -246,7 +246,7 @@ public class PropertyCreatorTest
         for ( ExpectedProperty initialProperty : initialRecord.properties )
         {
             PropertyBlock block = new PropertyBlock();
-            PropertyStore.encodeValue( block, initialProperty.key, initialProperty.value, null, null );
+            PropertyStore.encodeValue( block, initialProperty.key, initialProperty.value, null, null, true );
             record.addPropertyBlock( block );
         }
         assertTrue( record.size() <= PropertyType.getPayloadSize() );

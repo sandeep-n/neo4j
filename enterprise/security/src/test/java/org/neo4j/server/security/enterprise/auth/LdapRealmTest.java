@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -57,7 +57,7 @@ import static java.util.Collections.singletonList;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.hasItems;
 import static org.junit.Assert.assertThat;
-import static org.mockito.ArgumentMatchers.anyObject;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.mock;
@@ -235,7 +235,7 @@ public class LdapRealmTest
 
         LdapContext ldapContext = mock( LdapContext.class );
         NamingEnumeration result = mock( NamingEnumeration.class );
-        when( ldapContext.search( anyString(), anyString(), anyObject(), anyObject() ) ).thenReturn( result );
+        when( ldapContext.search( anyString(), anyString(), any(), any() ) ).thenReturn( result );
         when( result.hasMoreElements() ).thenReturn( false );
 
         makeAndInit();
@@ -250,7 +250,7 @@ public class LdapRealmTest
 
         LdapContext ldapContext = mock( LdapContext.class );
         NamingEnumeration result = mock( NamingEnumeration.class );
-        when( ldapContext.search( anyString(), anyString(), anyObject(), anyObject() ) ).thenReturn( result );
+        when( ldapContext.search( anyString(), anyString(), any(), any() ) ).thenReturn( result );
         when( result.hasMoreElements() ).thenReturn( false );
 
         assertException( this::makeAndInit, IllegalArgumentException.class,
@@ -267,7 +267,7 @@ public class LdapRealmTest
 
         LdapContext ldapContext = mock( LdapContext.class );
         NamingEnumeration result = mock( NamingEnumeration.class );
-        when( ldapContext.search( anyString(), anyString(), anyObject(), anyObject() ) ).thenReturn( result );
+        when( ldapContext.search( anyString(), anyString(), any(), any() ) ).thenReturn( result );
         when( result.hasMoreElements() ).thenReturn( false );
 
         assertException( this::makeAndInit, IllegalArgumentException.class,
@@ -285,7 +285,7 @@ public class LdapRealmTest
         LdapContext ldapContext = mock( LdapContext.class );
         NamingEnumeration result = mock( NamingEnumeration.class );
         SearchResult searchResult = mock( SearchResult.class );
-        when( ldapContext.search( anyString(), anyString(), anyObject(), anyObject() ) ).thenReturn( result );
+        when( ldapContext.search( anyString(), anyString(), any(), any() ) ).thenReturn( result );
         when( result.hasMoreElements() ).thenReturn( true );
         when( result.next() ).thenReturn( searchResult );
         when( searchResult.toString() ).thenReturn( "<ldap search result>" );
@@ -319,7 +319,7 @@ public class LdapRealmTest
 
         // Mock ldap search result "attr1" contains "group1" and "attr2" contains "group2" (a bit brittle...)
         // "attr0" is non-existing and should have no effect
-        when( ldapContext.search( anyString(), anyString(), anyObject(), anyObject() ) ).thenReturn( result );
+        when( ldapContext.search( anyString(), anyString(), any(), any() ) ).thenReturn( result );
         when( result.hasMoreElements() ).thenReturn( true, false );
         when( result.next() ).thenReturn( searchResult );
         when( searchResult.getAttributes() ).thenReturn( attributes );
@@ -405,9 +405,10 @@ public class LdapRealmTest
                 NamingException.class );
 
         // Then
-        verify( securityLog ).error( contains(
-                "{LdapRealm}: Failed to authenticate user 'olivia' against 'ldap://myserver.org:12345' using StartTLS: " +
-                        "Simulated failure" ) );
+        // Authentication failures are logged from MultiRealmAuthManager
+        //verify( securityLog ).error( contains(
+        //        "{LdapRealm}: Failed to authenticate user 'olivia' against 'ldap://myserver.org:12345' using StartTLS: " +
+        //                "Simulated failure" ) );
     }
 
     @Test

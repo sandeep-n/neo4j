@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -60,7 +60,7 @@ case class desugarMapProjection(state: SemanticState) extends Rewriter {
 }
 
 case class DesugaredMapProjection(
-                                   name: Variable,
+                                   name: LogicalVariable,
                                    items: Seq[LiteralEntry],
                                    includeAllProps: Boolean
                                  )(val position: InputPosition) extends Expression

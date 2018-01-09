@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,6 +23,7 @@ import org.junit.Test;
 
 import java.io.File;
 
+import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.kernel.configuration.Config;
 
 import static org.hamcrest.core.IsEqual.equalTo;
@@ -33,8 +34,8 @@ public class DatabaseManagementSystemSettingsTest
     @Test
     public void shouldPutDatabaseDirectoriesIntoDataDatabases()
     {
-        Config config = Config.defaults( DatabaseManagementSystemSettings.data_directory, "the-data-directory" );
-        assertThat( config.get( DatabaseManagementSystemSettings.database_path ),
+        Config config = Config.defaults( GraphDatabaseSettings.data_directory, "the-data-directory" );
+        assertThat( config.get( GraphDatabaseSettings.database_path ),
                 equalTo( new File( "the-data-directory/databases/graph.db" ) ) );
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -29,6 +29,8 @@ import org.neo4j.values.AnyValue;
 import org.neo4j.values.AnyValueWriter;
 import org.neo4j.values.VirtualValue;
 import org.neo4j.values.storable.Values;
+
+import static org.neo4j.values.storable.Values.NO_VALUE;
 
 public final class MapValue extends VirtualValue
 {
@@ -118,6 +120,52 @@ public final class MapValue extends VirtualValue
         return compare;
     }
 
+    @Override
+    public Boolean ternaryEquals( AnyValue other )
+    {
+        if ( other == null || other == NO_VALUE )
+        {
+            return null;
+        }
+        else if ( !(other instanceof MapValue) )
+        {
+            return false;
+        }
+        Map<String,AnyValue> otherMap = ((MapValue) other).map;
+        int size = map.size();
+        if ( size != otherMap.size() )
+        {
+            return false;
+        }
+        String[] thisKeys = map.keySet().toArray( new String[size] );
+        Arrays.sort( thisKeys, String::compareTo );
+        String[] thatKeys = otherMap.keySet().toArray( new String[size] );
+        Arrays.sort( thatKeys, String::compareTo );
+        for ( int i = 0; i < size; i++ )
+        {
+            if ( thisKeys[i].compareTo( thatKeys[i] ) != 0 )
+            {
+                return false;
+            }
+        }
+        Boolean equalityResult = true;
+
+        for ( int i = 0; i < size; i++ )
+        {
+            String key = thisKeys[i];
+            Boolean s = map.get( key ).ternaryEquals( otherMap.get( key ) );
+            if ( s == null )
+            {
+                equalityResult = null;
+            }
+            else if ( !s )
+            {
+                return false;
+            }
+        }
+        return equalityResult;
+    }
+
     public void foreach( BiConsumer<String,AnyValue> f )
     {
         map.forEach( f );
@@ -135,7 +183,7 @@ public final class MapValue extends VirtualValue
 
     public AnyValue get( String key )
     {
-      return map.getOrDefault( key, Values.NO_VALUE );
+      return map.getOrDefault( key, NO_VALUE );
     }
 
     @Override

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -46,6 +46,7 @@ import org.neo4j.kernel.configuration.Settings;
 import org.neo4j.kernel.impl.enterprise.configuration.EnterpriseEditionSettings;
 import org.neo4j.kernel.impl.enterprise.configuration.OnlineBackupSettings;
 import org.neo4j.kernel.impl.factory.GraphDatabaseFacade;
+import org.neo4j.kernel.monitoring.Monitors;
 import org.neo4j.logging.Level;
 
 import static java.lang.String.format;
@@ -62,11 +63,13 @@ public class CoreClusterMember implements ClusterMember<GraphDatabaseFacade>
     protected final File storeDir;
     private final File clusterStateDir;
     private final File raftLogDir;
-    private final Map<String, String> config = stringMap();
+    private final Map<String,String> config = stringMap();
     private final int serverId;
     private final String boltAdvertisedSocketAddress;
     private final int discoveryPort;
     protected CoreGraphDatabase database;
+    private final Config memberConfig;
+    private final ThreadGroup threadGroup;
 
     public CoreClusterMember( int serverId,
                               int discoveryPort,
@@ -86,6 +89,7 @@ public class CoreClusterMember implements ClusterMember<GraphDatabaseFacade>
                               String advertisedAddress )
     {
         this.serverId = serverId;
+
         this.discoveryPort = discoveryPort;
 
         String initialMembers = addresses.stream().map( AdvertisedSocketAddress::toString ).collect( joining( "," ) );
@@ -124,14 +128,18 @@ public class CoreClusterMember implements ClusterMember<GraphDatabaseFacade>
         this.neo4jHome = new File( parentDir, "server-core-" + serverId );
         config.put( GraphDatabaseSettings.neo4j_home.name(), neo4jHome.getAbsolutePath() );
         config.put( GraphDatabaseSettings.logs_directory.name(), new File( neo4jHome, "logs" ).getAbsolutePath() );
+        config.put( GraphDatabaseSettings.logical_logs_location.name(), "core-tx-logs-" + serverId );
 
         this.discoveryServiceFactory = discoveryServiceFactory;
         File dataDir = new File( neo4jHome, "data" );
         clusterStateDir = ClusterStateDirectory.withoutInitializing( dataDir ).get();
         raftLogDir = new File( clusterStateDir, RAFT_LOG_DIRECTORY_NAME );
         storeDir = new File( new File( dataDir, "databases" ), "graph.db" );
+        memberConfig = Config.defaults( config );
+
         //noinspection ResultOfMethodCallIgnored
         storeDir.mkdirs();
+        threadGroup = new ThreadGroup( toString() );
     }
 
     public String boltAdvertisedAddress()
@@ -152,7 +160,7 @@ public class CoreClusterMember implements ClusterMember<GraphDatabaseFacade>
     @Override
     public void start()
     {
-        database = new CoreGraphDatabase( storeDir, Config.defaults( config ),
+        database = new CoreGraphDatabase( storeDir, memberConfig,
                 GraphDatabaseDependencies.newDependencies(), discoveryServiceFactory );
     }
 
@@ -175,6 +183,11 @@ public class CoreClusterMember implements ClusterMember<GraphDatabaseFacade>
     public File storeDir()
     {
         return storeDir;
+    }
+
+    public Config getMemberConfig()
+    {
+        return memberConfig;
     }
 
     public RaftLogPruner raftLogPruner()
@@ -227,6 +240,12 @@ public class CoreClusterMember implements ClusterMember<GraphDatabaseFacade>
     public String settingValue( String settingName )
     {
         return config.get(settingName);
+    }
+
+    @Override
+    public ThreadGroup threadGroup()
+    {
+        return threadGroup;
     }
 
     public File clusterStateDirectory()

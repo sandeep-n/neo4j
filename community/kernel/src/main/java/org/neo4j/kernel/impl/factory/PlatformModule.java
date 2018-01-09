@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,7 +21,6 @@ package org.neo4j.kernel.impl.factory;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Map;
 
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.graphdb.security.URLAccessRule;
@@ -117,13 +116,6 @@ public class PlatformModule
 
     public final RecoveryCleanupWorkCollector recoveryCleanupWorkCollector;
 
-    public PlatformModule( File providedStoreDir, Map<String,String> params, DatabaseInfo databaseInfo,
-            GraphDatabaseFacadeFactory.Dependencies externalDependencies, GraphDatabaseFacade graphDatabaseFacade )
-    {
-        this( providedStoreDir, Config.defaults( params ), databaseInfo, externalDependencies,
-                graphDatabaseFacade );
-    }
-
     public PlatformModule( File providedStoreDir, Config config, DatabaseInfo databaseInfo,
             GraphDatabaseFacadeFactory.Dependencies externalDependencies, GraphDatabaseFacade graphDatabaseFacade )
     {
@@ -174,7 +166,7 @@ public class PlatformModule
 
         String desiredImplementationName = config.get( GraphDatabaseFacadeFactory.Configuration.tracer );
         tracers = dependencies.satisfyDependency( new Tracers( desiredImplementationName,
-                logging.getInternalLog( Tracers.class ), monitors, jobScheduler ) );
+                logging.getInternalLog( Tracers.class ), monitors, jobScheduler, clock ) );
         dependencies.satisfyDependency( tracers.pageCacheTracer );
         dependencies.satisfyDependency( firstImplementor(
                 LogRotationMonitor.class, tracers.transactionTracer, LogRotationMonitor.NULL ) );
@@ -187,10 +179,6 @@ public class PlatformModule
         diagnosticsManager = life.add( dependencies
                 .satisfyDependency( new DiagnosticsManager( logging.getInternalLog( DiagnosticsManager.class ) ) ) );
 
-        // TODO please fix the bad dependencies instead of doing this.
-        // this was the place of the XaDataSourceManager. NeoStoreXaDataSource is create further down than
-        // (specifically) KernelExtensions, which creates an interesting out-of-order issue with #doAfterRecovery().
-        // Anyways please fix this.
         dependencies.satisfyDependency( dataSourceManager );
 
         availabilityGuard = dependencies.satisfyDependency( createAvailabilityGuard() );

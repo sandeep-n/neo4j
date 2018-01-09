@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,10 +25,29 @@ sealed trait Slot {
   def offset: Int
   def nullable: Boolean
   def typ: CypherType
+  def isTypeCompatibleWith(other: Slot): Boolean
+  def isLongSlot: Boolean
 }
 
-case class LongSlot(offset: Int, nullable: Boolean, typ: CypherType) extends Slot
-case class RefSlot(offset: Int, nullable: Boolean, typ: CypherType) extends Slot
+case class LongSlot(offset: Int, nullable: Boolean, typ: CypherType) extends Slot {
+  override def isTypeCompatibleWith(other: Slot): Boolean = other match {
+    case LongSlot(_, _, otherTyp) =>
+      typ.isAssignableFrom(otherTyp) || otherTyp.isAssignableFrom(typ)
+    case _ => false
+  }
+
+  override def isLongSlot: Boolean = true
+}
+
+case class RefSlot(offset: Int, nullable: Boolean, typ: CypherType) extends Slot {
+  override def isTypeCompatibleWith(other: Slot): Boolean = other match {
+    case RefSlot(_, _, otherTyp) =>
+      typ.isAssignableFrom(otherTyp) || otherTyp.isAssignableFrom(typ)
+    case _ => false
+  }
+
+  override def isLongSlot: Boolean = false
+}
 
 sealed trait SlotWithAliases {
   def slot: Slot
@@ -36,7 +55,7 @@ sealed trait SlotWithAliases {
 
   protected def makeString: String = {
     val aliasesString = s"${aliases.mkString("'", "','", "'")}"
-    f"${slot}%-30s ${aliasesString}%-10s"
+    f"$slot%-30s $aliasesString%-10s"
   }
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,45 +21,54 @@ package org.neo4j.cypher.internal.compatibility.v3_4.runtime.slotted.pipes
 
 import java.util.function.BiConsumer
 
-import org.neo4j.cypher.internal.compatibility.v3_4.runtime.PipelineInformation
+import org.neo4j.cypher.internal.compatibility.v3_4.runtime.{Slot, SlotConfiguration}
+import org.neo4j.cypher.internal.compatibility.v3_4.runtime.slotted.helpers.SlottedPipeBuilderUtils.makeGetPrimitiveNodeFromSlotFunctionFor
 import org.neo4j.cypher.internal.runtime.QueryContext
-import org.neo4j.cypher.internal.util.v3_4.{CypherTypeException, InvalidSemanticsException}
 import org.neo4j.cypher.internal.runtime.interpreted.commands.expressions.Expression
 import org.neo4j.cypher.internal.runtime.interpreted.pipes.{LazyType, Pipe, PipeWithSource, QueryState}
 import org.neo4j.cypher.internal.runtime.interpreted.{ExecutionContext, IsMap, makeValueNeoSafe}
-import org.neo4j.cypher.internal.v3_4.logical.plans.LogicalPlanId
+import org.neo4j.cypher.internal.util.v3_4.attribution.Id
+import org.neo4j.cypher.internal.util.v3_4.{CypherTypeException, InvalidSemanticsException}
 import org.neo4j.graphdb.{Node, Relationship}
 import org.neo4j.values.AnyValue
+import org.neo4j.values.storable.Values
 import org.neo4j.values.virtual.MapValue
 
-abstract class BaseRelationshipSlottedPipe(src: Pipe, RelationshipKey: String, startNode: Int, typ: LazyType, endNode: Int,
-                                           pipelineInformation: PipelineInformation,
-                                           properties: Option[Expression])
-  extends PipeWithSource(src) {
+abstract class BaseRelationshipSlottedPipe(src: Pipe,
+                                           RelationshipKey: String,
+                                           startNode: Slot,
+                                           typ: LazyType,
+                                           endNode: Slot,
+                                           slots: SlotConfiguration,
+                                           properties: Option[Expression]) extends PipeWithSource(src) {
 
-  private val offset = pipelineInformation.getLongOffsetFor(RelationshipKey)
+  //===========================================================================
+  // Compile-time initializations
+  //===========================================================================
+  private val getStartNodeFunction = makeGetPrimitiveNodeFromSlotFunctionFor(startNode)
+  private val getEndNodeFunction = makeGetPrimitiveNodeFromSlotFunctionFor(endNode)
+  private val offset = slots.getLongOffsetFor(RelationshipKey)
+
+  //===========================================================================
+  // Runtime code
+  //===========================================================================
 
   protected def internalCreateResults(input: Iterator[ExecutionContext], state: QueryState): Iterator[ExecutionContext] =
     input.map {
       row =>{
-        val start = getNode(row, startNode)
-        val end = getNode(row, endNode)
+        val start = getStartNodeFunction(row)
+        val end = getEndNodeFunction(row)
         val typeId = typ.typ(state.query)
         val relationship = state.query.createRelationship(start, end, typeId)
 
-        relationship.getType // we do this to make sure the relationship is loaded from the store into this object
+        relationship.`type`() // we do this to make sure the relationship is loaded from the store into this object
 
-        setProperties(row, state, relationship.getId)
+        setProperties(row, state, relationship.id())
 
-        row.setLongAt(offset, relationship.getId)
+        row.setLongAt(offset, relationship.id())
         row
       }
     }
-
-
-  private def getNode(row: ExecutionContext, offset: Int): Long ={
-    row.getLongAt(offset)
-  }
 
   private def setProperties(context: ExecutionContext, state: QueryState, relId: Long) = {
     properties.foreach { expr =>
@@ -81,7 +90,7 @@ abstract class BaseRelationshipSlottedPipe(src: Pipe, RelationshipKey: String, s
 
   private def setProperty(relId: Long, key: String, value: AnyValue, qtx: QueryContext) {
     //do not set properties for null values
-    if (value == null) {
+    if (value == Values.NO_VALUE) {
       handleNull(key: String)
     } else {
       val propertyKeyId = qtx.getOrCreatePropertyKeyId(key)
@@ -92,21 +101,29 @@ abstract class BaseRelationshipSlottedPipe(src: Pipe, RelationshipKey: String, s
   protected def handleNull(key: String): Unit
 }
 
-case class CreateRelationshipSlottedPipe(src: Pipe, RelationshipKey: String, startNode: Int, typ: LazyType, endNode: Int,
-                                         pipelineInformation: PipelineInformation,
+case class CreateRelationshipSlottedPipe(src: Pipe,
+                                         RelationshipKey: String,
+                                         startNode: Slot,
+                                         typ: LazyType,
+                                         endNode: Slot,
+                                         slots: SlotConfiguration,
                                          properties: Option[Expression])
-                                        (val id: LogicalPlanId = LogicalPlanId.DEFAULT)
-  extends BaseRelationshipSlottedPipe(src, RelationshipKey, startNode, typ: LazyType, endNode, pipelineInformation, properties) {
+                                        (val id: Id = Id.INVALID_ID)
+  extends BaseRelationshipSlottedPipe(src, RelationshipKey, startNode, typ: LazyType, endNode, slots, properties) {
   override protected def handleNull(key: String) {
     //do nothing
   }
 }
 
-case class MergeCreateRelationshipSlottedPipe(src: Pipe, RelationshipKey: String, startNode: Int, typ: LazyType, endNode: Int,
-                                              pipelineInformation: PipelineInformation,
+case class MergeCreateRelationshipSlottedPipe(src: Pipe,
+                                              RelationshipKey: String,
+                                              startNode: Slot,
+                                              typ: LazyType,
+                                              endNode: Slot,
+                                              slots: SlotConfiguration,
                                               properties: Option[Expression])
-                                             (val id: LogicalPlanId = LogicalPlanId.DEFAULT)
-  extends BaseRelationshipSlottedPipe(src, RelationshipKey, startNode, typ: LazyType, endNode, pipelineInformation, properties) {
+                                             (val id: Id = Id.INVALID_ID)
+  extends BaseRelationshipSlottedPipe(src, RelationshipKey, startNode, typ: LazyType, endNode, slots, properties) {
 
   override protected def handleNull(key: String) {
     //merge cannot use null properties, since in that case the match part will not find the result of the create

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -30,6 +30,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.logging.Level;
 
+import org.neo4j.causalclustering.core.consensus.log.cache.InFlightCacheFactory;
 import org.neo4j.configuration.Description;
 import org.neo4j.configuration.Internal;
 import org.neo4j.configuration.LoadableConfig;
@@ -77,6 +78,10 @@ public class CausalClusteringSettings implements LoadableConfig
             "availability for the cluster." )
     public static final Setting<Boolean> refuse_to_be_leader =
             setting( "causal_clustering.refuse_to_be_leader", BOOLEAN, FALSE );
+
+    @Description( "Enable pre-voting extension to the Raft protocol (this is breaking and must match between the core cluster members)" )
+    public static final Setting<Boolean> enable_pre_voting =
+            setting( "causal_clustering.enable_pre_voting", BOOLEAN, FALSE );
 
     @Description( "The maximum batch size when catching up (in unit of entries)" )
     public static final Setting<Integer> catchup_batch_size =
@@ -129,6 +134,19 @@ public class CausalClusteringSettings implements LoadableConfig
             setting( "causal_clustering.initial_discovery_members", list( ",", ADVERTISED_SOCKET_ADDRESS ),
                     NO_DEFAULT );
 
+    @Description( "Type of in-flight cache." )
+    public static final Setting<InFlightCacheFactory.Type> in_flight_cache_type =
+            setting( "causal_clustering.in_flight_cache.type", options( InFlightCacheFactory.Type.class, true ),
+                    InFlightCacheFactory.Type.CONSECUTIVE.name() );
+
+    @Description( "The maximum number of entries in the in-flight cache." )
+    public static final Setting<Integer> in_flight_cache_max_entries =
+            setting( "causal_clustering.in_flight_cache.max_entries", INTEGER, "1024" );
+
+    @Description( "The maximum number of bytes in the in-flight cache." )
+    public static final Setting<Long> in_flight_cache_max_bytes =
+            setting( "causal_clustering.in_flight_cache.max_bytes", BYTES, "2G" );
+
     public enum DiscoveryType
     {
         DNS,
@@ -143,7 +161,7 @@ public class CausalClusteringSettings implements LoadableConfig
     public static final Setting<Boolean> disable_middleware_logging =
             setting( "causal_clustering.disable_middleware_logging", BOOLEAN, TRUE );
 
-    @Description( "Logging level of middleware logging" )
+    @Description( "The level of middleware logging" )
     public static final Setting<Integer> middleware_logging_level =
             setting( "causal_clustering.middleware_logging.level", INTEGER, Integer.toString( Level.FINE.intValue() ) );
 
@@ -192,6 +210,10 @@ public class CausalClusteringSettings implements LoadableConfig
     public static final Setting<Duration> replication_retry_timeout_limit =
             setting( "causal_clustering.replication_retry_timeout_limit", DURATION, "60s" );
 
+    @Description( "The retry timeout for finding a leader for replication. Relevant during leader elections." )
+    public static final Setting<Duration> replication_leader_retry_timeout =
+            setting( "causal_clustering.replication_leader", DURATION, "500ms" );
+
     @Description( "The number of operations to be processed before the state machines flush to disk" )
     public static final Setting<Integer> state_machine_flush_window_size =
             setting( "causal_clustering.state_machine_flush_window_size", INTEGER, "4096" );
@@ -234,7 +256,7 @@ public class CausalClusteringSettings implements LoadableConfig
     @Description( "Interval of pulling updates from cores." )
     public static final Setting<Duration> pull_interval = setting( "causal_clustering.pull_interval", DURATION, "1s" );
 
-    @Description( "The catch up protocol times out if the given duration elapses with not network activity. " +
+    @Description( "The catch up protocol times out if the given duration elapses with no network activity. " +
             "Every message received by the client from the server extends the time out duration." )
     public static final Setting<Duration> catch_up_client_inactivity_timeout =
             setting( "causal_clustering.catch_up_client_inactivity_timeout", DURATION, "20s" );

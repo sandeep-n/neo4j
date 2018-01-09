@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,7 +21,7 @@ import org.neo4j.cypher.internal.frontend.v3_4.ast._
 import org.neo4j.cypher.internal.frontend.v3_4.phases.CompilationPhaseTracer.CompilationPhase
 import org.neo4j.cypher.internal.frontend.v3_4.phases.{BaseContext, BaseState, Condition, Phase}
 import org.neo4j.cypher.internal.frontend.v3_4.semantics.{Scope, SemanticTable, SymbolUse}
-import org.neo4j.cypher.internal.v3_4.expressions.{ProcedureOutput, Variable}
+import org.neo4j.cypher.internal.v3_4.expressions.{LogicalVariable, ProcedureOutput, Variable}
 
 object Namespacer extends Phase[BaseContext, BaseState, BaseState] {
   type VariableRenamings = Map[Ref[Variable], Variable]
@@ -38,10 +38,11 @@ object Namespacer extends Phase[BaseContext, BaseState, BaseState] {
     val protectedVariables = returnAliases(from.statement())
     val renamings = variableRenamings(from.statement(), variableDefinitions, ambiguousNames, protectedVariables)
 
-    val newStatement = from.statement().endoRewrite(statementRewriter(renamings))
+    val rewriter = renamingRewriter(renamings)
+    val newStatement = from.statement().endoRewrite(rewriter)
     val table = SemanticTable(types = from.semantics().typeTable, recordedScopes = from.semantics().recordedScopes)
 
-    val newSemanticTable: SemanticTable = tableRewriter(renamings)(table)
+    val newSemanticTable = table.replaceExpressions(rewriter)
     from.withStatement(newStatement).withSemanticTable(newSemanticTable)
   }
 
@@ -55,8 +56,8 @@ object Namespacer extends Phase[BaseContext, BaseState, BaseState] {
     }.toSet
   }
 
-  private def returnAliases(statement: Statement): Set[Ref[Variable]] =
-    statement.treeFold(Set.empty[Ref[Variable]]) {
+  private def returnAliases(statement: Statement): Set[Ref[LogicalVariable]] =
+    statement.treeFold(Set.empty[Ref[LogicalVariable]]) {
 
       case With(_, _, GraphReturnItems(_, items), _, _, _, _) =>
         val gVars = extractGraphVars(items)
@@ -64,12 +65,12 @@ object Namespacer extends Phase[BaseContext, BaseState, BaseState] {
 
       // ignore variable in StartItem that represents index names and key names
       case Return(_, ReturnItems(_, items), graphItems, _, _, _, _) =>
-        val variables = items.map(_.alias.map(Ref[Variable]).get)
+        val variables = items.map(_.alias.map(Ref[LogicalVariable]).get)
         val gVars = graphItems.map(_.items).map(extractGraphVars).getOrElse(Seq.empty)
         acc => (acc ++ variables ++ gVars, Some(identity))
     }
 
-  private def extractGraphVars(items: Seq[GraphReturnItem]): Seq[Ref[Variable]] = {
+  private def extractGraphVars(items: Seq[GraphReturnItem]): Seq[Ref[LogicalVariable]] = {
     items.flatMap { item =>
       item.graphs.flatMap {
         case g: GraphAs =>
@@ -81,7 +82,7 @@ object Namespacer extends Phase[BaseContext, BaseState, BaseState] {
   }
 
   private def variableRenamings(statement: Statement, variableDefinitions: Map[SymbolUse, SymbolUse],
-                                ambiguousNames: Set[String], protectedVariables: Set[Ref[Variable]]): VariableRenamings =
+                                ambiguousNames: Set[String], protectedVariables: Set[Ref[LogicalVariable]]): VariableRenamings =
     statement.treeFold(Map.empty[Ref[Variable], Variable]) {
       case i: Variable if ambiguousNames(i.name) && !protectedVariables(Ref(i)) =>
         val symbolDefinition = variableDefinitions(SymbolUse(i))
@@ -90,7 +91,7 @@ object Namespacer extends Phase[BaseContext, BaseState, BaseState] {
         acc => (acc + renaming, Some(identity))
     }
 
-  private def statementRewriter(renamings: VariableRenamings): Rewriter = inSequence(
+  private def renamingRewriter(renamings: VariableRenamings): Rewriter = inSequence(
     bottomUp(Rewriter.lift {
       case item@ProcedureResultItem(None, v: Variable) if renamings.contains(Ref(v)) =>
         item.copy(output = Some(ProcedureOutput(v.name)(v.position)))(item.position)
@@ -102,11 +103,5 @@ object Namespacer extends Phase[BaseContext, BaseState, BaseState] {
           case None              => v
         }
     }))
-
-  private def tableRewriter(renamings: VariableRenamings)(semanticTable: SemanticTable) = {
-    val replacements = renamings.toIndexedSeq.collect { case (old, newVariable) => old.value -> newVariable }
-    val newSemanticTable = semanticTable.replaceVariables(replacements: _*)
-    newSemanticTable
-  }
 
 }

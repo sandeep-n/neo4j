@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,13 +25,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.neo4j.internal.kernel.api.InternalIndexState;
+import org.neo4j.internal.kernel.api.schema.LabelSchemaDescriptor;
 import org.neo4j.kernel.api.ReadOperations;
 import org.neo4j.kernel.api.exceptions.ProcedureException;
 import org.neo4j.kernel.api.exceptions.Status;
 import org.neo4j.kernel.api.exceptions.index.IndexNotFoundKernelException;
 import org.neo4j.kernel.api.exceptions.schema.SchemaRuleNotFoundException;
-import org.neo4j.kernel.api.index.InternalIndexState;
-import org.neo4j.kernel.api.schema.LabelSchemaDescriptor;
 import org.neo4j.kernel.api.schema.SchemaDescriptorFactory;
 import org.neo4j.kernel.api.schema.index.IndexDescriptor;
 import org.neo4j.kernel.api.schema.index.IndexDescriptorFactory;
@@ -42,14 +42,13 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyObject;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.neo4j.kernel.api.index.InternalIndexState.FAILED;
-import static org.neo4j.kernel.api.index.InternalIndexState.ONLINE;
-import static org.neo4j.kernel.api.index.InternalIndexState.POPULATING;
+import static org.neo4j.internal.kernel.api.InternalIndexState.FAILED;
+import static org.neo4j.internal.kernel.api.InternalIndexState.ONLINE;
+import static org.neo4j.internal.kernel.api.InternalIndexState.POPULATING;
 import static org.neo4j.storageengine.api.schema.SchemaRule.Kind.INDEX_RULE;
 import static org.neo4j.test.assertion.Assert.assertEventually;
 
@@ -101,7 +100,7 @@ public class AwaitIndexProcedureTest
     {
         when( operations.labelGetForName( anyString() ) ).thenReturn( descriptor.getLabelId() );
         when( operations.propertyKeyGetForName( anyString() ) ).thenReturn( descriptor.getPropertyId() );
-        when( operations.indexGetForSchema( anyObject() ) ).thenReturn( anyIndex );
+        when( operations.indexGetForSchema( any() ) ).thenReturn( anyIndex );
         when( operations.indexGetState( any( IndexDescriptor.class ) ) ).thenReturn( ONLINE );
 
         procedure.awaitIndex( ":Person(name)", TIMEOUT, TIME_UNIT );
@@ -116,7 +115,7 @@ public class AwaitIndexProcedureTest
     {
         when( operations.labelGetForName( anyString() ) ).thenReturn( 0 );
         when( operations.propertyKeyGetForName( anyString() ) ).thenReturn( 0 );
-        when( operations.indexGetForSchema( anyObject() ) ).thenReturn( anyIndex );
+        when( operations.indexGetForSchema( any() ) ).thenReturn( anyIndex );
         when( operations.indexGetState( any( IndexDescriptor.class ) ) ).thenReturn( FAILED );
 
         try
@@ -157,7 +156,7 @@ public class AwaitIndexProcedureTest
     {
         when( operations.labelGetForName( anyString() ) ).thenReturn( 0 );
         when( operations.propertyKeyGetForName( anyString() ) ).thenReturn( 0 );
-        when( operations.indexGetForSchema( anyObject() ) ).thenReturn( anyIndex );
+        when( operations.indexGetForSchema( any() ) ).thenReturn( anyIndex );
 
         AtomicReference<InternalIndexState> state = new AtomicReference<>( POPULATING );
         when( operations.indexGetState( any( IndexDescriptor.class ) ) ).then( invocationOnMock -> state.get() );
@@ -167,7 +166,7 @@ public class AwaitIndexProcedureTest
         {
             try
             {
-                procedure.awaitIndex( ":Person(name)", TIMEOUT, TimeUnit.MILLISECONDS );
+                procedure.awaitIndex( ":Person(name)", TIMEOUT, TIME_UNIT );
             }
             catch ( ProcedureException e )
             {
@@ -180,7 +179,7 @@ public class AwaitIndexProcedureTest
 
         state.set( ONLINE );
         assertEventually( "Procedure did not return after index was online",
-                done::get, is( true ), TIMEOUT, TimeUnit.SECONDS );
+                done::get, is( true ), TIMEOUT, TIME_UNIT );
     }
 
     @Test
@@ -189,7 +188,7 @@ public class AwaitIndexProcedureTest
     {
         when( operations.labelGetForName( anyString() ) ).thenReturn( 0 );
         when( operations.propertyKeyGetForName( anyString() ) ).thenReturn( 0 );
-        when( operations.indexGetForSchema( anyObject() ) ).thenReturn( anyIndex );
+        when( operations.indexGetForSchema( any() ) ).thenReturn( anyIndex );
         when( operations.indexGetState( any( IndexDescriptor.class ) ) ).thenReturn( POPULATING );
 
         AtomicReference<ProcedureException> exception = new AtomicReference<>();
@@ -197,7 +196,8 @@ public class AwaitIndexProcedureTest
         {
             try
             {
-                procedure.awaitIndex( ":Person(name)", TIMEOUT, TimeUnit.MILLISECONDS );
+                // We wait here, because we expect timeout
+                procedure.awaitIndex( ":Person(name)", 0, TIME_UNIT );
             }
             catch ( ProcedureException e )
             {

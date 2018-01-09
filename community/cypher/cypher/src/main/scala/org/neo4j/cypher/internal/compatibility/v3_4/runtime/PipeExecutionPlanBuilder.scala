@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -76,7 +76,7 @@ class PipeExecutionPlanBuilder(clock: Clock,
     val pipeBuilder = pipeBuilderFactory(
       monitors = monitors,
       recurse = p => buildPipe(p),
-      readOnly = plan.solved.all(_.queryGraph.readOnly),
+      readOnly = plan.solved.readOnly,
       expressionConverters = expressionConverters)
 
     val planStack = new mutable.Stack[LogicalPlan]()

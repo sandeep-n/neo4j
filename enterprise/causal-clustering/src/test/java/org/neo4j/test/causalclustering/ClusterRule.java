@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -29,8 +29,8 @@ import java.util.Map;
 import java.util.function.IntFunction;
 
 import org.neo4j.causalclustering.discovery.Cluster;
-import org.neo4j.causalclustering.discovery.IpFamily;
 import org.neo4j.causalclustering.discovery.DiscoveryServiceFactory;
+import org.neo4j.causalclustering.discovery.IpFamily;
 import org.neo4j.causalclustering.discovery.SharedDiscoveryService;
 import org.neo4j.graphdb.config.Setting;
 import org.neo4j.kernel.impl.store.format.standard.Standard;
@@ -56,9 +56,9 @@ public class ClusterRule extends ExternalResource
     private IpFamily ipFamily = IPV4;
     private boolean useWildcard;
 
-    public ClusterRule( Class<?> testClass )
+    public ClusterRule()
     {
-        this.testDirectory = TestDirectory.testDirectory( testClass );
+        this.testDirectory = TestDirectory.testDirectory();
     }
 
     @Override
@@ -88,14 +88,7 @@ public class ClusterRule extends ExternalResource
     {
         if ( cluster != null )
         {
-            try
-            {
-                cluster.shutdown();
-            }
-            catch ( Throwable e )
-            {
-                throw new RuntimeException( e );
-            }
+            cluster.shutdown();
         }
     }
 

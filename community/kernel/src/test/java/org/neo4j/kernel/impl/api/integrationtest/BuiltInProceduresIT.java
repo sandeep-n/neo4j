@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -31,21 +31,21 @@ import java.util.Set;
 import org.neo4j.collection.RawIterator;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.helpers.collection.MapUtil;
+import org.neo4j.internal.kernel.api.security.SecurityContext;
 import org.neo4j.kernel.api.Statement;
 import org.neo4j.kernel.api.TokenWriteOperations;
 import org.neo4j.kernel.api.exceptions.ProcedureException;
 import org.neo4j.kernel.api.security.AnonymousContext;
-import org.neo4j.kernel.api.security.SecurityContext;
 import org.neo4j.kernel.impl.api.index.inmemory.InMemoryIndexProviderFactory;
 import org.neo4j.kernel.internal.Version;
 
 import static java.util.Collections.singletonList;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static junit.framework.TestCase.fail;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.core.IsEqual.equalTo;
+import static org.junit.Assert.fail;
 import static org.neo4j.helpers.collection.Iterators.asList;
 import static org.neo4j.kernel.api.proc.ProcedureSignature.procedureName;
 import static org.neo4j.kernel.api.schema.SchemaDescriptorFactory.forLabel;
@@ -214,11 +214,11 @@ public class BuiltInProceduresIT extends KernelIntegrationTest
                         "(type :: STRING?, name :: STRING?, config :: MAP?)",
                         "Remove an explicit index - YIELD type,name,config"} ),
                 equalTo( new Object[]{ "db.index.explicit.forNodes",
-                        "db.index.explicit.forNodes(indexName :: STRING?) :: " +
+                        "db.index.explicit.forNodes(indexName :: STRING?, config = {} :: MAP?) :: " +
                         "(type :: STRING?, name :: STRING?, config :: MAP?)",
                         "Get or create a node explicit index - YIELD type,name,config"} ),
                 equalTo( new Object[]{ "db.index.explicit.forRelationships",
-                        "db.index.explicit.forRelationships(indexName :: STRING?) :: " +
+                        "db.index.explicit.forRelationships(indexName :: STRING?, config = {} :: MAP?) :: " +
                         "(type :: STRING?, name :: STRING?, config :: MAP?)",
                         "Get or create a relationship explicit index - YIELD type,name,config"} ),
                 equalTo( new Object[]{ "db.index.explicit.existsForNodes",

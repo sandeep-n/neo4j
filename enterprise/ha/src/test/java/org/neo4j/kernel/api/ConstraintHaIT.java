@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -38,10 +38,10 @@ import org.neo4j.graphdb.schema.ConstraintType;
 import org.neo4j.graphdb.schema.IndexDefinition;
 import org.neo4j.helpers.Exceptions;
 import org.neo4j.helpers.collection.Iterables;
+import org.neo4j.internal.kernel.api.exceptions.InvalidTransactionTypeKernelException;
 import org.neo4j.kernel.api.ConstraintHaIT.NodePropertyExistenceConstraintHaIT;
 import org.neo4j.kernel.api.ConstraintHaIT.RelationshipPropertyExistenceConstraintHaIT;
 import org.neo4j.kernel.api.ConstraintHaIT.UniquenessConstraintHaIT;
-import org.neo4j.kernel.api.exceptions.InvalidTransactionTypeKernelException;
 import org.neo4j.kernel.ha.HaSettings;
 import org.neo4j.kernel.ha.HighlyAvailableGraphDatabase;
 import org.neo4j.kernel.impl.coreapi.schema.NodePropertyExistenceConstraintDefinition;
@@ -212,7 +212,7 @@ public class ConstraintHaIT
     public abstract static class AbstractConstraintHaIT
     {
         @Rule
-        public ClusterRule clusterRule = new ClusterRule( getClass() )
+        public ClusterRule clusterRule = new ClusterRule()
                 .withSharedSetting( HaSettings.read_timeout, "4000s" );
 
         private static final String TYPE = "Type";

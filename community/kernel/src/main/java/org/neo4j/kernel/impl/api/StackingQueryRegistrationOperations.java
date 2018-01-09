@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -73,7 +73,7 @@ public class StackingQueryRegistrationOperations implements QueryRegistrationOpe
         String threadName = thread.getName();
         ExecutingQuery executingQuery =
                 new ExecutingQuery( queryId, clientConnection, statement.username(), queryText, queryParameters,
-                        statement.getTransaction().getMetaData(), statement.locks()::activeLockCount,
+                        statement.getTransaction().getMetaData(), () -> statement.locks().activeLockCount(),
                         statement.getPageCursorTracer(),
                         threadId, threadName, clock, cpuClock, heapAllocation );
         registerExecutingQuery( statement, executingQuery );

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -26,6 +26,7 @@ import org.neo4j.unsafe.impl.batchimport.cache.ByteArray;
 import org.neo4j.unsafe.impl.batchimport.staging.BatchFeedStep;
 import org.neo4j.unsafe.impl.batchimport.staging.ReadRecordsStep;
 import org.neo4j.unsafe.impl.batchimport.staging.Stage;
+import org.neo4j.unsafe.impl.batchimport.store.StorePrepareIdSequence;
 
 import static org.neo4j.unsafe.impl.batchimport.RecordIdIterator.allIn;
 
@@ -35,13 +36,15 @@ import static org.neo4j.unsafe.impl.batchimport.RecordIdIterator.allIn;
  */
 public class NodeFirstGroupStage extends Stage
 {
+    public static final String NAME = "Node --> Group";
+
     public NodeFirstGroupStage( Configuration config, RecordStore<RelationshipGroupRecord> groupStore,
             RecordStore<NodeRecord> nodeStore, ByteArray cache )
     {
-        super( "Node --> Group", config );
+        super( NAME, null, config, 0 );
         add( new BatchFeedStep( control(), config, allIn( groupStore, config ), groupStore.getRecordSize() ) );
         add( new ReadRecordsStep<>( control(), config, true, groupStore, null ) );
         add( new NodeSetFirstGroupStep( control(), config, nodeStore, cache ) );
-        add( new UpdateRecordsStep<>( control(), config, nodeStore ) );
+        add( new UpdateRecordsStep<>( control(), config, nodeStore, new StorePrepareIdSequence() ) );
     }
 }

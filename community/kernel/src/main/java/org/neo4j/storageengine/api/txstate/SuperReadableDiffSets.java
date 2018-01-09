@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,20 +25,22 @@ import java.util.function.Predicate;
 
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
-import org.neo4j.kernel.api.exceptions.schema.ConstraintValidationException;
+import org.neo4j.internal.kernel.api.exceptions.schema.ConstraintValidationException;
 import org.neo4j.kernel.api.exceptions.schema.CreateConstraintFailureException;
 
 /**
  * Super class of diff sets where use of {@link PrimitiveLongIterator} can be parameterized
  * to a specific subclass instead.
  */
-public interface SuperReadableDiffSets<T,LONGITERATOR extends PrimitiveLongIterator>
+public interface SuperReadableDiffSets<T,LONGITERATOR_OUT extends PrimitiveLongIterator, LONGITERATOR_IN extends PrimitiveLongIterator>
 {
     boolean isAdded( T elem );
 
     boolean isRemoved( T elem );
 
     Set<T> getAdded();
+
+    Set<T> getAddedSnapshot();
 
     Set<T> getRemoved();
 
@@ -48,13 +50,13 @@ public interface SuperReadableDiffSets<T,LONGITERATOR extends PrimitiveLongItera
 
     int delta();
 
-    LONGITERATOR augment( LONGITERATOR source );
+    LONGITERATOR_OUT augment( LONGITERATOR_IN source );
 
     PrimitiveIntIterator augment( PrimitiveIntIterator source );
 
-    LONGITERATOR augmentWithRemovals( LONGITERATOR source );
+    LONGITERATOR_OUT augmentWithRemovals( LONGITERATOR_IN source );
 
-    SuperReadableDiffSets<T,LONGITERATOR> filterAdded( Predicate<T> addedFilter );
+    SuperReadableDiffSets<T,LONGITERATOR_OUT, LONGITERATOR_IN> filterAdded( Predicate<T> addedFilter );
 
     void accept( DiffSetsVisitor<T> visitor ) throws ConstraintValidationException, CreateConstraintFailureException;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -68,3 +68,5 @@ case class DeprecatedVarLengthBindingNotification(position: InputPosition, varia
 case class DeprecatedRelTypeSeparatorNotification(position: InputPosition) extends InternalNotification
 
 case object DeprecatedPlannerNotification extends InternalNotification
+
+case class ExperimentalFeatureNotification(msg: String) extends InternalNotification

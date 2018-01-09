@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -47,12 +47,15 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.FileStore;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
+import java.nio.file.NotDirectoryException;
 import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.stream.Stream;
 
 import static java.nio.file.StandardOpenOption.APPEND;
 import static java.nio.file.StandardOpenOption.CREATE;
@@ -190,6 +193,30 @@ public class FileUtils
         return target;
     }
 
+    /**
+     * Utility method that copy a file from its current location to the
+     * provided target directory.
+     *
+     * @param file file that needs to be copied.
+     * @param targetDirectory the destination directory
+     * @throws IOException
+     */
+    public static void copyFileToDirectory( File file, File targetDirectory ) throws IOException
+    {
+        if ( !targetDirectory.exists() )
+        {
+            Files.createDirectories( targetDirectory.toPath() );
+        }
+        if ( !targetDirectory.isDirectory() )
+        {
+            throw new IllegalArgumentException(
+                    "Move target must be a directory, not " + targetDirectory );
+        }
+
+        File target = new File( targetDirectory, file.getName() );
+        copyFile( file, target );
+    }
+
     public static void renameFile( File srcFile, File renameToFile, CopyOption... copyOptions ) throws IOException
     {
         Files.move( srcFile.toPath(), renameToFile.toPath(), copyOptions );
@@ -264,22 +291,7 @@ public class FileUtils
     {
         //noinspection ResultOfMethodCallIgnored
         dstFile.getParentFile().mkdirs();
-        try ( FileInputStream input = new FileInputStream( srcFile );
-              FileOutputStream output = new FileOutputStream( dstFile ) )
-        {
-            int bufferSize = 1024;
-            byte[] buffer = new byte[bufferSize];
-            int bytesRead;
-            while ( (bytesRead = input.read( buffer )) != -1 )
-            {
-                output.write( buffer, 0, bytesRead );
-            }
-        }
-        catch ( IOException e )
-        {
-            // Because the message from this cause may not mention which file it's about
-            throw new IOException( "Could not copy '" + srcFile + "' to '" + dstFile + "'", e );
-        }
+        Files.copy( srcFile.toPath(), dstFile.toPath(), StandardCopyOption.REPLACE_EXISTING );
     }
 
     public static void copyRecursively( File fromDirectory, File toDirectory ) throws IOException
@@ -482,6 +494,22 @@ public class FileUtils
         }
 
         return toDir.resolve( fromDir.relativize( fileToMove ) );
+    }
+
+    /**
+     * Count the number of files and directories, contained in the given {@link Path}, which must be a directory.
+     * @param dir The directory whose contents to count.
+     * @return The number of files and directories in the given directory.
+     * @throws NotDirectoryException If the given {@link Path} is not a directory. This exception is an optionally
+     * specific exception. {@link IOException} might be thrown instead.
+     * @throws IOException If the given directory could not be opened for some reason.
+     */
+    public static long countFilesInDirectoryPath( Path dir ) throws IOException
+    {
+        try ( Stream<Path> listing = Files.list( dir ) )
+        {
+            return listing.count();
+        }
     }
 
     public interface FileOperation

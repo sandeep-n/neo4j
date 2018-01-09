@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -27,6 +27,8 @@ import java.util.concurrent.ThreadLocalRandom;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.neo4j.values.storable.NumberValues.hash;
+import static org.neo4j.values.utils.AnyValueTestUtil.assertIncomparable;
+import static org.neo4j.values.virtual.VirtualValueTestUtil.toAnyValue;
 
 public class NumberValuesTest
 {
@@ -42,6 +44,14 @@ public class NumberValuesTest
     {
         assertThat( hash( Double.NEGATIVE_INFINITY ), equalTo( hash( Float.NEGATIVE_INFINITY ) ) );
         assertThat( hash( Double.POSITIVE_INFINITY ), equalTo( hash( Float.POSITIVE_INFINITY ) ) );
+    }
+
+    @Test
+    public void shouldHandleNaNCorrectly()
+    {
+        assertIncomparable( toAnyValue(Double.NaN), toAnyValue( Double.NaN ) );
+        assertIncomparable( toAnyValue( 1 ), toAnyValue( Double.NaN ) );
+        assertIncomparable( toAnyValue( Double.NaN ), toAnyValue( 1 ) );
     }
 
     @Test

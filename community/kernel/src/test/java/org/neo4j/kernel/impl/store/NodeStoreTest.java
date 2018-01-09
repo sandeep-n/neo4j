@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -32,7 +32,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.function.Supplier;
+import java.util.function.LongSupplier;
 import java.util.stream.LongStream;
 
 import org.neo4j.collection.primitive.Primitive;
@@ -276,7 +276,7 @@ public class NodeStoreTest
                 return new DelegatingStoreChannel( super.open( fileName, openMode ) )
                 {
                     @Override
-                    public int read( ByteBuffer dst ) throws IOException
+                    public void readAll( ByteBuffer dst ) throws IOException
                     {
                         fired.setValue( true );
                         throw new IOException( "Proving a point here" );
@@ -376,7 +376,7 @@ public class NodeStoreTest
         {
             @Override
             protected IdGenerator instantiate( FileSystemAbstraction fs, File fileName, int grabSize, long maxValue,
-                    boolean aggressiveReuse, IdType idType, Supplier<Long> highId )
+                    boolean aggressiveReuse, IdType idType, LongSupplier highId )
             {
                 return spy( super.instantiate( fs, fileName, grabSize, maxValue, aggressiveReuse, idType, highId ) );
             }
